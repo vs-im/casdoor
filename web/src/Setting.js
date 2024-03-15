@@ -430,7 +430,7 @@ export function getCountryImage(country) {
 export function initServerUrl() {
   // const hostname = window.location.hostname;
   // if (hostname === "localhost") {
-  //   ServerUrl = `http://${hostname}:8000`;
+  //   ServerUrl = `http://${hostname}:7777`;
   // }
 }
 
@@ -442,7 +442,7 @@ export function isLocalhost() {
 export function getFullServerUrl() {
   let fullServerUrl = window.location.origin;
   if (fullServerUrl === "http://localhost:7001") {
-    fullServerUrl = "http://localhost:8000";
+    fullServerUrl = "http://localhost:7777";
   }
   return fullServerUrl;
 }

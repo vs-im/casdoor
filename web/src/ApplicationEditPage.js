@@ -912,12 +912,12 @@ class ApplicationEditPage extends React.Component {
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
           </Col>
-          <Button style={{marginLeft: "10px", marginBottom: "5px"}} onClick={() => this.updateApplicationField("footerHtml", Setting.getDefaultFooterContent())} >
+          {/* <Button style={{marginLeft: "10px", marginBottom: "5px"}} onClick={() => this.updateApplicationField("footerHtml", Setting.getDefaultFooterContent())} >
             {i18next.t("provider:Reset to Default HTML")}
-          </Button>
-          <Button style={{marginLeft: "10px", marginBottom: "5px"}} onClick={() => this.updateApplicationField("footerHtml", Setting.getEmptyFooterContent())} >
+          </Button> */}
+          {/* <Button style={{marginLeft: "10px", marginBottom: "5px"}} onClick={() => this.updateApplicationField("footerHtml", Setting.getEmptyFooterContent())} >
             {i18next.t("application:Reset to Empty")}
-          </Button>
+          </Button> */}
         </Row>
         {
           <React.Fragment>

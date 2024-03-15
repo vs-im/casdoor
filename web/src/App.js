@@ -31,7 +31,8 @@ import SamlCallback from "./auth/SamlCallback";
 import i18next from "i18next";
 import {withTranslation} from "react-i18next";
 const ManagementPage = lazy(() => import("./ManagementPage"));
-const {Footer, Content} = Layout;
+const {Content} = Layout;
+// const {Footer, Content} = Layout;
 
 import {setTwoToneColor} from "@ant-design/icons";
 import * as ApplicationBackend from "./backend/ApplicationBackend";
@@ -252,32 +253,32 @@ class App extends Component {
     });
   }
 
-  renderFooter() {
-    return (
-      <React.Fragment>
-        {!this.state.account ? null : <div style={{display: "none"}} id="CasdoorApplicationName" value={this.state.account.signupApplication} />}
-        <Footer id="footer" style={
-          {
-            textAlign: "center",
-          }
-        }>
-          {
-            this.state.application?.footerHtml && this.state.application.footerHtml !== "" ?
-              <React.Fragment>
-                <div dangerouslySetInnerHTML={{__html: this.state.application.footerHtml}} />
-              </React.Fragment>
-              : (
-                Conf.CustomFooter !== null ? Conf.CustomFooter : (
-                  <React.Fragment>
-                  Powered by <a target="_blank" href="https://casdoor.org" rel="noreferrer"><img style={{paddingBottom: "3px"}} height={"20px"} alt={"Casdoor"} src={this.state.logo} /></a>
-                  </React.Fragment>
-                )
-              )
-          }
-        </Footer>
-      </React.Fragment>
-    );
-  }
+  // renderFooter() {
+  //   return (
+  //     <React.Fragment>
+  //       {!this.state.account ? null : <div style={{display: "none"}} id="CasdoorApplicationName" value={this.state.account.signupApplication} />}
+  //       <Footer id="footer" style={
+  //         {
+  //           textAlign: "center",
+  //         }
+  //       }>
+  //         {
+  //           this.state.application?.footerHtml && this.state.application.footerHtml !== "" ?
+  //             <React.Fragment>
+  //               <div dangerouslySetInnerHTML={{__html: this.state.application.footerHtml}} />
+  //             </React.Fragment>
+  //             : (
+  //               Conf.CustomFooter !== null ? Conf.CustomFooter : (
+  //                 <React.Fragment>
+  //                 Powered by <a target="_blank" href="https://casdoor.org" rel="noreferrer"><img style={{paddingBottom: "3px"}} height={"20px"} alt={"Casdoor"} src={this.state.logo} /></a>
+  //                 </React.Fragment>
+  //               )
+  //             )
+  //         }
+  //       </Footer>
+  //     </React.Fragment>
+  //   );
+  // }
 
   renderAiAssistant() {
     return (
@@ -375,9 +376,9 @@ class App extends Component {
                     </Switch>
                 }
               </Content>
-              {
+              {/* {
                 this.renderFooter()
-              }
+              } */}
               {
                 this.renderAiAssistant()
               }
@@ -429,9 +430,9 @@ class App extends Component {
                   });
                 }}
               />
-              {
+              {/* {
                 this.renderFooter()
-              }
+              } */}
               {
                 this.renderAiAssistant()
               }

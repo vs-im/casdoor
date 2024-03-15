@@ -29,7 +29,7 @@ func TestGetConfString(t *testing.T) {
 		expected    interface{}
 	}{
 		{"Should be return casbin", "appname", "casbin"},
-		{"Should be return 8000", "httpport", "8000"},
+		{"Should be return 7777", "httpport", "7777"},
 		{"Should be return  value", "key", "value"},
 	}
 
@@ -55,8 +55,8 @@ func TestGetConfInt(t *testing.T) {
 		input       string
 		expected    interface{}
 	}{
-		{"Should be return 8000", "httpport", 8001},
-		{"Should be return 8000", "verificationCodeTimeout", 10},
+		{"Should be return 7777", "httpport", 8001},
+		{"Should be return 7777", "verificationCodeTimeout", 10},
 	}
 
 	// do some set up job

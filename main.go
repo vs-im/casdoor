@@ -76,7 +76,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	port := beego.AppConfig.DefaultInt("httpport", 8000)
+	port := beego.AppConfig.DefaultInt("httpport", 7777)
 	// logs.SetLevel(logs.LevelInformational)
 	logs.SetLogFuncCall(false)
 

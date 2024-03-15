@@ -68,15 +68,15 @@ func getOriginFromHostInternal(host string) (string, string) {
 	// "door.casdoor.com"
 	protocol := "https://"
 	if !strings.Contains(host, ".") {
-		// "localhost:8000" or "computer-name:80"
+		// "localhost:7777" or "computer-name:80"
 		protocol = "http://"
 	} else if isIpAddress(host) {
 		// "192.168.0.10"
 		protocol = "http://"
 	}
 
-	if host == "localhost:8000" {
-		return fmt.Sprintf("%s%s", protocol, "localhost:7001"), fmt.Sprintf("%s%s", protocol, "localhost:8000")
+	if host == "localhost:7777" {
+		return fmt.Sprintf("%s%s", protocol, "localhost:7001"), fmt.Sprintf("%s%s", protocol, "localhost:7777")
 	} else {
 		return fmt.Sprintf("%s%s", protocol, host), fmt.Sprintf("%s%s", protocol, host)
 	}

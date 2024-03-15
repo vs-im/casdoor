@@ -12,7 +12,7 @@ spec:
   #EDIT IT: if you don't want to run casdoor in default namespace, please modify this filed
   type: NodePort
   ports:
-    - port: 8000
+    - port: 7777
   selector:
     app: casdoor
 ---
@@ -40,7 +40,7 @@ spec:
           image: casbin/casdoor:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 8000
+            - containerPort: 7777
           volumeMounts:
             # the mounted directory path in THE CONTAINER
             - mountPath: /conf
