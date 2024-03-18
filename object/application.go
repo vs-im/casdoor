@@ -311,6 +311,9 @@ func extendApplicationWithSigninMethods(application *Application) (err error) {
 			signinMethod := &SigninMethod{Name: "WebAuthn", DisplayName: "WebAuthn", Rule: "None"}
 			application.SigninMethods = append(application.SigninMethods, signinMethod)
 		}
+
+		signinMethod := &SigninMethod{Name: "Face ID", DisplayName: "Face ID", Rule: "None"}
+		application.SigninMethods = append(application.SigninMethods, signinMethod)
 	}
 
 	if len(application.SigninMethods) == 0 {
@@ -750,6 +753,17 @@ func (application *Application) IsLdapEnabled() bool {
 	if len(application.SigninMethods) > 0 {
 		for _, signinMethod := range application.SigninMethods {
 			if signinMethod.Name == "LDAP" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (application *Application) IsFaceIdEnabled() bool {
+	if len(application.SigninMethods) > 0 {
+		for _, signinMethod := range application.SigninMethods {
+			if signinMethod.Name == "Face ID" {
 				return true
 			}
 		}
