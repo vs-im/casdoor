@@ -350,6 +350,9 @@ class App extends Component {
       return (
         <ConfigProvider theme={{
           algorithm: Setting.getAlgorithm(["default"]),
+          token: {
+            marginLG: 4,
+          },
         }}>
           <StyleProvider hashPriority="high" transformers={[legacyLogicalPropertiesTransformer]}>
             <Layout id="parent-area">

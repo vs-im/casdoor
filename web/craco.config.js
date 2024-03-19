@@ -1,4 +1,5 @@
 const CracoLessPlugin = require("craco-less");
+const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 
 module.exports = {
   devServer: {
@@ -54,6 +55,9 @@ module.exports = {
       },
     },
   ],
+  optimization: {
+    minimizer: [new UglifyJsPlugin()],
+  },
   webpack: {
     configure: {
       // ignore webpack warnings by source-map-loader 

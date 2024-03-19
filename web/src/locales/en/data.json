@@ -1,5 +1,6 @@
 {
   "account": {
+    "or": "or",
     "Logout": "Logout",
     "My Account": "My Account",
     "Sign Up": "Sign Up"
@@ -475,7 +476,7 @@
     "Login button": "Login button",
     "MetaMask plugin not detected": "MetaMask plugin not detected",
     "Model loading failure": "Model loading failure",
-    "No account?": "No account?",
+    "No account?": "Don't have an account?",
     "Or sign in with another account": "Or sign in with another account",
     "Phone": "Phone",
     "Please ensure sufficient lighting and align your face in the center of the recognition box": "Please ensure sufficient lighting and align your face in the center of the recognition box",

@@ -75,7 +75,7 @@ function initDefaultValue(application) {
   return isAgreementRequired(application) && agreementItem.rule === "Signin (Default True)";
 }
 
-export function renderAgreementFormItem(application, required, layout, ths) {
+export function renderAgreementFormItem(application, required, layout, ths, float = "left") {
   return (<React.Fragment>
     <Form.Item
       name="agreement"
@@ -104,7 +104,7 @@ export function renderAgreementFormItem(application, required, layout, ths) {
       {...layout}
       initialValue={initDefaultValue(application)}
     >
-      <Checkbox style={{float: "left"}}>
+      <Checkbox style={{float}}>
         {i18next.t("signup:Accept")}&nbsp;
         <a onClick={() => {
           ths.setState({

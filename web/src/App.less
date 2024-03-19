@@ -94,7 +94,7 @@ img {
   border: 2px solid #fff;
   border-radius: 7px;
   background-color: rgb(255 255 255);
-  box-shadow: 0 0 20px rgb(0 0 0 / 20%);
+  box-shadow: 0 0 5px rgb(0 0 0 / 15%);
 }
 
 .login-panel {
@@ -108,6 +108,19 @@ img {
 .login-form {
   text-align: center;
   padding: 30px;
+  width: 100vw;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ant-form-large .ant-form-item .ant-form-item-label > label {
+  height: auto !important;
+}
+
+.ant-form-item-label {
+  padding: 0 !important;
 }
 
 .login-content {

@@ -28,6 +28,8 @@ import moment from "moment";
 
 const {Option} = Select;
 
+let themeDataCached = null;
+
 export const ServerUrl = "";
 
 export const StaticBaseUrl = "https://cdn.casbin.org";
@@ -60,11 +62,13 @@ export const Countries = [
 
 export function getThemeData(organization, application) {
   if (application?.themeData?.isEnabled) {
+    themeDataCached = application.themeData;
     return application.themeData;
   } else if (organization?.themeData?.isEnabled) {
+    themeDataCached = application.themeData;
     return organization.themeData;
   } else {
-    return Conf.ThemeDefault;
+    return themeDataCached || Conf.ThemeDefault;
   }
 }
 

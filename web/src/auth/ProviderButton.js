@@ -43,59 +43,84 @@ import DouyinLoginButton from "./DouyinLoginButton";
 import LoginButton from "./LoginButton";
 import * as AuthBackend from "./AuthBackend";
 import {WechatOfficialAccountModal} from "./Util";
+import * as Setting from "../Setting";
+import * as Conf from "../Conf";
 
-function getSigninButton(provider) {
-  const text = i18next.t("login:Sign in with {type}").replace("{type}", provider.displayName !== "" ? provider.displayName : provider.type);
+const style = {
+  display: "flex",
+  justifyContent: "center",
+  width: "100%",
+  margin: "5px 0",
+  borderRadius: Conf.ThemeDefault.borderRadius,
+  boxShadow: "none",
+  fontSize: "1rem",
+  border: "0.5px solid rgb(191, 191, 191)",
+};
+
+function getSigninButton(provider, action = "signIn") {
+  const data = Setting.getThemeData();
+  style.borderRadius = data.borderRadius;
+  let text = "";
+  if (action === "signUp") {
+    text = i18next.t("login:Sign up with {type}").replace("{type}", provider.displayName !== "" ? provider.displayName : provider.type);
+    if (!text) {
+      // eslint-disable-next-line
+      console.log("getSigninButton missing translation:", {0: "login:Sign up with {type}"});
+    }
+  }
+  if (action === "signIn" || !text) {
+    text = i18next.t("login:Sign in with {type}").replace("{type}", provider.displayName !== "" ? provider.displayName : provider.type);
+  }
   if (provider.type === "GitHub") {
-    return <GithubLoginButton text={text} align={"center"} />;
+    return <GithubLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Google") {
-    return <GoogleLoginButton text={text} align={"center"} />;
+    return <GoogleLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "QQ") {
-    return <QqLoginButton text={text} align={"center"} />;
+    return <QqLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Facebook") {
-    return <FacebookLoginButton text={text} align={"center"} />;
+    return <FacebookLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Weibo") {
-    return <WeiboLoginButton text={text} align={"center"} />;
+    return <WeiboLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Gitee") {
-    return <GiteeLoginButton text={text} align={"center"} />;
+    return <GiteeLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "WeChat") {
-    return <WechatLoginButton text={text} align={"center"} />;
+    return <WechatLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "DingTalk") {
-    return <DingTalkLoginButton text={text} align={"center"} />;
+    return <DingTalkLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "LinkedIn") {
-    return <LinkedInLoginButton text={text} align={"center"} />;
+    return <LinkedInLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "WeCom") {
-    return <WeComLoginButton text={text} align={"center"} />;
+    return <WeComLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Lark") {
-    return <LarkLoginButton text={text} align={"center"} />;
+    return <LarkLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "GitLab") {
-    return <GitLabLoginButton text={text} align={"center"} />;
+    return <GitLabLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "ADFS") {
-    return <AdfsLoginButton text={text} align={"center"} />;
+    return <AdfsLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Casdoor") {
-    return <CasdoorLoginButton text={text} align={"center"} />;
+    return <CasdoorLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Baidu") {
-    return <BaiduLoginButton text={text} align={"center"} />;
+    return <BaiduLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Alipay") {
-    return <AlipayLoginButton text={text} align={"center"} />;
+    return <AlipayLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Infoflow") {
-    return <InfoflowLoginButton text={text} align={"center"} />;
+    return <InfoflowLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Apple") {
-    return <AppleLoginButton text={text} align={"center"} />;
+    return <AppleLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "AzureAD") {
-    return <AzureADLoginButton text={text} align={"center"} />;
+    return <AzureADLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "AzureADB2C") {
-    return <AzureADB2CLoginButton text={text} align={"center"} />;
+    return <AzureADB2CLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Slack") {
-    return <SlackLoginButton text={text} align={"center"} />;
+    return <SlackLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Steam") {
-    return <SteamLoginButton text={text} align={"center"} />;
+    return <SteamLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Bilibili") {
-    return <BilibiliLoginButton text={text} align={"center"} />;
+    return <BilibiliLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Okta") {
-    return <OktaLoginButton text={text} align={"center"} />;
+    return <OktaLoginButton text={text} align={"center"} style={style} />;
   } else if (provider.type === "Douyin") {
-    return <DouyinLoginButton text={text} align={"center"} />;
+    return <DouyinLoginButton text={text} align={"center"} style={style} />;
   } else {
     return <LoginButton key={provider.type} type={provider.type} logoUrl={getProviderLogoURL(provider)} />;
   }
@@ -199,7 +224,7 @@ export function renderProviderLogo(provider, application, width, margin, size, l
         <div key={provider.displayName} className="provider-big-img">
           <a onClick={() => goToSamlUrl(provider, location)}>
             {
-              getSigninButton(provider)
+              getSigninButton(provider, location?.pathname?.includes("signup") ? "signUp" : "signIn")
             }
           </a>
         </div>
@@ -209,7 +234,7 @@ export function renderProviderLogo(provider, application, width, margin, size, l
         <div key={provider.displayName} className="provider-big-img">
           <a onClick={() => goToWeb3Url(application, provider, "signup")}>
             {
-              getSigninButton(provider)
+              getSigninButton(provider, location?.pathname?.includes("signup") ? "signUp" : "signIn")
             }
           </a>
         </div>
@@ -219,7 +244,7 @@ export function renderProviderLogo(provider, application, width, margin, size, l
         <div key={provider.displayName} className="provider-big-img">
           <a href={Provider.getAuthUrl(application, provider, "signup")}>
             {
-              getSigninButton(provider)
+              getSigninButton(provider, location?.pathname?.includes("signup") ? "signUp" : "signIn")
             }
           </a>
         </div>

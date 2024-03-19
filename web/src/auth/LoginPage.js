@@ -37,6 +37,7 @@ import RedirectForm from "../common/RedirectForm";
 import {MfaAuthVerifyForm, NextMfa, RequiredMfa} from "./mfa/MfaAuthVerifyForm";
 import {GoogleOneTapLoginVirtualButton} from "./GoogleLoginButton";
 const FaceRecognitionModal = lazy(() => import("../common/modal/FaceRecognitionModal"));
+import "./AuthButtons.css";
 
 class LoginPage extends React.Component {
   constructor(props) {
@@ -576,7 +577,7 @@ class LoginPage extends React.Component {
       ;
     } else if (signinItem.name === "Username") {
       return (
-        <div className="login-username">
+        <div className="login-username" style={{margin: "0px"}}>
           <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
           <Form.Item
             name="username"
@@ -650,7 +651,7 @@ class LoginPage extends React.Component {
       );
     } else if (signinItem.name === "Password") {
       return (
-        <div>
+        <div style={{marginTop: "17px"}}>
           <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
           {this.renderPasswordOrCodeInput()}
         </div>
@@ -659,7 +660,7 @@ class LoginPage extends React.Component {
       return (
         <div>
           <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
-          <div className="login-forget-password">
+          <div className="login-forget-password" style={{width: "100%", margin: "20px 0"}}>
             <Form.Item name="autoSignin" valuePropName="checked" noStyle>
               <Checkbox style={{float: "left"}}>
                 {i18next.t("login:Auto sign in")}
@@ -717,20 +718,25 @@ class LoginPage extends React.Component {
       if (signinItem.rule === "None" || signinItem.rule === "") {
         signinItem.rule = showForm ? "small" : "big";
       }
-
+      const avaliableProviders = application.providers.filter(providerItem => this.isProviderVisible(providerItem));
+      const showProviders = avaliableProviders.length > 0;
       return (
         <div>
           <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+          {showProviders && <React.Fragment><div className="social-auth-label">
+            <p className="social-auth">{i18next.t("account:or") || "or"}</p>
+          </div>
           <Form.Item>
             {
-              application.providers.filter(providerItem => this.isProviderVisible(providerItem)).map(providerItem => {
+              avaliableProviders.map(providerItem => {
                 return ProviderButton.renderProviderLogo(providerItem.provider, application, null, null, signinItem.rule, this.props.location);
               })
             }
             {
               this.renderOtherFormProvider(application)
             }
-          </Form.Item>
+          </Form.Item></React.Fragment>}
+          {this.renderFooter(application)}
         </div>
       );
     } else if (signinItem.name.startsWith("Text ") || signinItem?.isCustom) {
@@ -739,9 +745,8 @@ class LoginPage extends React.Component {
       );
     } else if (signinItem.name === "Signup link") {
       return (
-        <div style={{width: "100%"}} className="login-signup-link">
+        <div style={{width: "100%", marginBottom: "10px"}} className="login-signup-link">
           <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
-          {this.renderFooter(application)}
         </div>
       );
     }
@@ -773,14 +778,6 @@ class LoginPage extends React.Component {
 
     const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application) || Setting.isFaceIdEnabled(application);
     if (showForm) {
-      let loginWidth = 320;
-      if (Setting.getLanguage() === "fr") {
-        loginWidth += 20;
-      } else if (Setting.getLanguage() === "es") {
-        loginWidth += 40;
-      } else if (Setting.getLanguage() === "ru") {
-        loginWidth += 10;
-      }
 
       return (
         <Form
@@ -796,7 +793,7 @@ class LoginPage extends React.Component {
           onFinish={(values) => {
             this.onFinish(values);
           }}
-          style={{width: `${loginWidth}px`}}
+          style={{width: "100%"}}
           size="large"
           ref={this.form}
         >
@@ -896,7 +893,7 @@ class LoginPage extends React.Component {
 
   renderFooter(application) {
     return (
-      <div>
+      <div style={{display: "flex", justifyContent: "center", marginTop: "34px"}}>
         {
           !application.enableSignUp ? null : (
             <React.Fragment>
@@ -1243,11 +1240,9 @@ class LoginPage extends React.Component {
               <div dangerouslySetInnerHTML={{__html: application.formSideHtml}} />
             </div>
             <div className="login-form">
-              <div>
-                {
-                  this.renderLoginPanel(application)
-                }
-              </div>
+              {
+                this.renderLoginPanel(application)
+              }
             </div>
           </div>
         </div>

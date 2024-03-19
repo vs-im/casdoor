@@ -1,0 +1,50 @@
+:root {
+  --border-primary: rgb(191 191 191);
+}
+
+.social-auth {
+  text-align: center;
+  padding-bottom: 1em;
+  transform: translateY(7.5px);
+}
+
+.social-auth-label {
+  position: relative;
+}
+
+.social-auth-label::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 37%;
+  height: 1px;
+  background: var(--border-primary);
+  opacity: 0.5;
+}
+
+.social-auth-label::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 37%;
+  height: 1px;
+  background: var(--border-primary);
+  opacity: 0.5;
+}
+
+.social-auth-icon {
+  margin-top: 12px;
+  padding-right: 1em;
+  padding-left: 1em;
+  cursor: pointer;
+}
+
+/* .social-auth-icon:focus {
+  outline: 1px solid var(--md-light-purple);
+} */
+.social-auth-icons {
+  display: flex;
+  justify-content: center;
+}

@@ -1,5 +1,6 @@
 {
   "account": {
+    "or": "o",
     "Logout": "Cierre de sesión",
     "My Account": "Mi cuenta",
     "Sign Up": "Registrarse"
