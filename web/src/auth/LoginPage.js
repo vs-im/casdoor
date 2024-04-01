@@ -1170,7 +1170,7 @@ class LoginPage extends React.Component {
     };
 
     return (
-      <div style={{height: 300}}>
+      <div style={{height: 300, minWidth: 320}}>
         {renderChoiceBox()}
       </div>
     );
