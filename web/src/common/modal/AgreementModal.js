@@ -104,7 +104,7 @@ export function renderAgreementFormItem(application, required, layout, ths, floa
       {...layout}
       initialValue={initDefaultValue(application)}
     >
-      <Checkbox style={{float}}>
+      <Checkbox style={{float: "inline-start"}}>
         {i18next.t("signup:Accept")}&nbsp;
         <a onClick={() => {
           ths.setState({

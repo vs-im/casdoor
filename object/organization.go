@@ -72,6 +72,8 @@ type Organization struct {
 	InitScore              int        `json:"initScore"`
 	EnableSoftDeletion     bool       `json:"enableSoftDeletion"`
 	IsProfilePublic        bool       `json:"isProfilePublic"`
+	UseEmailAsUsername     bool       `json:"useEmailAsUsername"`
+	EnableTour             bool       `json:"enableTour"`
 
 	MfaItems     []*MfaItem     `xorm:"varchar(300)" json:"mfaItems"`
 	AccountItems []*AccountItem `xorm:"varchar(5000)" json:"accountItems"`
@@ -241,17 +243,21 @@ func AddOrganization(organization *Organization) (bool, error) {
 	return affected != 0, nil
 }
 
-func DeleteOrganization(organization *Organization) (bool, error) {
-	if organization.Name == "built-in" {
-		return false, nil
-	}
-
+func deleteOrganization(organization *Organization) (bool, error) {
 	affected, err := ormer.Engine.ID(core.PK{organization.Owner, organization.Name}).Delete(&Organization{})
 	if err != nil {
 		return false, err
 	}
 
 	return affected != 0, nil
+}
+
+func DeleteOrganization(organization *Organization) (bool, error) {
+	if organization.Name == "built-in" {
+		return false, nil
+	}
+
+	return deleteOrganization(organization)
 }
 
 func GetOrganizationByUser(user *User) (*Organization, error) {
@@ -313,6 +319,7 @@ func GetDefaultApplication(id string) (*Application, error) {
 		if defaultApplication == nil {
 			return nil, fmt.Errorf("The default application: %s does not exist", organization.DefaultApplication)
 		} else {
+			defaultApplication.Organization = organization.Name
 			return defaultApplication, nil
 		}
 	}
@@ -346,6 +353,11 @@ func GetDefaultApplication(id string) (*Application, error) {
 	}
 
 	err = extendApplicationWithSigninItems(defaultApplication)
+	if err != nil {
+		return nil, err
+	}
+
+	err = extendApplicationWithSigninMethods(defaultApplication)
 	if err != nil {
 		return nil, err
 	}

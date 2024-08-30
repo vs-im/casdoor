@@ -54,10 +54,16 @@ code {
 
 @media (prefers-color-scheme: dark) {
   body {
-    filter: invert(100%);
+    background: grey;
+
+    /* filter: invert(100%); */
   }
 
-  body img {
+  /* body img {
     filter: invert(100%);
-  }
+  } */
+
+  /* body svg {
+    filter: invert(100%);
+  } */
 }

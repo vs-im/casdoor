@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/beego/beego/utils/pagination"
+	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
 )
@@ -288,9 +289,24 @@ func (c *ApiController) UpdateUser() {
 		}
 	}
 
+	if user.MfaEmailEnabled && user.Email == "" {
+		c.ResponseError(c.T("user:MFA email is enabled but email is empty"))
+		return
+	}
+
+	if user.MfaPhoneEnabled && user.Phone == "" {
+		c.ResponseError(c.T("user:MFA phone is enabled but phone number is empty"))
+		return
+	}
+
 	if msg := object.CheckUpdateUser(oldUser, &user, c.GetAcceptLanguage()); msg != "" {
 		c.ResponseError(msg)
 		return
+	}
+
+	isUsernameLowered := conf.GetConfigBool("isUsernameLowered")
+	if isUsernameLowered {
+		user.Name = strings.ToLower(user.Name)
 	}
 
 	isAdmin := c.IsAdmin()
@@ -503,8 +519,21 @@ func (c *ApiController) SetPassword() {
 		return
 	}
 
+	organization, err := object.GetOrganizationByUser(targetUser)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	if organization == nil {
+		c.ResponseError(fmt.Sprintf(c.T("the organization: %s is not found"), targetUser.Owner))
+		return
+	}
+
 	targetUser.Password = newPassword
-	_, err = object.SetUserField(targetUser, "password", targetUser.Password)
+	targetUser.UpdateUserPassword(organization)
+	targetUser.NeedUpdatePassword = false
+
+	_, err = object.UpdateUser(userId, targetUser, []string{"password", "need_update_password", "password_type"}, false)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return

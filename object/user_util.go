@@ -21,12 +21,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/i18n"
-
-	jsoniter "github.com/json-iterator/go"
-
 	"github.com/casdoor/casdoor/idp"
 	"github.com/casdoor/casdoor/util"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/xorm-io/core"
 )
 
@@ -57,6 +56,13 @@ func HasUserByField(organizationName string, field string, value string) bool {
 }
 
 func GetUserByFields(organization string, field string) (*User, error) {
+	isUsernameLowered := conf.GetConfigBool("isUsernameLowered")
+	if isUsernameLowered {
+		field = strings.ToLower(field)
+	}
+
+	field = strings.TrimSpace(field)
+
 	// check username
 	user, err := GetUserByField(organization, "name", field)
 	if err != nil || user != nil {
@@ -387,6 +393,20 @@ func CheckPermissionForUpdateUser(oldUser, newUser *User, isAdmin bool, lang str
 		itemsChanged = append(itemsChanged, item)
 	}
 
+	if oldUser.Address == nil {
+		oldUser.Address = []string{}
+	}
+	oldUserAddressJson, _ := json.Marshal(oldUser.Address)
+
+	if newUser.Address == nil {
+		newUser.Address = []string{}
+	}
+	newUserAddressJson, _ := json.Marshal(newUser.Address)
+	if string(oldUserAddressJson) != string(newUserAddressJson) {
+		item := GetAccountItemByName("Address", organization)
+		itemsChanged = append(itemsChanged, item)
+	}
+
 	if newUser.FaceIds != nil {
 		item := GetAccountItemByName("Face ID", organization)
 		itemsChanged = append(itemsChanged, item)
@@ -405,9 +425,43 @@ func CheckPermissionForUpdateUser(oldUser, newUser *User, isAdmin bool, lang str
 		item := GetAccountItemByName("Is deleted", organization)
 		itemsChanged = append(itemsChanged, item)
 	}
+	if oldUser.NeedUpdatePassword != newUser.NeedUpdatePassword {
+		item := GetAccountItemByName("Need update password", organization)
+		itemsChanged = append(itemsChanged, item)
+	}
+
+	if oldUser.Balance != newUser.Balance {
+		item := GetAccountItemByName("Balance", organization)
+		itemsChanged = append(itemsChanged, item)
+	}
 
 	if oldUser.Score != newUser.Score {
 		item := GetAccountItemByName("Score", organization)
+		itemsChanged = append(itemsChanged, item)
+	}
+
+	if oldUser.Karma != newUser.Karma {
+		item := GetAccountItemByName("Karma", organization)
+		itemsChanged = append(itemsChanged, item)
+	}
+
+	if oldUser.Language != newUser.Language {
+		item := GetAccountItemByName("Language", organization)
+		itemsChanged = append(itemsChanged, item)
+	}
+
+	if oldUser.Ranking != newUser.Ranking {
+		item := GetAccountItemByName("Ranking", organization)
+		itemsChanged = append(itemsChanged, item)
+	}
+
+	if oldUser.Currency != newUser.Currency {
+		item := GetAccountItemByName("Currency", organization)
+		itemsChanged = append(itemsChanged, item)
+	}
+
+	if oldUser.Hash != newUser.Hash {
+		item := GetAccountItemByName("Hash", organization)
 		itemsChanged = append(itemsChanged, item)
 	}
 
@@ -463,4 +517,11 @@ func (user *User) IsAdminUser() bool {
 	}
 
 	return user.IsAdmin || user.IsGlobalAdmin()
+}
+
+func IsAppUser(userId string) bool {
+	if strings.HasPrefix(userId, "app/") {
+		return true
+	}
+	return false
 }

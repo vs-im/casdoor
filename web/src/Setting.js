@@ -58,6 +58,8 @@ export const Countries = [
   {label: "Українська", key: "uk", country: "UA", alt: "Українська"},
   {label: "Қазақ", key: "kk", country: "KZ", alt: "Қазақ"},
   {label: "فارسی", key: "fa", country: "IR", alt: "فارسی"},
+  {label: "Čeština", key: "cs", country: "CZ", alt: "Čeština"},
+  {label: "Slovenčina", key: "sk", country: "SK", alt: "Slovenčina"},
 ];
 
 export function getThemeData(organization, application) {
@@ -185,6 +187,10 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_azure.png`,
       url: "https://learn.microsoft.com/zh-cn/azure/communication-services",
     },
+    "SendGrid": {
+      logo: `${StaticBaseUrl}/img/email_sendgrid.png`,
+      url: "https://sendgrid.com/",
+    },
     "Custom HTTP Email": {
       logo: `${StaticBaseUrl}/img/social_default.png`,
       url: "https://casdoor.org/docs/provider/email/overview",
@@ -227,6 +233,10 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_synology.png`,
       url: "https://www.synology.com/en-global/dsm/feature/file_sharing",
     },
+    "Casdoor": {
+      logo: `${StaticBaseUrl}/img/casdoor.png`,
+      url: "https://casdoor.org/docs/provider/storage/overview",
+    },
   },
   SAML: {
     "Aliyun IDaaS": {
@@ -245,6 +255,10 @@ export const OtherProviderInfo = {
   Payment: {
     "Dummy": {
       logo: `${StaticBaseUrl}/img/payment_paypal.png`,
+      url: "",
+    },
+    "Balance": {
+      logo: `${StaticBaseUrl}/img/payment_balance.svg`,
       url: "",
     },
     "Alipay": {
@@ -1019,6 +1033,7 @@ export function getProviderTypeOptions(category) {
         {id: "SUBMAIL", name: "SUBMAIL"},
         {id: "Mailtrap", name: "Mailtrap"},
         {id: "Azure ACS", name: "Azure ACS"},
+        {id: "SendGrid", name: "SendGrid"},
         {id: "Custom HTTP Email", name: "Custom HTTP Email"},
       ]
     );
@@ -1055,6 +1070,7 @@ export function getProviderTypeOptions(category) {
         {id: "Qiniu Cloud Kodo", name: "Qiniu Cloud Kodo"},
         {id: "Google Cloud Storage", name: "Google Cloud Storage"},
         {id: "Synology", name: "Synology"},
+        {id: "Casdoor", name: "Casdoor"},
       ]
     );
   } else if (category === "SAML") {
@@ -1066,6 +1082,7 @@ export function getProviderTypeOptions(category) {
   } else if (category === "Payment") {
     return ([
       {id: "Dummy", name: "Dummy"},
+      {id: "Balance", name: "Balance"},
       {id: "Alipay", name: "Alipay"},
       {id: "WeChat Pay", name: "WeChat Pay"},
       {id: "PayPal", name: "PayPal"},
@@ -1363,6 +1380,13 @@ export function getApplicationName(application) {
   return `${application?.owner}/${application?.name}`;
 }
 
+export function getApplicationDisplayName(application) {
+  if (application.isShared) {
+    return `${application.name}(Shared)`;
+  }
+  return application.name;
+}
+
 export function getRandomName() {
   return Math.random().toString(36).slice(-6);
 }
@@ -1462,7 +1486,7 @@ export function getUserCommonFields() {
   return ["Owner", "Name", "CreatedTime", "UpdatedTime", "DeletedTime", "Id", "Type", "Password", "PasswordSalt", "DisplayName", "FirstName", "LastName", "Avatar", "PermanentAvatar",
     "Email", "EmailVerified", "Phone", "Location", "Address", "Affiliation", "Title", "IdCardType", "IdCard", "Homepage", "Bio", "Tag", "Region",
     "Language", "Gender", "Birthday", "Education", "Score", "Ranking", "IsDefaultAvatar", "IsOnline", "IsAdmin", "IsForbidden", "IsDeleted", "CreatedIp",
-    "PreferredMfaType", "TotpSecret", "SignupApplication"];
+    "PreferredMfaType", "TotpSecret", "SignupApplication", "RecoveryCodes", "MfaPhoneEnabled", "MfaEmailEnabled"];
 }
 
 export function getDefaultFooterContent() {
@@ -1514,4 +1538,14 @@ export function getDefaultHtmlEmailContent() {
 </div>
 </body>
 </html>`;
+}
+
+export function getCurrencyText(product) {
+  if (product?.currency === "USD") {
+    return i18next.t("product:USD");
+  } else if (product?.currency === "CNY") {
+    return i18next.t("product:CNY");
+  } else {
+    return "(Unknown currency)";
+  }
 }

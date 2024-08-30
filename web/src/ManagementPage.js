@@ -231,8 +231,8 @@ function ManagementPage(props) {
       }
       textColor = "white";
     }
-
-    !Setting.isMobile() ? res.push({
+    const logoDisabled = true;
+    !Setting.isMobile() && !logoDisabled ? res.push({
       label:
             <Link to="/">
               <img className="logo" src={logo ?? props.logo} alt="logo" />
@@ -328,6 +328,8 @@ function ManagementPage(props) {
       return <Redirect to="/login" />;
     } else if (props.account === undefined) {
       return null;
+    } else if (props.account.needUpdatePassword) {
+      return <Redirect to={"/forget/" + props.application.name} />;
     } else {
       return component;
     }
@@ -409,7 +411,7 @@ function ManagementPage(props) {
     return Setting.isMobile() || window.location.pathname.startsWith("/trees");
   }
 
-  const menuStyleRight = Setting.isAdminUser(props.account) && !Setting.isMobile() ? "calc(180px + 280px)" : "280px";
+  const menuStyleRight = Setting.isAdminUser(props.account) && !Setting.isMobile() ? "calc(180px + 280px)" : "320px";
 
   const onClose = () => {
     setMenuVisible(false);

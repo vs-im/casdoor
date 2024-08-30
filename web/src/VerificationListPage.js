@@ -19,7 +19,7 @@ import * as VerificationBackend from "./backend/VerificationBackend";
 import i18next from "i18next";
 import {Link} from "react-router-dom";
 import React from "react";
-import {Table} from "antd";
+import {Switch, Table} from "antd";
 
 class VerificationListPage extends BaseListPage {
   newVerification() {
@@ -35,26 +35,48 @@ class VerificationListPage extends BaseListPage {
   renderTable(verifications) {
     const columns = [
       {
-        title: i18next.t("general:Name"),
-        dataIndex: "name",
-        key: "name",
-        width: "150px",
-        fixed: "left",
+        title: i18next.t("general:Organization"),
+        dataIndex: "owner",
+        key: "owner",
+        width: "120px",
         sorter: true,
-        ...this.getColumnSearchProps("name"),
+        ...this.getColumnSearchProps("owner"),
         render: (text, record, index) => {
+          if (text === "admin") {
+            return `(${i18next.t("general:empty")})`;
+          }
+
           return (
-            <Link to={`/syncers/${text}`}>
+            <Link to={`/organizations/${text}`}>
               {text}
             </Link>
           );
         },
       },
       {
+        title: i18next.t("general:Name"),
+        dataIndex: "name",
+        key: "name",
+        width: "260px",
+        fixed: "left",
+        sorter: true,
+        ...this.getColumnSearchProps("name"),
+      },
+      {
+        title: i18next.t("general:Created time"),
+        dataIndex: "createdTime",
+        key: "createdTime",
+        width: "160px",
+        sorter: true,
+        render: (text, record, index) => {
+          return Setting.getFormattedDate(text);
+        },
+      },
+      {
         title: i18next.t("provider:Type"),
         dataIndex: "type",
         key: "type",
-        width: "120px",
+        width: "90px",
         sorter: true,
         ...this.getColumnSearchProps("type"),
       },
@@ -67,7 +89,7 @@ class VerificationListPage extends BaseListPage {
         ...this.getColumnSearchProps("user"),
         render: (text, record, index) => {
           return (
-            <Link to={`/users/${record.owner}/${text}`}>
+            <Link to={`/users/${text}`}>
               {text}
             </Link>
           );
@@ -89,6 +111,26 @@ class VerificationListPage extends BaseListPage {
         },
       },
       {
+        title: i18next.t("general:Client IP"),
+        dataIndex: "remoteAddr",
+        key: "remoteAddr",
+        width: "100px",
+        sorter: true,
+        ...this.getColumnSearchProps("remoteAddr"),
+        render: (text, record, index) => {
+          let clientIp = text;
+          if (clientIp.endsWith(": ")) {
+            clientIp = clientIp.slice(0, -2);
+          }
+
+          return (
+            <a target="_blank" rel="noreferrer" href={`https://db-ip.com/${clientIp}`}>
+              {clientIp}
+            </a>
+          );
+        },
+      },
+      {
         title: i18next.t("verification:Receiver"),
         dataIndex: "receiver",
         key: "receiver",
@@ -100,28 +142,20 @@ class VerificationListPage extends BaseListPage {
         title: i18next.t("login:Verification code"),
         dataIndex: "code",
         key: "code",
-        width: "120px",
+        width: "150px",
         sorter: true,
         ...this.getColumnSearchProps("code"),
       },
       {
-        title: i18next.t("general:Timestamp"),
-        dataIndex: "time",
-        key: "time",
-        width: "160px",
+        title: i18next.t("verification:Is used"),
+        dataIndex: "isUsed",
+        key: "isUsed",
+        width: "90px",
         sorter: true,
         render: (text, record, index) => {
-          return Setting.getFormattedDate(text * 1000);
-        },
-      },
-      {
-        title: i18next.t("general:Created time"),
-        dataIndex: "createdTime",
-        key: "createdTime",
-        width: "160px",
-        sorter: true,
-        render: (text, record, index) => {
-          return Setting.getFormattedDate(text);
+          return (
+            <Switch disabled checkedChildren="ON" unCheckedChildren="OFF" checked={text} />
+          );
         },
       },
     ];
@@ -156,7 +190,7 @@ class VerificationListPage extends BaseListPage {
       value = params.type;
     }
     this.setState({loading: true});
-    VerificationBackend.getVerifications("admin", Setting.isDefaultOrganizationSelected(this.props.account) ? "" : Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
+    VerificationBackend.getVerifications("", Setting.isDefaultOrganizationSelected(this.props.account) ? "" : Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
       .then((res) => {
         this.setState({
           loading: false,

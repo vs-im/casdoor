@@ -181,15 +181,15 @@ func UpdatePermission(id string, permission *Permission) (bool, error) {
 			return false, err
 		}
 
-		if oldPermission.Adapter != "" && oldPermission.Adapter != permission.Adapter {
-			isEmpty, _ := ormer.Engine.IsTableEmpty(oldPermission.Adapter)
-			if isEmpty {
-				err = ormer.Engine.DropTables(oldPermission.Adapter)
-				if err != nil {
-					return false, err
-				}
-			}
-		}
+		// if oldPermission.Adapter != "" && oldPermission.Adapter != permission.Adapter {
+		// 	isEmpty, _ := ormer.Engine.IsTableEmpty(oldPermission.Adapter)
+		// 	if isEmpty {
+		// 		err = ormer.Engine.DropTables(oldPermission.Adapter)
+		// 		if err != nil {
+		// 			return false, err
+		// 		}
+		// 	}
+		// }
 
 		err = addGroupingPolicies(permission)
 		if err != nil {
@@ -286,13 +286,22 @@ func AddPermissionsInBatch(permissions []*Permission) (bool, error) {
 	return affected, nil
 }
 
-func DeletePermission(permission *Permission) (bool, error) {
+func deletePermission(permission *Permission) (bool, error) {
 	affected, err := ormer.Engine.ID(core.PK{permission.Owner, permission.Name}).Delete(&Permission{})
 	if err != nil {
 		return false, err
 	}
 
-	if affected != 0 {
+	return affected != 0, nil
+}
+
+func DeletePermission(permission *Permission) (bool, error) {
+	affected, err := deletePermission(permission)
+	if err != nil {
+		return false, err
+	}
+
+	if affected {
 		err = removeGroupingPolicies(permission)
 		if err != nil {
 			return false, err
@@ -303,18 +312,18 @@ func DeletePermission(permission *Permission) (bool, error) {
 			return false, err
 		}
 
-		if permission.Adapter != "" && permission.Adapter != "permission_rule" {
-			isEmpty, _ := ormer.Engine.IsTableEmpty(permission.Adapter)
-			if isEmpty {
-				err = ormer.Engine.DropTables(permission.Adapter)
-				if err != nil {
-					return false, err
-				}
-			}
-		}
+		// if permission.Adapter != "" && permission.Adapter != "permission_rule" {
+		// 	isEmpty, _ := ormer.Engine.IsTableEmpty(permission.Adapter)
+		// 	if isEmpty {
+		// 		err = ormer.Engine.DropTables(permission.Adapter)
+		// 		if err != nil {
+		// 			return false, err
+		// 		}
+		// 	}
+		// }
 	}
 
-	return affected != 0, nil
+	return affected, nil
 }
 
 func getPermissionsByUser(userId string) ([]*Permission, error) {

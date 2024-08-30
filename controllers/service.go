@@ -27,11 +27,12 @@ import (
 )
 
 type EmailForm struct {
-	Title     string   `json:"title"`
-	Content   string   `json:"content"`
-	Sender    string   `json:"sender"`
-	Receivers []string `json:"receivers"`
-	Provider  string   `json:"provider"`
+	Title          string          `json:"title"`
+	Content        string          `json:"content"`
+	Sender         string          `json:"sender"`
+	Receivers      []string        `json:"receivers"`
+	Provider       string          `json:"provider"`
+	ProviderObject object.Provider `json:"providerObject"`
 }
 
 type SmsForm struct {
@@ -74,7 +75,6 @@ func (c *ApiController) SendEmail() {
 			c.ResponseError(err.Error())
 			return
 		}
-
 	} else {
 		// called by Casdoor SDK via Client ID & Client Secret, so the used Email provider will be the application' Email provider or the default Email provider
 		provider, err = c.GetProviderFromContext("Email")
@@ -82,6 +82,13 @@ func (c *ApiController) SendEmail() {
 			c.ResponseError(err.Error())
 			return
 		}
+	}
+
+	if emailForm.ProviderObject.Name != "" {
+		if emailForm.ProviderObject.ClientSecret == "***" {
+			emailForm.ProviderObject.ClientSecret = provider.ClientSecret
+		}
+		provider = &emailForm.ProviderObject
 	}
 
 	// when receiver is the reserved keyword: "TestSmtpServer", it means to test the SMTP server instead of sending a real Email
@@ -113,25 +120,25 @@ func (c *ApiController) SendEmail() {
 
 	content := emailForm.Content
 	if content == "" {
-		code := "123456"
+		content = provider.Content
+	}
 
-		// "You have requested a verification code at Casdoor. Here is your code: %s, please enter in 5 minutes."
-		content = strings.Replace(provider.Content, "%s", code, 1)
-		if !strings.HasPrefix(userId, "app/") {
-			var user *object.User
-			user, err = object.GetUser(userId)
-			if err != nil {
-				c.ResponseError(err.Error())
-				return
-			}
-
-			userString := "Hi"
-			if user != nil {
-				userString = user.GetFriendlyName()
-			}
-			content = strings.Replace(content, "%{user.friendlyName}", userString, 1)
+	code := "123456"
+	// "You have requested a verification code at Casdoor. Here is your code: %s, please enter in 5 minutes."
+	content = strings.Replace(content, "%s", code, 1)
+	userString := "Hi"
+	if !object.IsAppUser(userId) {
+		var user *object.User
+		user, err = object.GetUser(userId)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		if user != nil {
+			userString = user.GetFriendlyName()
 		}
 	}
+	content = strings.Replace(content, "%{user.friendlyName}", userString, 1)
 
 	for _, receiver := range emailForm.Receivers {
 		err = object.SendEmail(provider, emailForm.Title, content, receiver, emailForm.Sender)

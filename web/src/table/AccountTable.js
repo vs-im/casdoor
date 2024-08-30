@@ -88,6 +88,7 @@ class AccountTable extends React.Component {
       {name: "Gender", label: i18next.t("user:Gender")},
       {name: "Birthday", label: i18next.t("user:Birthday")},
       {name: "Education", label: i18next.t("user:Education")},
+      {name: "Balance", label: i18next.t("user:Balance")},
       {name: "Score", label: i18next.t("user:Score")},
       {name: "Karma", label: i18next.t("user:Karma")},
       {name: "Ranking", label: i18next.t("user:Ranking")},
@@ -102,10 +103,12 @@ class AccountTable extends React.Component {
       {name: "Is admin", label: i18next.t("user:Is admin")},
       {name: "Is forbidden", label: i18next.t("user:Is forbidden")},
       {name: "Is deleted", label: i18next.t("user:Is deleted")},
+      {name: "Need update password", label: i18next.t("user:Need update password")},
       {name: "Multi-factor authentication", label: i18next.t("user:Multi-factor authentication")},
       {name: "WebAuthn credentials", label: i18next.t("user:WebAuthn credentials")},
       {name: "Managed accounts", label: i18next.t("user:Managed accounts")},
       {name: "Face ID", label: i18next.t("user:Face ID")},
+      {name: "MFA accounts", label: i18next.t("user:MFA accounts")},
     ];
   };
 

@@ -45,6 +45,13 @@ func (c *ApiController) ResponseOk(data ...interface{}) {
 
 // ResponseError ...
 func (c *ApiController) ResponseError(error string, data ...interface{}) {
+	enableErrorMask := conf.GetConfigBool("enableErrorMask")
+	if enableErrorMask {
+		if strings.HasPrefix(error, "The user: ") && strings.HasSuffix(error, " doesn't exist") || strings.HasPrefix(error, "用户: ") && strings.HasSuffix(error, "不存在") {
+			error = c.T("check:password or code is incorrect")
+		}
+	}
+
 	resp := &Response{Status: "error", Msg: error}
 	c.ResponseJsonData(resp, data...)
 }
@@ -96,7 +103,7 @@ func (c *ApiController) RequireSignedInUser() (*object.User, bool) {
 		return nil, false
 	}
 
-	if strings.HasPrefix(userId, "app/") {
+	if object.IsAppUser(userId) {
 		tmpUserId := c.Input().Get("userId")
 		if tmpUserId != "" {
 			userId = tmpUserId
@@ -142,7 +149,7 @@ func (c *ApiController) IsOrgAdmin() (bool, bool) {
 		return false, true
 	}
 
-	if strings.HasPrefix(userId, "app/") {
+	if object.IsAppUser(userId) {
 		return true, true
 	}
 

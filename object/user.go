@@ -203,7 +203,9 @@ type User struct {
 	LastSigninWrongTime string `xorm:"varchar(100)" json:"lastSigninWrongTime"`
 	SigninWrongTimes    int    `json:"signinWrongTimes"`
 
-	ManagedAccounts []ManagedAccount `xorm:"managedAccounts blob" json:"managedAccounts"`
+	ManagedAccounts    []ManagedAccount `xorm:"managedAccounts blob" json:"managedAccounts"`
+	MfaAccounts        []MfaAccount     `xorm:"mfaAccounts blob" json:"mfaAccounts"`
+	NeedUpdatePassword bool             `json:"needUpdatePassword"`
 }
 
 type Userinfo struct {
@@ -227,6 +229,12 @@ type ManagedAccount struct {
 	Username    string `xorm:"varchar(100)" json:"username"`
 	Password    string `xorm:"varchar(100)" json:"password"`
 	SigninUrl   string `xorm:"varchar(200)" json:"signinUrl"`
+}
+
+type MfaAccount struct {
+	AccountName string `xorm:"varchar(100)" json:"accountName"`
+	Issuer      string `xorm:"varchar(100)" json:"issuer"`
+	SecretKey   string `xorm:"varchar(100)" json:"secretKey"`
 }
 
 type FaceId struct {
@@ -602,6 +610,12 @@ func GetMaskedUser(user *User, isAdminOrSelf bool, errs ...error) (*User, error)
 		}
 	}
 
+	if user.MfaAccounts != nil {
+		for _, mfaAccount := range user.MfaAccounts {
+			mfaAccount.SecretKey = "***"
+		}
+	}
+
 	if user.TotpSecret != "" {
 		user.TotpSecret = ""
 	}
@@ -674,19 +688,19 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 		columns = []string{
 			"owner", "display_name", "avatar", "first_name", "last_name",
 			"location", "address", "country_code", "region", "language", "affiliation", "title", "id_card_type", "id_card", "homepage", "bio", "tag", "language", "gender", "birthday", "education", "score", "karma", "ranking", "signup_application",
-			"is_admin", "is_forbidden", "is_deleted", "hash", "is_default_avatar", "properties", "webauthnCredentials", "managedAccounts", "face_ids",
-			"signin_wrong_times", "last_signin_wrong_time", "groups", "access_key", "access_secret",
+			"is_admin", "is_forbidden", "is_deleted", "hash", "is_default_avatar", "properties", "webauthnCredentials", "managedAccounts", "face_ids", "mfaAccounts",
+			"signin_wrong_times", "last_signin_wrong_time", "groups", "access_key", "access_secret", "mfa_phone_enabled", "mfa_email_enabled",
 			"github", "google", "qq", "wechat", "facebook", "dingtalk", "weibo", "gitee", "linkedin", "wecom", "lark", "gitlab", "adfs",
 			"baidu", "alipay", "casdoor", "infoflow", "apple", "azuread", "azureadb2c", "slack", "steam", "bilibili", "okta", "douyin", "line", "amazon",
 			"auth0", "battlenet", "bitbucket", "box", "cloudfoundry", "dailymotion", "deezer", "digitalocean", "discord", "dropbox",
 			"eveonline", "fitbit", "gitea", "heroku", "influxcloud", "instagram", "intercom", "kakao", "lastfm", "mailru", "meetup",
 			"microsoftonline", "naver", "nextcloud", "onedrive", "oura", "patreon", "paypal", "salesforce", "shopify", "soundcloud",
 			"spotify", "strava", "stripe", "type", "tiktok", "tumblr", "twitch", "twitter", "typetalk", "uber", "vk", "wepay", "xero", "yahoo",
-			"yammer", "yandex", "zoom", "custom",
+			"yammer", "yandex", "zoom", "custom", "need_update_password",
 		}
 	}
 	if isAdmin {
-		columns = append(columns, "name", "id", "email", "phone", "country_code", "type")
+		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance")
 	}
 
 	columns = append(columns, "updated_time")
@@ -833,6 +847,11 @@ func AddUser(user *User) (bool, error) {
 		}
 	}
 
+	isUsernameLowered := conf.GetConfigBool("isUsernameLowered")
+	if isUsernameLowered {
+		user.Name = strings.ToLower(user.Name)
+	}
+
 	affected, err := ormer.Engine.Insert(user)
 	if err != nil {
 		return false, err
@@ -845,6 +864,8 @@ func AddUsers(users []*User) (bool, error) {
 	if len(users) == 0 {
 		return false, fmt.Errorf("no users are provided")
 	}
+
+	isUsernameLowered := conf.GetConfigBool("isUsernameLowered")
 
 	// organization := GetOrganizationByUser(users[0])
 	for _, user := range users {
@@ -868,6 +889,11 @@ func AddUsers(users []*User) (bool, error) {
 			if err != nil {
 				return false, err
 			}
+		}
+
+		user.Name = strings.TrimSpace(user.Name)
+		if isUsernameLowered {
+			user.Name = strings.ToLower(user.Name)
 		}
 	}
 
@@ -908,6 +934,15 @@ func AddUsersInBatch(users []*User) (bool, error) {
 	return affected, nil
 }
 
+func deleteUser(user *User) (bool, error) {
+	affected, err := ormer.Engine.ID(core.PK{user.Owner, user.Name}).Delete(&User{})
+	if err != nil {
+		return false, err
+	}
+
+	return affected != 0, nil
+}
+
 func DeleteUser(user *User) (bool, error) {
 	// Forced offline the user first
 	_, err := DeleteSession(util.GetSessionId(user.Owner, user.Name, CasdoorApplication))
@@ -915,12 +950,7 @@ func DeleteUser(user *User) (bool, error) {
 		return false, err
 	}
 
-	affected, err := ormer.Engine.ID(core.PK{user.Owner, user.Name}).Delete(&User{})
-	if err != nil {
-		return false, err
-	}
-
-	return affected != 0, nil
+	return deleteUser(user)
 }
 
 func GetUserInfo(user *User, scope string, aud string, host string) (*Userinfo, error) {
@@ -992,7 +1022,7 @@ func (user *User) GetFriendlyName() string {
 }
 
 func isUserIdGlobalAdmin(userId string) bool {
-	return strings.HasPrefix(userId, "built-in/") || strings.HasPrefix(userId, "app/")
+	return strings.HasPrefix(userId, "built-in/") || IsAppUser(userId)
 }
 
 func ExtendUserWithRolesAndPermissions(user *User) (err error) {
@@ -1108,7 +1138,7 @@ func (user *User) IsApplicationAdmin(application *Application) bool {
 		return false
 	}
 
-	return (user.Owner == application.Organization && user.IsAdmin) || user.IsGlobalAdmin()
+	return (user.Owner == application.Organization && user.IsAdmin) || user.IsGlobalAdmin() || (user.IsAdmin && application.IsShared)
 }
 
 func (user *User) IsGlobalAdmin() bool {
@@ -1139,4 +1169,14 @@ func GenerateIdForNewUser(application *Application) (string, error) {
 
 	res := strconv.Itoa(lastUserId + 1)
 	return res, nil
+}
+
+func UpdateUserBalance(owner string, name string, balance float64) error {
+	user, err := getUser(owner, name)
+	if err != nil {
+		return err
+	}
+	user.Balance += balance
+	_, err = UpdateUser(user.GetId(), user, []string{"balance"}, true)
+	return err
 }

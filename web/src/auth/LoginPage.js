@@ -23,7 +23,6 @@ import * as AuthBackend from "./AuthBackend";
 import * as OrganizationBackend from "../backend/OrganizationBackend";
 import * as ApplicationBackend from "../backend/ApplicationBackend";
 import * as Provider from "./Provider";
-import * as ProviderButton from "./ProviderButton";
 import * as Util from "./Util";
 import * as Setting from "../Setting";
 import * as AgreementModal from "../common/modal/AgreementModal";
@@ -36,6 +35,7 @@ import {CaptchaModal, CaptchaRule} from "../common/modal/CaptchaModal";
 import RedirectForm from "../common/RedirectForm";
 import {MfaAuthVerifyForm, NextMfa, RequiredMfa} from "./mfa/MfaAuthVerifyForm";
 import {GoogleOneTapLoginVirtualButton} from "./GoogleLoginButton";
+import * as ProviderButton from "./ProviderButton";
 const FaceRecognitionModal = lazy(() => import("../common/modal/FaceRecognitionModal"));
 import "./AuthButtons.css";
 
@@ -68,6 +68,8 @@ class LoginPage extends React.Component {
       this.state.owner = props.match?.params?.owner;
       this.state.applicationName = props.match?.params?.casApplicationName;
     }
+
+    localStorage.setItem("signinUrl", window.location.href);
 
     this.form = React.createRef();
   }
@@ -301,6 +303,12 @@ class LoginPage extends React.Component {
       return;
     }
 
+    if (resp.data2) {
+      sessionStorage.setItem("signinUrl", window.location.href);
+      Setting.goToLinkSoft(ths, `/forget/${application.name}`);
+      return;
+    }
+
     if (Setting.hasPromptPage(application)) {
       AuthBackend.getAccount()
         .then((res) => {
@@ -443,15 +451,27 @@ class LoginPage extends React.Component {
             const responseType = values["type"];
 
             if (responseType === "login") {
+              if (res.data2) {
+                sessionStorage.setItem("signinUrl", window.location.href);
+                Setting.goToLink(this, `/forget/${this.state.applicationName}`);
+              }
               Setting.showMessage("success", i18next.t("application:Logged in successfully"));
               this.props.onLoginSuccess();
             } else if (responseType === "code") {
               this.postCodeLoginAction(res);
             } else if (responseType === "token" || responseType === "id_token") {
+              if (res.data2) {
+                sessionStorage.setItem("signinUrl", window.location.href);
+                Setting.goToLink(this, `/forget/${this.state.applicationName}`);
+              }
               const amendatoryResponseType = responseType === "token" ? "access_token" : responseType;
               const accessToken = res.data;
               Setting.goToLink(`${oAuthParams.redirectUri}#${amendatoryResponseType}=${accessToken}&state=${oAuthParams.state}&token_type=bearer`);
             } else if (responseType === "saml") {
+              if (res.data2.needUpdatePassword) {
+                sessionStorage.setItem("signinUrl", window.location.href);
+                Setting.goToLink(this, `/forget/${this.state.applicationName}`);
+              }
               if (res.data2.method === "POST") {
                 this.setState({
                   samlResponse: res.data,
@@ -533,7 +553,7 @@ class LoginPage extends React.Component {
     if (signinItem.name === "Logo") {
       return (
         <div className="login-logo-box">
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           {
             Setting.renderHelmet(application)
           }
@@ -544,8 +564,8 @@ class LoginPage extends React.Component {
       );
     } else if (signinItem.name === "Back button") {
       return (
-        <div>
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+        <div className="back-button">
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           {
             this.renderBackButton()
           }
@@ -563,24 +583,26 @@ class LoginPage extends React.Component {
 
       return (
         <div className="login-languages">
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <LanguageSelect languages={application.organizationObj.languages} />
         </div>
       );
     } else if (signinItem.name === "Signin methods") {
       return (
         <div>
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           {this.renderMethodChoiceBox()}
         </div>
       )
       ;
     } else if (signinItem.name === "Username") {
       return (
-        <div className="login-username" style={{margin: "0px"}}>
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+        <div style={{margin: "0px"}}>
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <Form.Item
             name="username"
+            className="login-username"
+            label={signinItem.label ? signinItem.label : null}
             rules={[
               {
                 required: true,
@@ -638,6 +660,7 @@ class LoginPage extends React.Component {
 
             <Input
               id="input"
+              className="login-username-input"
               prefix={<UserOutlined className="site-form-item-icon" />}
               placeholder={this.getPlaceholder()}
               onChange={e => {
@@ -652,14 +675,14 @@ class LoginPage extends React.Component {
     } else if (signinItem.name === "Password") {
       return (
         <div style={{marginTop: "17px"}}>
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
-          {this.renderPasswordOrCodeInput()}
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
+          {this.renderPasswordOrCodeInput(signinItem)}
         </div>
       );
     } else if (signinItem.name === "Forgot password?") {
       return (
         <div>
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <div className="login-forget-password" style={{width: "100%", margin: "20px 0"}}>
             <Form.Item name="autoSignin" valuePropName="checked" noStyle>
               <Checkbox style={{float: "left"}}>
@@ -667,7 +690,7 @@ class LoginPage extends React.Component {
               </Checkbox>
             </Form.Item>
             {
-              signinItem.visible ? Setting.renderForgetLink(application, i18next.t("login:Forgot password?")) : null
+              signinItem.visible ? Setting.renderForgetLink(application, signinItem.label ? signinItem.label : i18next.t("login:Forgot password?")) : null
             }
           </div>
         </div>
@@ -677,7 +700,7 @@ class LoginPage extends React.Component {
     } else if (signinItem.name === "Login button") {
       return (
         <Form.Item className="login-button-box">
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <Button
             type="primary"
             htmlType="submit"
@@ -686,7 +709,7 @@ class LoginPage extends React.Component {
             {
               this.state.loginMethod === "webAuthn" ? i18next.t("login:Sign in with WebAuthn") :
                 this.state.loginMethod === "faceId" ? i18next.t("login:Sign in with Face ID") :
-                  i18next.t("login:Sign In")
+                  signinItem.label ? signinItem.label : i18next.t("login:Sign In")
             }
           </Button>
           {
@@ -722,31 +745,44 @@ class LoginPage extends React.Component {
       const showProviders = avaliableProviders.length > 0;
       return (
         <div>
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
-          {showProviders && <React.Fragment><div className="social-auth-label">
-            <p className="social-auth">{i18next.t("account:or") || "or"}</p>
-          </div>
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <Form.Item>
-            {
-              avaliableProviders.map(providerItem => {
-                return ProviderButton.renderProviderLogo(providerItem.provider, application, null, null, signinItem.rule, this.props.location);
-              })
-            }
             {
               this.renderOtherFormProvider(application)
             }
-          </Form.Item></React.Fragment>}
-          {this.renderFooter(application)}
+            {showProviders && (
+              <React.Fragment>
+                <div className="social-auth-label">
+                  <p className="social-auth">{i18next.t("account:or") || "or"}</p>
+                </div>
+                <div
+                  style={{display: "flex", flexDirection: "column", gap: "4px"}}
+                >
+                  {avaliableProviders.map((providerItem) => {
+                    return ProviderButton.renderProviderLogo(
+                      providerItem.provider,
+                      application,
+                      30,
+                      5,
+                      "medium",
+                      this.props.location
+                    );
+                  })}
+                </div>
+              </React.Fragment>
+            )}
+          </Form.Item>
         </div>
       );
     } else if (signinItem.name.startsWith("Text ") || signinItem?.isCustom) {
       return (
-        <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+        <div dangerouslySetInnerHTML={{__html: signinItem.customCss}} />
       );
     } else if (signinItem.name === "Signup link") {
       return (
         <div style={{width: "100%", marginBottom: "10px"}} className="login-signup-link">
-          <div dangerouslySetInnerHTML={{__html: signinItem.label}} />
+          <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
+          {this.renderFooter(application, signinItem)}
         </div>
       );
     }
@@ -835,7 +871,7 @@ class LoginPage extends React.Component {
                 {application.displayName}
               </span>
             </a>
-              :
+            :
           </div>
           <br />
           {
@@ -891,17 +927,20 @@ class LoginPage extends React.Component {
     />;
   }
 
-  renderFooter(application) {
+  renderFooter(application, signinItem) {
     return (
-      <div style={{display: "flex", justifyContent: "center", marginTop: "34px"}}>
+      <div style={{display: "flex", justifyContent: "center", marginTop: "34px", width: "100%"}}>
         {
           !application.enableSignUp ? null : (
-            <React.Fragment>
-              {i18next.t("login:No account?")}&nbsp;
-              {
-                Setting.renderSignupLink(application, i18next.t("login:sign up now"))
-              }
-            </React.Fragment>
+            signinItem?.label ? Setting.renderSignupLink(application, signinItem.label) :
+              (
+                <React.Fragment>
+                  {i18next.t("login:No account?")}&nbsp;
+                  {
+                    Setting.renderSignupLink(application, i18next.t("login:sign up now"))
+                  }
+                </React.Fragment>
+              )
           )
         }
       </div>
@@ -1017,17 +1056,20 @@ class LoginPage extends React.Component {
       });
   }
 
-  renderPasswordOrCodeInput() {
+  renderPasswordOrCodeInput(signinItem) {
     const application = this.getApplicationObj();
     if (this.state.loginMethod === "password" || this.state.loginMethod === "ldap") {
       return (
         <Col span={24}>
-          <div className="login-password">
+          <div>
             <Form.Item
               name="password"
+              className="login-password"
+              label={signinItem.label ? signinItem.label : null}
               rules={[{required: true, message: i18next.t("login:Please input your password!")}]}
             >
               <Input.Password
+                className="login-password-input"
                 prefix={<LockOutlined className="site-form-item-icon" />}
                 type="password"
                 placeholder={i18next.t("general:Password")}
@@ -1192,8 +1234,7 @@ class LoginPage extends React.Component {
   renderBackButton() {
     if (this.state.orgChoiceMode === "None" || this.props.preview === "auto") {
       return (
-        <Button type="text" size="large" icon={<ArrowLeftOutlined />}
-          className="back-button"
+        <Button className="back-inner-button" type="text" size="large" icon={<ArrowLeftOutlined />}
           onClick={() => history.back()}>
         </Button>
       );

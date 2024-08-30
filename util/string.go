@@ -131,6 +131,15 @@ func GetOwnerAndNameFromId(id string) (string, string) {
 	return tokens[0], tokens[1]
 }
 
+func GetOwnerAndNameFromIdWithError(id string) (string, string, error) {
+	tokens := strings.Split(id, "/")
+	if len(tokens) != 2 {
+		return "", "", errors.New("GetOwnerAndNameFromId() error, wrong token count for ID: " + id)
+	}
+
+	return tokens[0], tokens[1], nil
+}
+
 func GetOwnerFromId(id string) string {
 	tokens := strings.Split(id, "/")
 	if len(tokens) != 2 {
@@ -152,6 +161,16 @@ func GetOwnerAndNameAndOtherFromId(id string) (string, string, string) {
 	}
 
 	return tokens[0], tokens[1], tokens[2]
+}
+
+func GetSharedOrgFromApp(rawName string) (name string, organization string) {
+	name = rawName
+	splitName := strings.Split(rawName, "-org-")
+	if len(splitName) >= 2 {
+		organization = splitName[len(splitName)-1]
+		name = splitName[0]
+	}
+	return name, organization
 }
 
 func GenerateId() string {
@@ -354,9 +373,16 @@ func StringToInterfaceArray(array []string) []interface{} {
 func StringToInterfaceArray2d(arrays [][]string) [][]interface{} {
 	var interfaceArrays [][]interface{}
 	for _, req := range arrays {
-		var interfaceArray []interface{}
-		for _, r := range req {
-			interfaceArray = append(interfaceArray, r)
+		var (
+			interfaceArray []interface{}
+			elem           interface{}
+		)
+		for _, elem = range req {
+			jStruct, err := TryJsonToAnonymousStruct(elem.(string))
+			if err == nil {
+				elem = jStruct
+			}
+			interfaceArray = append(interfaceArray, elem)
 		}
 		interfaceArrays = append(interfaceArrays, interfaceArray)
 	}

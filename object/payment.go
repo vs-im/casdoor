@@ -39,6 +39,8 @@ type Payment struct {
 	Currency           string  `xorm:"varchar(100)" json:"currency"`
 	Price              float64 `json:"price"`
 	ReturnUrl          string  `xorm:"varchar(1000)" json:"returnUrl"`
+	IsRecharge         bool    `xorm:"bool" json:"isRecharge"`
+
 	// Payer Info
 	User         string `xorm:"varchar(100)" json:"user"`
 	PersonName   string `xorm:"varchar(100)" json:"personName"`
@@ -193,9 +195,14 @@ func notifyPayment(body []byte, owner string, paymentName string) (*Payment, *pp
 		return payment, nil, err
 	}
 
-	if notifyResult.Price != product.Price {
+	if notifyResult.Price != product.Price && !product.IsRecharge {
 		err = fmt.Errorf("the payment's price: %f doesn't equal to the expected price: %f", notifyResult.Price, product.Price)
 		return payment, nil, err
+	}
+
+	if payment.IsRecharge {
+		err = UpdateUserBalance(payment.Owner, payment.User, payment.Price)
+		return payment, notifyResult, err
 	}
 
 	return payment, notifyResult, nil
@@ -214,6 +221,19 @@ func NotifyPayment(body []byte, owner string, paymentName string) (*Payment, err
 		_, err = UpdatePayment(payment.GetId(), payment)
 		if err != nil {
 			return nil, err
+		}
+
+		transaction, err := GetTransaction(payment.GetId())
+		if err != nil {
+			return nil, err
+		}
+
+		if transaction != nil {
+			transaction.State = payment.State
+			_, err = UpdateTransaction(transaction.GetId(), transaction)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

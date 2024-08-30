@@ -266,7 +266,13 @@ func initDefinedOrganization(organization *Organization) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := deleteOrganization(organization)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete organization")
+		}
 	}
 	organization.CreatedTime = util.GetCurrentTime()
 	organization.AccountItems = getBuiltInAccountItems()
@@ -284,7 +290,13 @@ func initDefinedApplication(application *Application) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := deleteApplication(application)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete application")
+		}
 	}
 	application.CreatedTime = util.GetCurrentTime()
 	_, err = AddApplication(application)
@@ -299,11 +311,19 @@ func initDefinedUser(user *User) {
 		panic(err)
 	}
 	if existed != nil {
-		return
+		affected, err := deleteUser(user)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete user")
+		}
 	}
 	user.CreatedTime = util.GetCurrentTime()
 	user.Id = util.GenerateId()
-	user.Properties = make(map[string]string)
+	if user.Properties == nil {
+		user.Properties = make(map[string]string)
+	}
 	_, err = AddUser(user)
 	if err != nil {
 		panic(err)
@@ -317,7 +337,13 @@ func initDefinedCert(cert *Cert) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeleteCert(cert)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete cert")
+		}
 	}
 	cert.CreatedTime = util.GetCurrentTime()
 	_, err = AddCert(cert)
@@ -333,7 +359,13 @@ func initDefinedLdap(ldap *Ldap) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeleteLdap(ldap)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete ldap")
+		}
 	}
 	_, err = AddLdap(ldap)
 	if err != nil {
@@ -348,7 +380,13 @@ func initDefinedProvider(provider *Provider) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeleteProvider(provider)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete provider")
+		}
 	}
 	_, err = AddProvider(provider)
 	if err != nil {
@@ -363,7 +401,13 @@ func initDefinedModel(model *Model) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeleteModel(model)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete provider")
+		}
 	}
 	model.CreatedTime = util.GetCurrentTime()
 	_, err = AddModel(model)
@@ -379,7 +423,13 @@ func initDefinedPermission(permission *Permission) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := deletePermission(permission)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete permission")
+		}
 	}
 	permission.CreatedTime = util.GetCurrentTime()
 	_, err = AddPermission(permission)
@@ -395,7 +445,13 @@ func initDefinedPayment(payment *Payment) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeletePayment(payment)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete payment")
+		}
 	}
 	payment.CreatedTime = util.GetCurrentTime()
 	_, err = AddPayment(payment)
@@ -411,7 +467,13 @@ func initDefinedProduct(product *Product) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeleteProduct(product)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete product")
+		}
 	}
 	product.CreatedTime = util.GetCurrentTime()
 	_, err = AddProduct(product)
@@ -427,7 +489,13 @@ func initDefinedResource(resource *Resource) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeleteResource(resource)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete resource")
+		}
 	}
 	resource.CreatedTime = util.GetCurrentTime()
 	_, err = AddResource(resource)
@@ -443,7 +511,13 @@ func initDefinedRole(role *Role) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := deleteRole(role)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete role")
+		}
 	}
 	role.CreatedTime = util.GetCurrentTime()
 	_, err = AddRole(role)
@@ -459,7 +533,13 @@ func initDefinedSyncer(syncer *Syncer) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeleteSyncer(syncer)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete role")
+		}
 	}
 	syncer.CreatedTime = util.GetCurrentTime()
 	_, err = AddSyncer(syncer)
@@ -475,7 +555,13 @@ func initDefinedToken(token *Token) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeleteToken(token)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete token")
+		}
 	}
 	token.CreatedTime = util.GetCurrentTime()
 	_, err = AddToken(token)
@@ -491,7 +577,13 @@ func initDefinedWebhook(webhook *Webhook) {
 	}
 
 	if existed != nil {
-		return
+		affected, err := DeleteWebhook(webhook)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete webhook")
+		}
 	}
 	webhook.CreatedTime = util.GetCurrentTime()
 	_, err = AddWebhook(webhook)
@@ -506,7 +598,13 @@ func initDefinedGroup(group *Group) {
 		panic(err)
 	}
 	if existed != nil {
-		return
+		affected, err := deleteGroup(group)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete group")
+		}
 	}
 	group.CreatedTime = util.GetCurrentTime()
 	_, err = AddGroup(group)
@@ -521,7 +619,13 @@ func initDefinedAdapter(adapter *Adapter) {
 		panic(err)
 	}
 	if existed != nil {
-		return
+		affected, err := DeleteAdapter(adapter)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete adapter")
+		}
 	}
 	adapter.CreatedTime = util.GetCurrentTime()
 	_, err = AddAdapter(adapter)
@@ -536,7 +640,13 @@ func initDefinedEnforcer(enforcer *Enforcer) {
 		panic(err)
 	}
 	if existed != nil {
-		return
+		affected, err := DeleteEnforcer(enforcer)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete enforcer")
+		}
 	}
 	enforcer.CreatedTime = util.GetCurrentTime()
 	_, err = AddEnforcer(enforcer)
@@ -551,7 +661,13 @@ func initDefinedPlan(plan *Plan) {
 		panic(err)
 	}
 	if existed != nil {
-		return
+		affected, err := DeletePlan(plan)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete plan")
+		}
 	}
 	plan.CreatedTime = util.GetCurrentTime()
 	_, err = AddPlan(plan)
@@ -561,12 +677,18 @@ func initDefinedPlan(plan *Plan) {
 }
 
 func initDefinedPricing(pricing *Pricing) {
-	existed, err := getPlan(pricing.Owner, pricing.Name)
+	existed, err := getPricing(pricing.Owner, pricing.Name)
 	if err != nil {
 		panic(err)
 	}
 	if existed != nil {
-		return
+		affected, err := DeletePricing(pricing)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete pricing")
+		}
 	}
 	pricing.CreatedTime = util.GetCurrentTime()
 	_, err = AddPricing(pricing)
@@ -581,7 +703,13 @@ func initDefinedInvitation(invitation *Invitation) {
 		panic(err)
 	}
 	if existed != nil {
-		return
+		affected, err := DeleteInvitation(invitation)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete invitation")
+		}
 	}
 	invitation.CreatedTime = util.GetCurrentTime()
 	_, err = AddInvitation(invitation, "en")
@@ -591,6 +719,7 @@ func initDefinedInvitation(invitation *Invitation) {
 }
 
 func initDefinedRecord(record *casvisorsdk.Record) {
+	record.Id = 0
 	record.CreatedTime = util.GetCurrentTime()
 	_ = AddRecord(record)
 }
@@ -609,7 +738,13 @@ func initDefinedSubscription(subscription *Subscription) {
 		panic(err)
 	}
 	if existed != nil {
-		return
+		affected, err := DeleteSubscription(subscription)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete subscription")
+		}
 	}
 	subscription.CreatedTime = util.GetCurrentTime()
 	_, err = AddSubscription(subscription)
@@ -624,7 +759,13 @@ func initDefinedTransaction(transaction *Transaction) {
 		panic(err)
 	}
 	if existed != nil {
-		return
+		affected, err := DeleteTransaction(transaction)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete transaction")
+		}
 	}
 	transaction.CreatedTime = util.GetCurrentTime()
 	_, err = AddTransaction(transaction)

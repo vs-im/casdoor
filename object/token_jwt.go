@@ -128,7 +128,7 @@ type UserWithoutThirdIdp struct {
 	LastSigninWrongTime string `xorm:"varchar(100)" json:"lastSigninWrongTime"`
 	SigninWrongTimes    int    `json:"signinWrongTimes"`
 
-	// ManagedAccounts []ManagedAccount `xorm:"managedAccounts blob" json:"managedAccounts"`
+	ManagedAccounts []ManagedAccount `xorm:"managedAccounts blob" json:"managedAccounts"`
 }
 
 type ClaimsShort struct {
@@ -137,6 +137,15 @@ type ClaimsShort struct {
 	Nonce     string `json:"nonce,omitempty"`
 	Scope     string `json:"scope,omitempty"`
 	jwt.RegisteredClaims
+}
+
+type OIDCAddress struct {
+	Formatted     string `json:"formatted"`
+	StreetAddress string `json:"street_address"`
+	Locality      string `json:"locality"`
+	Region        string `json:"region"`
+	PostalCode    string `json:"postal_code"`
+	Country       string `json:"country"`
 }
 
 type ClaimsWithoutThirdIdp struct {
@@ -245,6 +254,8 @@ func getUserWithoutThirdIdp(user *User) *UserWithoutThirdIdp {
 
 		LastSigninWrongTime: user.LastSigninWrongTime,
 		SigninWrongTimes:    user.SigninWrongTimes,
+
+		ManagedAccounts: user.ManagedAccounts,
 	}
 
 	return res
@@ -356,6 +367,10 @@ func generateJwtToken(application *Application, user *User, nonce string, scope 
 		},
 	}
 
+	if application.IsShared {
+		claims.Audience = []string{application.ClientId + "-org-" + user.Owner}
+	}
+
 	var token *jwt.Token
 	var refreshToken *jwt.Token
 
@@ -386,6 +401,13 @@ func generateJwtToken(application *Application, user *User, nonce string, scope 
 		refreshClaims["exp"] = jwt.NewNumericDate(refreshExpireTime)
 		refreshClaims["TokenType"] = "refresh-token"
 		refreshToken = jwt.NewWithClaims(jwt.SigningMethodRS256, refreshClaims)
+	} else if application.TokenFormat == "JWT-Standard" {
+		claimsStandard := getStandardClaims(claims)
+
+		token = jwt.NewWithClaims(jwt.SigningMethodRS256, claimsStandard)
+		claimsStandard.ExpiresAt = jwt.NewNumericDate(refreshExpireTime)
+		claimsStandard.TokenType = "refresh-token"
+		refreshToken = jwt.NewWithClaims(jwt.SigningMethodRS256, claimsStandard)
 	} else {
 		return "", "", "", fmt.Errorf("unknown application TokenFormat: %s", application.TokenFormat)
 	}

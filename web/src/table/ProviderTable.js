@@ -15,6 +15,7 @@
 import React from "react";
 import {DeleteOutlined, DownOutlined, UpOutlined} from "@ant-design/icons";
 import {Button, Col, Input, Row, Select, Switch, Table, Tooltip} from "antd";
+import {CountryCodeSelect} from "../common/select/CountryCodeSelect";
 import * as Setting from "../Setting";
 import i18next from "i18next";
 import * as Provider from "../auth/Provider";
@@ -27,6 +28,10 @@ class ProviderTable extends React.Component {
     this.state = {
       classes: props,
     };
+  }
+
+  getUserOrganization() {
+    return this.props.application?.organizationObj;
   }
 
   updateTable(table) {
@@ -79,7 +84,7 @@ class ProviderTable extends React.Component {
 
                 // If the provider is email or SMS, set the rule to "all" instead of the default "None"
                 if (provider.category === "Email" || provider.category === "SMS") {
-                  this.updateField(table, index, "rule", "all");
+                  this.updateField(table, index, "rule", "All");
                 }
               }} >
               {
@@ -107,6 +112,30 @@ class ProviderTable extends React.Component {
         render: (text, record, index) => {
           const provider = Setting.getArrayItem(this.props.providers, "name", record.name);
           return Provider.getProviderLogoWidget(provider);
+        },
+      },
+      {
+        title: i18next.t("user:Country/Region"),
+        dataIndex: "countryCodes",
+        key: "countryCodes",
+        width: "140px",
+        render: (text, record, index) => {
+          if (record.provider?.category !== "SMS") {
+            return null;
+          }
+
+          return (
+            <CountryCodeSelect
+              style={{width: "100%"}}
+              hasDefault={true}
+              mode={"multiple"}
+              initValue={text ? text : ["All"]}
+              onChange={(value) => {
+                this.updateField(table, index, "countryCodes", value);
+              }}
+              countryCodes={this.getUserOrganization()?.countryCodes}
+            />
+          );
         },
       },
       {
@@ -198,7 +227,7 @@ class ProviderTable extends React.Component {
         title: i18next.t("application:Rule"),
         dataIndex: "rule",
         key: "rule",
-        width: "120px",
+        width: "160px",
         render: (text, record, index) => {
           if (record.provider?.type === "Google") {
             if (text === "None") {
@@ -230,12 +259,12 @@ class ProviderTable extends React.Component {
             );
           } else if (record.provider?.category === "SMS" || record.provider?.category === "Email") {
             if (text === "None") {
-              text = "all";
+              text = "All";
             }
             return (
               <Select virtual={false} style={{width: "100%"}}
                 value={text}
-                defaultValue="all"
+                defaultValue="All"
                 onChange={value => {
                   this.updateField(table, index, "rule", value);
                 }}>

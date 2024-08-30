@@ -41,6 +41,7 @@ import {CheckCircleOutlined, HolderOutlined, UsergroupAddOutlined} from "@ant-de
 import * as MfaBackend from "./backend/MfaBackend";
 import AccountAvatar from "./account/AccountAvatar";
 import FaceIdTable from "./table/FaceIdTable";
+import MfaAccountTable from "./table/MfaAccountTable";
 
 const {Option} = Select;
 
@@ -202,7 +203,7 @@ class UserEditPage extends React.Component {
     return value;
   }
 
-  updateUserField(key, value) {
+  updateUserField(key, value, idx) {
     if (this.props.account === null) {
       return;
     }
@@ -210,7 +211,15 @@ class UserEditPage extends React.Component {
     value = this.parseUserField(key, value);
 
     const user = this.state.user;
-    user[key] = value;
+    if (key === "address") {
+      if (!user[key]) {
+        user[key] = ["", ""];
+      }
+      user[key][idx] = value;
+    } else {
+      user[key] = value;
+    }
+
     this.setState({
       user: user,
     });
@@ -501,16 +510,33 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "Address") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("user:Address"), i18next.t("user:Address - Tooltip"))} :
-          </Col>
-          <Col span={22} >
-            <Input value={this.state.user.address} onChange={e => {
-              this.updateUserField("address", e.target.value);
-            }} />
-          </Col>
-        </Row>
+        <React.Fragment>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+              {Setting.getLabel(i18next.t("user:Address"), i18next.t("user:Address - Tooltip"))} :
+            </Col>
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+              <span>{i18next.t("user:Address line") + " 1"}</span> :
+            </Col>
+            <Col span={20} >
+              <Input value={!this.state.user.address ? "" : this.state.user.address[0]} onChange={e => {
+                this.updateUserField("address", e.target.value, 0);
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            </Col>
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+              <span>{i18next.t("user:Address line") + " 2"}</span> :
+            </Col>
+            <Col span={20} >
+              <Input value={!this.state.user.address ? "" : this.state.user.address[1]} onChange={e => {
+                this.updateUserField("address", e.target.value, 1);
+              }} />
+            </Col>
+          </Row>
+        </React.Fragment>
       );
     } else if (accountItem.name === "Affiliation") {
       return (
@@ -678,6 +704,19 @@ class UserEditPage extends React.Component {
           <Col span={22} >
             <Input value={this.state.user.education} onChange={e => {
               this.updateUserField("education", e.target.value);
+            }} />
+          </Col>
+        </Row>
+      );
+    } else if (accountItem.name === "Balance") {
+      return (
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("user:Balance"), i18next.t("user:Balance - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <InputNumber value={this.state.user.balance} onChange={value => {
+              this.updateUserField("balance", value);
             }} />
           </Col>
         </Row>
@@ -998,6 +1037,34 @@ class UserEditPage extends React.Component {
               table={this.state.user.faceIds}
               onUpdateTable={(table) => {this.updateUserField("faceIds", table);}}
             />
+          </Col>
+        </Row>
+      );
+    } else if (accountItem.name === "MFA accounts") {
+      return (
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("user:MFA accounts"), i18next.t("user:MFA accounts"))} :
+          </Col>
+          <Col span={22} >
+            <MfaAccountTable
+              title={i18next.t("user:MFA accounts")}
+              table={this.state.user.mfaAccounts}
+              onUpdateTable={(table) => {this.updateUserField("mfaAccounts", table);}}
+            />
+          </Col>
+        </Row>
+      );
+    } else if (accountItem.name === "Need update password") {
+      return (
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("user:Need update password"), i18next.t("user:Need update password - Tooltip"))} :
+          </Col>
+          <Col span={(Setting.isMobile()) ? 22 : 2} >
+            <Switch disabled={(!this.state.user.phone) && (!this.state.user.email) && (!this.state.user.mfaProps)} checked={this.state.user.needUpdatePassword} onChange={checked => {
+              this.updateUserField("needUpdatePassword", checked);
+            }} />
           </Col>
         </Row>
       );
