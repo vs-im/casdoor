@@ -835,6 +835,10 @@ class SignupPage extends React.Component {
         />
       );
     } else if (signupItem.name === "Providers") {
+      const a = 1;
+      if (5 > a) {
+        return null;
+      }
       const showForm =
         Setting.isPasswordEnabled(application) ||
         Setting.isCodeSigninEnabled(application) ||
