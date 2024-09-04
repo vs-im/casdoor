@@ -18,9 +18,11 @@ export const MfaVerifyTotpForm = ({mfaProps, onFinish}) => {
         <Col span={24} style={{display: "flex", justifyContent: "center"}}>
           <QRCode
             errorLevel="H"
-            value={mfaProps.url}
-            icon={"https://cdn.casdoor.com/static/favicon.png"}
+            // TODO: Get company name from backend
+            value={mfaProps.url.replaceAll("Casdoor", "RightLine")}
+            icon={""}
           />
+          {/* {mfaProps.url.replaceAll("Casdoor", "RightLine")} */}
         </Col>
         <p style={{textAlign: "center"}}>{i18next.t("mfa:Scan the QR code with your Authenticator App")}</p>
         <p style={{textAlign: "center"}}>{i18next.t("mfa:Or copy the secret to your Authenticator App")}</p>

@@ -34,6 +34,8 @@ export const CropperDivModal = (props) => {
   const {user} = props;
   const {buttonText} = props;
   const {organization} = props;
+  const {style} = props;
+  const {buttonStyle} = props;
   let uploadButton;
 
   const onChange = (e) => {
@@ -141,8 +143,8 @@ export const CropperDivModal = (props) => {
   }, []);
 
   return (
-    <div>
-      <Button type="default" onClick={showModal} disabled={disabled}>
+    <div style={style}>
+      <Button style={buttonStyle} type="default" onClick={showModal} disabled={disabled}>
         {buttonText}
       </Button>
       <Modal

@@ -738,7 +738,9 @@ export function goToLinkSoft(ths, link) {
     return;
   }
 
-  ths.props.history.push(link);
+  if (ths?.props) {
+    ths.props.history.push(link);
+  }
 }
 
 export function goToLinkSoftOrJumpSelf(ths, link) {

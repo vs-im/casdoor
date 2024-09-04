@@ -25,7 +25,7 @@ export const ResetModal = (props) => {
   const [confirmLoading, setConfirmLoading] = React.useState(false);
   const [dest, setDest] = React.useState("");
   const [code, setCode] = React.useState("");
-  const {buttonText, destType, application, countryCode} = props;
+  const {buttonText, destType, application, countryCode, style, buttonStyle} = props;
 
   const showModal = () => {
     setVisible(true);
@@ -68,8 +68,8 @@ export const ResetModal = (props) => {
   }
 
   return (
-    <Row>
-      <Button type="default" onClick={showModal}>
+    <Row style={style}>
+      <Button style={buttonStyle} type="default" onClick={showModal}>
         {buttonText}
       </Button>
       <Modal

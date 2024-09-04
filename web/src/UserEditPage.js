@@ -268,6 +268,12 @@ class UserEditPage extends React.Component {
   renderAccountItem(accountItem) {
     const isAdmin = Setting.isLocalAdminUser(this.props.account);
 
+    const justifyContent = "auto";
+
+    const secondColumnProps = {
+      style: {flex: "0 0 100%", maxWidth: "100%"},
+    };
+
     let disabled = false;
     if (accountItem.modifyRule === "Self") {
       if (!this.isSelfOrAdmin()) {
@@ -300,11 +306,11 @@ class UserEditPage extends React.Component {
 
     if (accountItem.name === "Organization") {
       return (
-        <Row style={{marginTop: "10px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "10px", justifyContent}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:Organization"), i18next.t("general:Organization - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Select virtual={false} style={{width: "100%"}} disabled={disabled} value={this.state.user.owner} onChange={(value => {
               this.getApplicationsByOrganization(value);
               this.updateUserField("owner", value);
@@ -319,11 +325,11 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "Groups") {
       return (
-        <Row style={{marginTop: "10px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "10px", justifyContent}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:Groups"), i18next.t("general:Groups - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Select virtual={false} mode="multiple" style={{width: "100%"}} disabled={disabled} value={this.state.user.groups ?? []} onChange={(value => {
               if (this.state.groups?.filter(group => value.includes(group.name))
                 .filter(group => group.type === "Physical").length > 1) {
@@ -348,11 +354,11 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "ID") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "20px", justifyContent}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel("ID", i18next.t("general:ID - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.id} disabled={disabled} onChange={e => {
               this.updateUserField("id", e.target.value);
             }} />
@@ -361,11 +367,11 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "Name") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "20px", justifyContent}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:Name"), i18next.t("general:Name - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.name} disabled={disabled} onChange={e => {
               this.updateUserField("name", e.target.value);
             }} />
@@ -374,11 +380,11 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "Display name") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "20px", justifyContent}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:Display name"), i18next.t("general:Display name - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.displayName} onChange={e => {
               this.updateUserField("displayName", e.target.value);
             }} />
@@ -387,8 +393,8 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "Avatar") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "20px", flexDirection: "column"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:Avatar"), i18next.t("general:Avatar - Tooltip"))} :
           </Col>
           {
@@ -398,11 +404,11 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "User type") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "20px", justifyContent}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:User type"), i18next.t("general:User type - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Select virtual={false} style={{width: "100%"}} value={this.state.user.type} onChange={(value => {this.updateUserField("type", value);})}
               options={["normal-user", "paid-user"].map(item => Setting.getOption(item, item))}
             />
@@ -411,18 +417,18 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "Password") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "20px", justifyContent}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:Password"), i18next.t("general:Password - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             {
               (this.state.user.name === this.state.userName) ? (
-                <PasswordModal user={this.state.user} userName={this.state.userName} organization={this.getUserOrganization()} account={this.props.account} disabled={disabled} />
+                <PasswordModal buttonStyle={{width: "100%"}} user={this.state.user} userName={this.state.userName} organization={this.getUserOrganization()} account={this.props.account} disabled={disabled} />
               ) : (
                 <Tooltip placement={"topLeft"} title={i18next.t("user:You have changed the username, please save your change first before modifying the password")}>
                   <span>
-                    <PasswordModal user={this.state.user} userName={this.state.userName} organization={this.getUserOrganization()} account={this.props.account} disabled={true} />
+                    <PasswordModal buttonStyle={{width: "100%"}} user={this.state.user} userName={this.state.userName} organization={this.getUserOrganization()} account={this.props.account} disabled={true} />
                   </span>
                 </Tooltip>
               )
@@ -432,63 +438,67 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "Email") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("general:Email"), i18next.t("general:Email - Tooltip"))} :
-          </Col>
-          <Col style={{paddingRight: "20px"}} span={11} >
-            <Input
-              value={this.state.user.email}
-              style={{width: "280Px"}}
-              disabled={!Setting.isLocalAdminUser(this.props.account) ? true : disabled}
-              onChange={e => {
-                this.updateUserField("email", e.target.value);
-              }}
-            />
-          </Col>
-          <Col span={Setting.isMobile() ? 22 : 11} >
-            {/* backend auto get the current user, so admin can not edit. Just self can reset*/}
-            {this.isSelf() ? <ResetModal application={this.state.application} disabled={disabled} buttonText={i18next.t("user:Reset Email...")} destType={"email"} /> : null}
-          </Col>
+        <Row style={{marginTop: "20px", justifyContent}} >
+          <div style={{width: "100%"}}>
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
+              {Setting.getLabel(i18next.t("general:Email"), i18next.t("general:Email - Tooltip"))} :
+            </Col>
+            <Col style={{paddingRight: "20px"}} span={11} {...secondColumnProps} >
+              <Input
+                value={this.state.user.email}
+                style={{width: "100%"}}
+                disabled={!Setting.isLocalAdminUser(this.props.account) ? true : disabled}
+                onChange={e => {
+                  this.updateUserField("email", e.target.value);
+                }}
+              />
+            </Col>
+            <Col style={{marginTop: 4, maxWidth: "100%", flex: "0 0 100%"}} span={Setting.isMobile() ? 22 : 11} >
+              {/* backend auto get the current user, so admin can not edit. Just self can reset*/}
+              {this.isSelf() ? <ResetModal style={{width: "100%", maxWidth: "100%", flex: "0 0 100%"}} buttonStyle={{width: "100%", maxWidth: "100%", flex: "0 0 100%"}} application={this.state.application} disabled={disabled} buttonText={i18next.t("user:Reset Email...")} destType={"email"} /> : null}
+            </Col>
+          </div>
         </Row>
       );
     } else if (accountItem.name === "Phone") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={Setting.isMobile() ? 22 : 2}>
-            {Setting.getLabel(i18next.t("general:Phone"), i18next.t("general:Phone - Tooltip"))} :
-          </Col>
-          <Col style={{paddingRight: "20px"}} span={11} >
-            <Input.Group compact style={{width: "280Px"}}>
-              <CountryCodeSelect
-                style={{width: "30%"}}
-                // disabled={!Setting.isLocalAdminUser(this.props.account) ? true : disabled}
-                initValue={this.state.user.countryCode}
-                onChange={(value) => {
-                  this.updateUserField("countryCode", value);
-                }}
-                countryCodes={this.getUserOrganization()?.countryCodes}
-              />
-              <Input value={this.state.user.phone}
-                style={{width: "70%"}}
-                disabled={!Setting.isLocalAdminUser(this.props.account) ? true : disabled}
-                onChange={e => {
-                  this.updateUserField("phone", e.target.value);
-                }} />
-            </Input.Group>
-          </Col>
-          <Col span={Setting.isMobile() ? 24 : 11} >
-            {this.isSelf() ? (<ResetModal application={this.state.application} countryCode={this.getCountryCode()} disabled={disabled} buttonText={i18next.t("user:Reset Phone...")} destType={"phone"} />) : null}
-          </Col>
+        <Row style={{marginTop: "20px", justifyContent}} >
+          <div style={{width: "100%"}}>
+            <Col style={{marginTop: "5px"}} span={Setting.isMobile() ? 22 : 30}>
+              {Setting.getLabel(i18next.t("general:Phone"), i18next.t("general:Phone - Tooltip"))} :
+            </Col>
+            <Col style={{paddingRight: "20px"}} span={11} {...secondColumnProps} >
+              <Input.Group compact style={{width: "100%"}}>
+                <CountryCodeSelect
+                  style={{width: "30%"}}
+                  // disabled={!Setting.isLocalAdminUser(this.props.account) ? true : disabled}
+                  initValue={this.state.user.countryCode}
+                  onChange={(value) => {
+                    this.updateUserField("countryCode", value);
+                  }}
+                  countryCodes={this.getUserOrganization()?.countryCodes}
+                />
+                <Input value={this.state.user.phone}
+                  style={{width: "70%"}}
+                  disabled={!Setting.isLocalAdminUser(this.props.account) ? true : disabled}
+                  onChange={e => {
+                    this.updateUserField("phone", e.target.value);
+                  }} />
+              </Input.Group>
+            </Col>
+            <Col span={Setting.isMobile() ? 24 : 11} style={{...secondColumnProps.style, marginTop: 4}} >
+              {this.isSelf() ? (<ResetModal buttonStyle={{width: "100%"}} application={this.state.application} countryCode={this.getCountryCode()} disabled={disabled} buttonText={i18next.t("user:Reset Phone...")} destType={"phone"} />) : null}
+            </Col>
+          </div>
         </Row>
       );
     } else if (accountItem.name === "Country/Region") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "20px", justifyContent}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Country/Region"), i18next.t("user:Country/Region - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <RegionSelect defaultValue={this.state.user.region} onChange={(value) => {
               this.updateUserField("region", value);
             }} />
@@ -497,11 +507,11 @@ class UserEditPage extends React.Component {
       );
     } else if (accountItem.name === "Location") {
       return (
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+        <Row style={{marginTop: "20px", justifyContent}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Location"), i18next.t("user:Location - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.location} onChange={e => {
               this.updateUserField("location", e.target.value);
             }} />
@@ -511,11 +521,11 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Address") {
       return (
         <React.Fragment>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Row style={{marginTop: "20px", justifyContent}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
               {Setting.getLabel(i18next.t("user:Address"), i18next.t("user:Address - Tooltip"))} :
             </Col>
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
               <span>{i18next.t("user:Address line") + " 1"}</span> :
             </Col>
             <Col span={20} >
@@ -525,9 +535,9 @@ class UserEditPage extends React.Component {
             </Col>
           </Row>
           <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             </Col>
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
               <span>{i18next.t("user:Address line") + " 2"}</span> :
             </Col>
             <Col span={20} >
@@ -541,16 +551,16 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Affiliation") {
       return (
         (this.state.application === null || this.state.user === null) ? null : (
-          <AffiliationSelect labelSpan={(Setting.isMobile()) ? 22 : 2} application={this.state.application} user={this.state.user} onUpdateUserField={(key, value) => {return this.updateUserField(key, value);}} />
+          <AffiliationSelect style={{...secondColumnProps.style}} labelSpan={(Setting.isMobile()) ? 22 : 30} application={this.state.application} user={this.state.user} onUpdateUserField={(key, value) => {return this.updateUserField(key, value);}} />
         )
       );
     } else if (accountItem.name === "Title") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Title"), i18next.t("user:Title - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.title} onChange={e => {
               this.updateUserField("title", e.target.value);
             }} />
@@ -560,10 +570,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "ID card type") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:ID card type"), i18next.t("user:ID card type - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.idCardType} onChange={e => {
               this.updateUserField("idCardType", e.target.value);
             }} />
@@ -573,10 +583,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "ID card") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:ID card"), i18next.t("user:ID card - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.idCard} disabled={disabled} onChange={e => {
               this.updateUserField("idCard", e.target.value);
             }} />
@@ -586,10 +596,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "ID card info") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:ID card info"), i18next.t("user:ID card info - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Row style={{marginTop: "20px"}} >
               {
                 [
@@ -607,10 +617,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Homepage") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Homepage"), i18next.t("user:Homepage - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.homepage} onChange={e => {
               this.updateUserField("homepage", e.target.value);
             }} />
@@ -620,10 +630,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Bio") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Bio"), i18next.t("user:Bio - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.bio} onChange={e => {
               this.updateUserField("bio", e.target.value);
             }} />
@@ -633,10 +643,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Tag") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Tag"), i18next.t("user:Tag - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             {
               this.getUserOrganization()?.tags?.length > 0 ? (
                 <Select virtual={false} style={{width: "100%"}} value={this.state.user.tag}
@@ -659,10 +669,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Language") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Language"), i18next.t("user:Language - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.language} onChange={e => {
               this.updateUserField("language", e.target.value);
             }} />
@@ -672,10 +682,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Gender") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Gender"), i18next.t("user:Gender - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.gender} onChange={e => {
               this.updateUserField("gender", e.target.value);
             }} />
@@ -685,10 +695,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Birthday") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Birthday"), i18next.t("user:Birthday - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.birthday} onChange={e => {
               this.updateUserField("birthday", e.target.value);
             }} />
@@ -698,10 +708,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Education") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Education"), i18next.t("user:Education - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Input value={this.state.user.education} onChange={e => {
               this.updateUserField("education", e.target.value);
             }} />
@@ -711,10 +721,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Balance") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Balance"), i18next.t("user:Balance - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <InputNumber value={this.state.user.balance} onChange={value => {
               this.updateUserField("balance", value);
             }} />
@@ -724,10 +734,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Score") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Score"), i18next.t("user:Score - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <InputNumber value={this.state.user.score} onChange={value => {
               this.updateUserField("score", value);
             }} />
@@ -737,10 +747,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Karma") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Karma"), i18next.t("user:Karma - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <InputNumber value={this.state.user.karma} onChange={value => {
               this.updateUserField("karma", value);
             }} />
@@ -750,10 +760,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Ranking") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Ranking"), i18next.t("user:Ranking - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <InputNumber value={this.state.user.ranking} onChange={value => {
               this.updateUserField("ranking", value);
             }} />
@@ -763,10 +773,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Signup application") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:Signup application"), i18next.t("general:Signup application - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <Select virtual={false} style={{width: "100%"}} disabled={disabled} value={this.state.user.signupApplication}
               onChange={(value => {this.updateUserField("signupApplication", value);})}
               options={this.state.applications.map((application) => Setting.getOption(application.name, application.name))
@@ -777,7 +787,7 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "API key") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:API key"), i18next.t("general:API key - Tooltip"))} :
           </Col>
           <Col span={22} >
@@ -808,10 +818,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Roles") {
       return (
         <Row style={{marginTop: "20px", alignItems: "center"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:Roles"), i18next.t("general:Roles - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             {
               Setting.getTags(this.state.user.roles.map(role => role.name))
             }
@@ -821,10 +831,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Permissions") {
       return (
         <Row style={{marginTop: "20px", alignItems: "center"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("general:Permissions"), i18next.t("general:Permissions - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             {
               Setting.getTags(this.state.user.permissions.map(permission => permission.name))
             }
@@ -835,7 +845,7 @@ class UserEditPage extends React.Component {
       return (
         !this.isSelfOrAdmin() ? null : (
           <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
               {Setting.getLabel(i18next.t("user:3rd-party logins"), i18next.t("user:3rd-party logins - Tooltip"))} :
             </Col>
             <Col span={22} >
@@ -872,10 +882,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Properties") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Properties"), i18next.t("user:Properties - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <PropertyTable properties={this.state.user.properties} onUpdateTable={(value) => {this.updateUserField("properties", value);}} />
           </Col>
         </Row>
@@ -883,10 +893,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Is admin") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Is admin"), i18next.t("user:Is admin - Tooltip"))} :
           </Col>
-          <Col span={(Setting.isMobile()) ? 22 : 2} >
+          <Col span={(Setting.isMobile()) ? 22 : 30} {...secondColumnProps} >
             <Switch disabled={disabled} checked={this.state.user.isAdmin} onChange={checked => {
               this.updateUserField("isAdmin", checked);
             }} />
@@ -896,10 +906,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Is forbidden") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Is forbidden"), i18next.t("user:Is forbidden - Tooltip"))} :
           </Col>
-          <Col span={(Setting.isMobile()) ? 22 : 2} >
+          <Col span={(Setting.isMobile()) ? 22 : 30} {...secondColumnProps} >
             <Switch checked={this.state.user.isForbidden} onChange={checked => {
               this.updateUserField("isForbidden", checked);
             }} />
@@ -909,10 +919,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Is deleted") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Is deleted"), i18next.t("user:Is deleted - Tooltip"))} :
           </Col>
-          <Col span={(Setting.isMobile()) ? 22 : 2} >
+          <Col span={(Setting.isMobile()) ? 22 : 30} {...secondColumnProps} >
             <Switch checked={this.state.user.isDeleted} onChange={checked => {
               this.updateUserField("isDeleted", checked);
               this.updateUserField("deletedTime", checked ? moment().format() : "");
@@ -924,10 +934,10 @@ class UserEditPage extends React.Component {
       return (
         !this.isSelfOrAdmin() ? null : (
           <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={Setting.isMobile() ? 22 : 2}>
+            <Col style={{marginTop: "5px"}} span={Setting.isMobile() ? 22 : 30}>
               {Setting.getLabel(i18next.t("mfa:Multi-factor authentication"), i18next.t("mfa:Multi-factor authentication - Tooltip "))} :
             </Col>
-            <Col span={22} >
+            <Col span={22} {...secondColumnProps} >
               <Card size="small" title={i18next.t("mfa:Multi-factor methods")}
                 extra={this.state.multiFactorAuths?.some(mfaProps => mfaProps.enabled) ?
                   <PopconfirmModal
@@ -1001,10 +1011,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "WebAuthn credentials") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:WebAuthn credentials"), i18next.t("user:WebAuthn credentials"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <WebAuthnCredentialTable isSelf={this.isSelf()} table={this.state.user.webauthnCredentials} updateTable={(table) => {this.updateUserField("webauthnCredentials", table);}} refresh={this.getUser.bind(this)} />
           </Col>
         </Row>
@@ -1012,10 +1022,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Managed accounts") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Managed accounts"), i18next.t("user:Managed accounts"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <ManagedAccountTable
               title={i18next.t("user:Managed accounts")}
               table={this.state.user.managedAccounts}
@@ -1028,10 +1038,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Face ID") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Face IDs"), i18next.t("user:Face IDs"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <FaceIdTable
               title={i18next.t("user:Face IDs")}
               table={this.state.user.faceIds}
@@ -1043,10 +1053,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "MFA accounts") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:MFA accounts"), i18next.t("user:MFA accounts"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...secondColumnProps} >
             <MfaAccountTable
               title={i18next.t("user:MFA accounts")}
               table={this.state.user.mfaAccounts}
@@ -1058,10 +1068,10 @@ class UserEditPage extends React.Component {
     } else if (accountItem.name === "Need update password") {
       return (
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 30}>
             {Setting.getLabel(i18next.t("user:Need update password"), i18next.t("user:Need update password - Tooltip"))} :
           </Col>
-          <Col span={(Setting.isMobile()) ? 22 : 2} >
+          <Col span={(Setting.isMobile()) ? 22 : 30} {...secondColumnProps} >
             <Switch disabled={(!this.state.user.phone) && (!this.state.user.email) && (!this.state.user.mfaProps)} checked={this.state.user.needUpdatePassword} onChange={checked => {
               this.updateUserField("needUpdatePassword", checked);
             }} />
@@ -1073,7 +1083,7 @@ class UserEditPage extends React.Component {
 
   renderImage(imgUrl, title, set, tag, disabled) {
     return (
-      <Col span={4} style={{textAlign: "center", margin: "auto", marginLeft: "20px"}} key={tag}>
+      <Col span={4} style={{textAlign: "center", flex: "1", maxWidth: "100%"}} key={tag}>
         {
           imgUrl ?
             <div style={{marginBottom: "10px"}}>
@@ -1089,7 +1099,7 @@ class UserEditPage extends React.Component {
         }
         {
           (this.props.account === null) ? null : (
-            <CropperDivModal disabled={disabled} tag={tag} setTitle={set} buttonText={`${title}...`} title={title} user={this.state.user} organization={this.getUserOrganization()} />
+            <CropperDivModal style={{width: "100%"}} disabled={disabled} tag={tag} setTitle={set} buttonStyle={{width: "100%"}} buttonText={`${title}...`} title={title} user={this.state.user} organization={this.getUserOrganization()} />
           )
         }
       </Col>
@@ -1239,7 +1249,7 @@ class UserEditPage extends React.Component {
 
   render() {
     return (
-      <div>
+      <div style={{maxWidth: "960px", margin: "0 auto"}}>
         {
           this.state.loading ? <Spin size="large" style={{marginLeft: "50%", marginTop: "10%"}} /> : (
             this.state.user !== null ? this.renderUser() :

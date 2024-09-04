@@ -22,7 +22,8 @@ class AffiliationSelect extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      classes: props,
+      classes: props?.classes,
+      style: props?.style,
       addressOptions: [],
       affiliationOptions: [],
     };
@@ -75,7 +76,7 @@ class AffiliationSelect extends React.Component {
               <Col style={{marginTop: "5px"}} span={this.props.labelSpan}>
                 {Setting.getLabel(i18next.t("user:Address"), i18next.t("user:Address - Tooltip"))} :
               </Col>
-              <Col span={24 - this.props.labelSpan} >
+              <Col span={24 - this.props.labelSpan} {...(this.props.style && ({style: {...this.props.style}}))} >
                 <Cascader style={{width: "100%", maxWidth: "400px"}} value={this.props.user.address} options={this.state.addressOptions} onChange={value => {
                   this.updateUserField("address", value);
                   this.updateUserField("affiliation", "");
@@ -90,7 +91,7 @@ class AffiliationSelect extends React.Component {
           <Col style={{marginTop: "5px"}} span={this.props.labelSpan}>
             {Setting.getLabel(i18next.t("user:Affiliation"), i18next.t("user:Affiliation - Tooltip"))} :
           </Col>
-          <Col span={22} >
+          <Col span={22} {...(this.props.style && ({style: {...this.props.style}}))} >
             {
               this.props.application?.affiliationUrl === "" ? (
                 <Input value={this.props.user.affiliation} onChange={e => {

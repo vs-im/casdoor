@@ -29,6 +29,8 @@ export const PasswordModal = (props) => {
   const {userName} = props;
   const {organization} = props;
   const {account} = props;
+  const {style} = props;
+  const {buttonStyle} = props;
 
   const [passwordOptions, setPasswordOptions] = React.useState([]);
   const [newPasswordValid, setNewPasswordValid] = React.useState(false);
@@ -108,8 +110,8 @@ export const PasswordModal = (props) => {
   const hasOldPassword = user.password !== "";
 
   return (
-    <Row>
-      <Button type="default" disabled={props.disabled} onClick={showModal}>
+    <Row style={style}>
+      <Button style={buttonStyle} type="default" disabled={props.disabled} onClick={showModal}>
         {hasOldPassword ? i18next.t("user:Modify password...") : i18next.t("user:Set password...")}
       </Button>
       <Modal

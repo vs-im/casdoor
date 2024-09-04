@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React from "react";
-import {Card, Col} from "antd";
+import {Card} from "antd";
 import * as Setting from "../Setting";
 import {withRouter} from "react-router-dom";
 
@@ -35,22 +35,25 @@ class SingleCard extends React.Component {
   }
 
   renderCardMobile(logo, link, title, desc, time, isSingle) {
+    // TODO: add borderRadius from app settings
     const gridStyle = {
-      width: "100vw",
+      width: "100%",
       textAlign: "center",
       cursor: "pointer",
+      borderRadius: "13px",
+      border: "1px solid #e6e6e6",
     };
     const silentSigninLink = this.wrappedAsSilentSigninLink(link);
 
     return (
-      <Card.Grid style={gridStyle} onClick={() => Setting.goToLinkSoft(this, silentSigninLink)}>
-        <img src={logo} alt="logo" width={"100%"} style={{marginBottom: "20px"}} />
+      <div style={gridStyle} onClick={() => Setting.goToLinkSoft(this, silentSigninLink)}>
+        <img src={logo} alt="logo" width={"100%"} style={{padding: "10px"}} />
         <Meta
-          title={title}
+          title={""}
           description={desc}
           style={{justifyContent: "center"}}
         />
-      </Card.Grid>
+      </div>
     );
   }
 
@@ -58,7 +61,8 @@ class SingleCard extends React.Component {
     const silentSigninLink = this.wrappedAsSilentSigninLink(link);
 
     return (
-      <Col style={{paddingLeft: "20px", paddingRight: "20px", paddingBottom: "20px", marginBottom: "20px"}} span={6}>
+      // TODO: add borderRadius from app settings
+      <div style={{paddingLeft: "20px", paddingRight: "20px", paddingBottom: "20px", marginBottom: "20px"}}>
         <Card
           hoverable
           cover={
@@ -72,7 +76,7 @@ class SingleCard extends React.Component {
           <br />
           <Meta title={""} description={Setting.getFormattedDateShort(time)} />
         </Card>
-      </Col>
+      </div>
     );
   }
 

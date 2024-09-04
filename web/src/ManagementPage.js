@@ -13,14 +13,14 @@
 // limitations under the License.
 
 import * as Setting from "./Setting";
-import {Avatar, Button, Card, Drawer, Dropdown, Menu, Result, Tooltip} from "antd";
+import {Avatar, Button, Card, Drawer, Dropdown, Menu, Result} from "antd";
 import EnableMfaNotification from "./common/notifaction/EnableMfaNotification";
 import {Link, Redirect, Route, Switch, withRouter} from "react-router-dom";
-import React, {useState} from "react";
+import React, {forwardRef, memo, useEffect, useState} from "react";
 import i18next from "i18next";
 import {
   AppstoreTwoTone,
-  BarsOutlined, DeploymentUnitOutlined, DollarTwoTone, DownOutlined,
+  DollarTwoTone,
   HomeTwoTone,
   LockTwoTone, LogoutOutlined,
   SafetyCertificateTwoTone, SettingOutlined, SettingTwoTone,
@@ -83,9 +83,9 @@ import MfaSetupPage from "./auth/MfaSetupPage";
 import OdicDiscoveryPage from "./auth/OidcDiscoveryPage";
 import * as Conf from "./Conf";
 import LanguageSelect from "./common/select/LanguageSelect";
-import ThemeSelect from "./common/select/ThemeSelect";
+// import ThemeSelect from "./common/select/ThemeSelect";
 import OpenTour from "./common/OpenTour";
-import OrganizationSelect from "./common/select/OrganizationSelect";
+// import OrganizationSelect from "./common/select/OrganizationSelect";
 import AccountAvatar from "./account/AccountAvatar";
 import {Content, Header} from "antd/es/layout/layout";
 import * as AuthBackend from "./auth/AuthBackend";
@@ -93,10 +93,127 @@ import {clearWeb3AuthToken} from "./auth/Web3Auth";
 import TransactionListPage from "./TransactionListPage";
 import TransactionEditPage from "./TransactionEditPage";
 import VerificationListPage from "./VerificationListPage";
+import * as ApplicationBackend from "./backend/ApplicationBackend";
+// import SingleCard from "./basic/SingleCard";
+
+const DownCustomSvg = (
+  props,
+  ref
+) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={28}
+    height={28}
+    fill="none"
+    ref={ref}
+    {...props}
+  >
+    <g clipPath="url(#a)">
+      <path
+        fill="#8897AD"
+        d="M14.184 20.48c.293 0 .586-.117.785-.34l9.07-9.292c.2-.2.316-.457.316-.75 0-.61-.457-1.078-1.066-1.078-.293 0-.562.117-.762.304L13.551 18.5h1.254L5.828 9.324a1.07 1.07 0 0 0-.762-.304C4.457 9.02 4 9.488 4 10.098c0 .293.117.55.316.761l9.07 9.282a1.1 1.1 0 0 0 .798.34Z"
+      />
+    </g>
+    <defs>
+      <clipPath id="a">
+        <path fill="#fff" d="M4 8h20.355v12.48H4z" />
+      </clipPath>
+    </defs>
+  </svg>
+);
+
+const DownCustomForwardRef = forwardRef(DownCustomSvg);
+const DownCustomIcon = memo(DownCustomForwardRef);
+
+const SvgComponent = (props, ref) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={28}
+    height={28}
+    fill="none"
+    viewBox="0 0 28 28"
+    ref={ref}
+    {...props}
+  >
+    <g clipPath="url(#clip0_370_33550)">
+      <path
+        fill="#8897AD"
+        d="M12.45 24.492c.796 0 1.37-.586 1.37-1.37v-4.477h.34c4.547 0 7.406 1.148 9.457 4.98.41.75.95.867 1.442.867.62 0 1.207-.562 1.207-1.57 0-8.66-3.668-14.063-12.106-14.063h-.34V4.43c0-.784-.574-1.429-1.394-1.429-.574 0-.961.246-1.582.832l-9.246 8.649c-.457.433-.598.867-.598 1.265 0 .387.152.832.598 1.254l9.246 8.73c.562.528 1.031.762 1.605.762Zm-.669-2.52a.262.262 0 0 1-.199-.105L3.227 13.97c-.094-.094-.13-.153-.13-.223s.036-.14.13-.223L11.57 5.52c.059-.047.13-.094.2-.094.105 0 .164.07.164.164v4.652c0 .27.129.387.398.387h1.57c8.04 0 10.465 5.578 10.7 11.11 0 .093-.036.128-.094.128-.047 0-.07-.035-.106-.117-1.383-2.941-4.933-4.875-10.5-4.875h-1.57c-.27 0-.398.117-.398.387v4.535c0 .105-.059.176-.153.176Z"
+      />
+    </g>
+  </svg>
+);
+const BackToAppForwardRef = forwardRef(SvgComponent);
+const BackToAppIcon = memo(BackToAppForwardRef);
+
+const BarsSvgComponent = (props, ref) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={28}
+    height={28}
+    fill="none"
+    ref={ref}
+    {...props}
+  >
+    <g fill="#8897AD" clipPath="url(#a)">
+      <path d="M17.004 24.598h5.332c1.488 0 2.238-.739 2.238-2.285v-5.25c0-1.536-.75-2.286-2.238-2.286h-5.332c-1.5 0-2.25.75-2.25 2.286v5.25c0 1.546.75 2.285 2.25 2.285Zm.023-1.653c-.422 0-.62-.21-.62-.633v-5.238c0-.433.198-.644.62-.644h5.285c.41 0 .61.21.61.644v5.238c0 .422-.2.633-.61.633h-5.285ZM5.238 24.598h5.344c1.488 0 2.238-.739 2.238-2.285v-5.25c0-1.536-.75-2.286-2.238-2.286H5.238c-1.488 0-2.238.75-2.238 2.286v5.25c0 1.546.75 2.285 2.238 2.285Zm.024-1.653c-.41 0-.61-.21-.61-.633v-5.238c0-.433.2-.644.61-.644h5.285c.41 0 .621.21.621.644v5.238c0 .422-.211.633-.621.633H5.262ZM17.004 12.844h5.332c1.488 0 2.238-.75 2.238-2.297V5.309c0-1.547-.75-2.286-2.238-2.286h-5.332c-1.5 0-2.25.739-2.25 2.286v5.238c0 1.547.75 2.297 2.25 2.297Zm.023-1.653c-.422 0-.62-.21-.62-.644V5.309c0-.422.198-.633.62-.633h5.285c.41 0 .61.21.61.633v5.238c0 .433-.2.644-.61.644h-5.285ZM5.238 12.844h5.344c1.488 0 2.238-.75 2.238-2.297V5.309c0-1.547-.75-2.286-2.238-2.286H5.238C3.75 3.023 3 3.762 3 5.31v5.238c0 1.547.75 2.297 2.238 2.297Zm.024-1.653c-.41 0-.61-.21-.61-.644V5.309c0-.422.2-.633.61-.633h5.285c.41 0 .621.21.621.633v5.238c0 .433-.211.644-.621.644H5.262Z" />
+    </g>
+    <defs>
+      <clipPath id="a">
+        <path fill="#fff" d="M3 3h21.574v21.598H3z" />
+      </clipPath>
+    </defs>
+  </svg>
+);
+
+const BardForwardRef = forwardRef(BarsSvgComponent);
+const BarsOutlined = memo(BardForwardRef);
 
 function ManagementPage(props) {
 
   const [menuVisible, setMenuVisible] = useState(false);
+
+  const [applications, setApplications] = useState(null);
+
+  useEffect(() => {
+    if (!props.account) {
+      return;
+    }
+    ApplicationBackend.getApplicationsByOrganization("admin", props.account.owner)
+      .then((res) => {
+        setApplications(res.data || []);
+      });
+  }, [props.account]);
+
+  const getItems = () => {
+    if (applications === null) {
+      return null;
+    }
+
+    return applications.reduce((acc, application) => {
+      let homepageUrl = application.homepageUrl;
+      if (homepageUrl === "<custom-url>") {
+        homepageUrl = props.account.homepage;
+      }
+
+      if (homepageUrl) {
+        acc.push({
+          link: homepageUrl,
+          name: application.displayName,
+          description: application.description,
+          logo: application.logo,
+          createdTime: "",
+        });
+      }
+
+      return acc;
+    }, []);
+
+  };
+
+  const items = getItems();
+
+  const item = items?.length === 1 ? items[0] : null;
 
   function logout() {
     AuthBackend.logout()
@@ -166,13 +283,23 @@ function ManagementPage(props) {
           }
                     &nbsp;
                     &nbsp;
-          {Setting.isMobile() ? null : Setting.getShortText(Setting.getNameAtLeast(props.account.displayName), 30)} &nbsp; <DownOutlined />
+          {Setting.isMobile() ? null : Setting.getShortText(Setting.getNameAtLeast(props.account.displayName), 30)} &nbsp; <DownCustomIcon />
                     &nbsp;
                     &nbsp;
                     &nbsp;
         </div>
       </Dropdown>
     );
+  }
+
+  const location = props.history.location.pathname;
+
+  function redirectToApp() {
+    if (item && item.link) {
+      Setting.goToLinkSoft(props, item.link);
+    } else if (props?.history) {
+      props.history.push("/apps");
+    }
   }
 
   function renderAccountMenu() {
@@ -188,17 +315,21 @@ function ManagementPage(props) {
       return (
         <React.Fragment>
           {renderRightDropdown()}
-          <ThemeSelect
+          {/* <ThemeSelect
             themeAlgorithm={props.themeAlgorithm}
-            onChange={props.setLogoAndThemeAlgorithm} />
+            onChange={props.setLogoAndThemeAlgorithm} /> */}
           <LanguageSelect languages={props.account.organization.languages} />
-          <Tooltip title="Click to open AI assitant">
+          {/* <Tooltip title="Click to open AI assitant">
             <div className="select-box" onClick={props.openAiAssistant}>
               <DeploymentUnitOutlined style={{fontSize: "24px"}} />
             </div>
-          </Tooltip>
+          </Tooltip> */}
+          {!location.startsWith("/apps") && <div className="select-box" onClick={redirectToApp} >
+            <BackToAppIcon />
+          </div>}
+
           <OpenTour />
-          {Setting.isAdminUser(props.account) && !Setting.isMobile() && (props.uri.indexOf("/trees") === -1) &&
+          {/* {Setting.isAdminUser(props.account) && !Setting.isMobile() && (props.uri.indexOf("/trees") === -1) &&
                         <OrganizationSelect
                           initValue={Setting.getOrganization()}
                           withAll={true}
@@ -208,7 +339,7 @@ function ManagementPage(props) {
                           }}
                           className="select-box"
                         />
-          }
+          } */}
         </React.Fragment>
       );
     }
@@ -427,7 +558,7 @@ function ManagementPage(props) {
       <Header style={{padding: "0", marginBottom: "3px", backgroundColor: props.themeAlgorithm.includes("dark") ? "black" : "white"}} >
         {props.requiredEnableMfa || (Setting.isMobile() ?
           <React.Fragment>
-            <Drawer title={i18next.t("general:Close")} placement="left" visible={menuVisible} onClose={onClose}>
+            <Drawer width="280px" title={i18next.t("general:Close")} placement="left" visible={menuVisible} onClose={onClose}>
               <Menu
                 items={getMenuItems()}
                 mode={"inline"}
@@ -437,9 +568,9 @@ function ManagementPage(props) {
               >
               </Menu>
             </Drawer>
-            <Button icon={<BarsOutlined />} onClick={showMenu} type="text">
-              {i18next.t("general:Menu")}
-            </Button>
+            <div style={{width: "66px", height: "100%", float: "left", display: "flex", justifyContent: "center", alignItems: "center"}}>
+              <Button style={{padding: 0}} icon={<BarsOutlined />} onClick={showMenu} type="icon" />
+            </div>
           </React.Fragment> :
           <Menu
             onClick={onClose}
