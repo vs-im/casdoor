@@ -111,7 +111,7 @@ class PropertyTable extends React.Component {
 
     return (
       <Table title={() => (
-        <div>
+        <div style={{display: "flex", justifyContent: "flex-end"}}>
           <Button style={{marginRight: "5px"}} type="primary" size="small" onClick={() => this.addRow(table)}>{i18next.t("general:Add")}</Button>
         </div>
       )}

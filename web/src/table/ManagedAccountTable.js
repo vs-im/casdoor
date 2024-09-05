@@ -162,8 +162,8 @@ class ManagedAccountTable extends React.Component {
     return (
       <Table scroll={{x: "max-content"}} rowKey="key" columns={columns} dataSource={table} size="middle" bordered pagination={false}
         title={() => (
-          <div>
-            {this.props.title}&nbsp;&nbsp;&nbsp;&nbsp;
+          <div style={{display: "flex", justifyContent: this.props.disableTitle ? "flex-end" : "space-between", alignItems: "center"}}>
+            {this.props.disableTitle ? null : this.props.title}&nbsp;&nbsp;&nbsp;&nbsp;
             <Button style={{marginRight: "5px"}} type="primary" size="small" onClick={() => this.addRow(table)}>{i18next.t("general:Add")}</Button>
           </div>
         )}
@@ -174,7 +174,7 @@ class ManagedAccountTable extends React.Component {
   render() {
     return (
       <div>
-        <Row style={{marginTop: "20px"}} >
+        <Row>
           <Col span={24}>
             {
               this.renderTable(this.state.managedAccounts)

@@ -83,7 +83,7 @@ import MfaSetupPage from "./auth/MfaSetupPage";
 import OdicDiscoveryPage from "./auth/OidcDiscoveryPage";
 import * as Conf from "./Conf";
 import LanguageSelect from "./common/select/LanguageSelect";
-import ThemeSelect from "./common/select/ThemeSelect";
+// import ThemeSelect from "./common/select/ThemeSelect";
 import OpenTour from "./common/OpenTour";
 // import OrganizationSelect from "./common/select/OrganizationSelect";
 import AccountAvatar from "./account/AccountAvatar";
@@ -123,6 +123,7 @@ const DownCustomSvg = (
 );
 
 const DownCustomForwardRef = forwardRef(DownCustomSvg);
+// eslint-disable-next-line
 const DownCustomIcon = memo(DownCustomForwardRef);
 
 const SvgComponent = (props, ref) => (
@@ -276,17 +277,12 @@ function ManagementPage(props) {
     };
 
     return (
-      <Dropdown key="/rightDropDown" menu={{items, onClick}} >
-        <div className="rightDropDown">
+      <Dropdown overlayClassName="header-dropdown" key="/rightDropDown" menu={{items, onClick}} >
+        <div className="rightDropDown" style={{height: "100%", minWidth: "70px"}}>
           {
             renderAvatar()
           }
-                    &nbsp;
-                    &nbsp;
-          {Setting.isMobile() ? null : Setting.getShortText(Setting.getNameAtLeast(props.account.displayName), 30)} &nbsp; <DownCustomIcon />
-                    &nbsp;
-                    &nbsp;
-                    &nbsp;
+          {Setting.isMobile() ? null : Setting.getShortText(Setting.getNameAtLeast(props.account.displayName), 30)}
         </div>
       </Dropdown>
     );
@@ -315,9 +311,9 @@ function ManagementPage(props) {
       return (
         <React.Fragment>
           {renderRightDropdown()}
-          <ThemeSelect
+          {/* <ThemeSelect
             themeAlgorithm={props.themeAlgorithm}
-            onChange={props.setLogoAndThemeAlgorithm} />
+            onChange={props.setLogoAndThemeAlgorithm} /> */}
           <LanguageSelect languages={props.account.organization.languages} />
           {/* <Tooltip title="Click to open AI assitant">
             <div className="select-box" onClick={props.openAiAssistant}>
@@ -380,7 +376,7 @@ function ManagementPage(props) {
       Setting.getItem(<Link to="/shortcuts">{i18next.t("general:Shortcuts")}</Link>, "/shortcuts"),
       Setting.getItem(<Link to="/apps">{i18next.t("general:Apps")}</Link>, "/apps"),
     ].filter(item => {
-      return Setting.isLocalAdminUser(props.account);
+      return Setting.isLocalAdminUser(props.account) || item.key === "/apps";
     })));
 
     if (Setting.isLocalAdminUser(props.account)) {
