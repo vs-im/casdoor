@@ -185,8 +185,7 @@ class App extends Component {
     this.setState({
       themeData: theme,
     });
-    // eslint-disable-next-line
-    console.log("setTheme", {theme, initThemeAlgorithm})
+
     if (initThemeAlgorithm) {
       if (localStorage.getItem("themeAlgorithm")) {
         const storageThemeAlgorithm = ["default"];
@@ -408,9 +407,9 @@ class App extends Component {
               {/* {
                 this.renderFooter()
               } */}
-              {
+              {/* {
                 this.renderAiAssistant()
-              }
+              } */}
             </Layout>
           </StyleProvider>
         </ConfigProvider>
@@ -465,9 +464,9 @@ class App extends Component {
               {/* {
                 this.renderFooter()
               } */}
-              {
+              {/* {
                 this.renderAiAssistant()
-              }
+              } */}
             </Layout>
           </Suspense>
         }

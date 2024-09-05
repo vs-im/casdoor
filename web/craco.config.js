@@ -99,6 +99,10 @@ module.exports = {
           "os": false,
           "fs": false,
         },
+      },
+      output: {
+        filename: "static/js/[name].[contenthash:8].js",
+        chunkFilename: "static/js/[name].[contenthash:8].chunk.js",
       }
     },
   }

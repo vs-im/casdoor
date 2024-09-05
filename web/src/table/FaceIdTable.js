@@ -95,8 +95,7 @@ class FaceIdTable extends React.Component {
     return (
       <Table scroll={{x: "max-content"}} columns={columns} dataSource={this.props.table} size="middle" bordered pagination={false}
         title={() => (
-          <div>
-            {i18next.t("user:Face IDs")}&nbsp;&nbsp;&nbsp;&nbsp;
+          <div style={{display: "flex", justifyContent: "flex-end", alignItems: "center"}}>
             <Button disabled={this.props.table?.length >= 5} style={{marginRight: "5px"}} type="primary" size="small" onClick={() => this.setState({openFaceRecognitionModal: true})}>
               {i18next.t("general:Add Face Id")}
             </Button>
@@ -119,7 +118,7 @@ class FaceIdTable extends React.Component {
   render() {
     return (
       <div>
-        <Row style={{marginTop: "20px"}}>
+        <Row>
           <Col span={24}>
             {
               this.renderTable(this.props.table)

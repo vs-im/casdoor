@@ -52,6 +52,10 @@ code {
   color: rgb(64 64 64) !important;
 }
 
+.header-dropdown ul {
+  min-width: 150px;
+}
+
 @media (prefers-color-scheme: dark) {
   body {
     background: grey;

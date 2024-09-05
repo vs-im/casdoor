@@ -13,14 +13,14 @@
 // limitations under the License.
 
 import React from "react";
-import {Button, Col, Row} from "antd";
+import {Button} from "antd";
 import i18next from "i18next";
 import * as UserBackend from "../backend/UserBackend";
 import * as Setting from "../Setting";
 import * as Provider from "../auth/Provider";
 import * as AuthBackend from "../auth/AuthBackend";
 import {goToWeb3Url} from "../auth/ProviderButton";
-import AccountAvatar from "../account/AccountAvatar";
+// import AccountAvatar from "../account/AccountAvatar";
 import {WechatOfficialAccountModal} from "../auth/Util";
 
 class OAuthWidget extends React.Component {
@@ -160,8 +160,8 @@ class OAuthWidget extends React.Component {
     }
 
     return (
-      <Row key={provider.name} style={{marginTop: "20px"}} >
-        <Col style={{marginTop: "5px"}} span={this.props.labelSpan}>
+      <div key={provider.name} style={{marginTop: "20px", display: "grid", gap: "8px", gridTemplateColumns: "auto auto"}} >
+        <div style={{display: "flex", alignItems: "center"}} span={this.props.labelSpan}>
           {
             Setting.getProviderLogo(provider)
           }
@@ -170,14 +170,15 @@ class OAuthWidget extends React.Component {
               `${provider.type}:`
             }
           </span>
-        </Col>
-        <Col span={24 - this.props.labelSpan} >
-          <AccountAvatar style={{marginRight: "10px"}} size={30} src={avatarUrl} alt={name} referrerPolicy="no-referrer" />
+        </div>
+        <div span={24 - this.props.labelSpan} style={{display: "flex", alignItems: "center", overflow: "hidden", justifyContent: "end"}} >
+          {/* <AccountAvatar style={{marginRight: "10px"}} size={30} src={avatarUrl} alt={name} referrerPolicy="no-referrer" /> */}
           <span style={{
             width: this.props.labelSpan === 3 ? "300px" : "200px",
             display: (Setting.isMobile()) ? "inline" : "inline-block",
             overflow: "hidden",
             textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }} title={name}>
             {
               linkedValue === "" ? (
@@ -216,8 +217,8 @@ class OAuthWidget extends React.Component {
               <Button disabled={!providerItem.canUnlink && !Setting.isAdminUser(account)} style={{marginLeft: "20px", width: linkButtonWidth}} onClick={() => this.unlinkUser(provider.type, linkedValue)}>{i18next.t("user:Unlink")}</Button>
             )
           }
-        </Col>
-      </Row>
+        </div>
+      </div>
     );
   }
 

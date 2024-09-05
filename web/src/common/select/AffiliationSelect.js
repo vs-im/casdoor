@@ -22,6 +22,7 @@ class AffiliationSelect extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
+      marginTop: props?.marginTop || "20px",
       classes: props?.classes,
       style: props?.style,
       addressOptions: [],
@@ -72,7 +73,7 @@ class AffiliationSelect extends React.Component {
       <React.Fragment>
         {
           this.props.application?.affiliationUrl === "" ? null : (
-            <Row style={{marginTop: "20px"}} >
+            <Row style={{marginTop: this.state.marginTop}} >
               <Col style={{marginTop: "5px"}} span={this.props.labelSpan}>
                 {Setting.getLabel(i18next.t("user:Address"), i18next.t("user:Address - Tooltip"))} :
               </Col>
@@ -87,7 +88,7 @@ class AffiliationSelect extends React.Component {
             </Row>
           )
         }
-        <Row style={{marginTop: "20px"}} >
+        <Row style={{marginTop: this.state.marginTop}} >
           <Col style={{marginTop: "5px"}} span={this.props.labelSpan}>
             {Setting.getLabel(i18next.t("user:Affiliation"), i18next.t("user:Affiliation - Tooltip"))} :
           </Col>
