@@ -44,12 +44,12 @@ class App extends Component {
   constructor(props) {
     super(props);
     this.setThemeAlgorithm();
-    let storageThemeAlgorithm = [];
-    try {
-      storageThemeAlgorithm = localStorage.getItem("themeAlgorithm") ? JSON.parse(localStorage.getItem("themeAlgorithm")) : ["default"];
-    } catch {
-      storageThemeAlgorithm = ["default"];
-    }
+    const storageThemeAlgorithm = ["default"];
+    // try {
+    //   storageThemeAlgorithm = localStorage.getItem("themeAlgorithm") ? JSON.parse(localStorage.getItem("themeAlgorithm")) : ["default"];
+    // } catch {
+    //   storageThemeAlgorithm = ["default"];
+    // }
     this.state = {
       classes: props,
       selectedMenuKey: 0,
@@ -165,7 +165,7 @@ class App extends Component {
     const url = new URL(currentUrl);
     const themeType = url.searchParams.get("theme");
     if (themeType === "dark" || themeType === "default") {
-      localStorage.setItem("themeAlgorithm", JSON.stringify([themeType]));
+      localStorage.setItem("themeAlgorithm", JSON.stringify(["default"]));
     }
   }
 
@@ -177,18 +177,24 @@ class App extends Component {
   }
 
   setTheme = (theme, initThemeAlgorithm) => {
+
+    if (theme && theme.themeType) {
+      theme.themeType = "default";
+    }
+
     this.setState({
       themeData: theme,
     });
-
+    // eslint-disable-next-line
+    console.log("setTheme", {theme, initThemeAlgorithm})
     if (initThemeAlgorithm) {
       if (localStorage.getItem("themeAlgorithm")) {
-        let storageThemeAlgorithm = [];
-        try {
-          storageThemeAlgorithm = JSON.parse(localStorage.getItem("themeAlgorithm"));
-        } catch {
-          storageThemeAlgorithm = ["default"];
-        }
+        const storageThemeAlgorithm = ["default"];
+        // try {
+        //   storageThemeAlgorithm = JSON.parse(localStorage.getItem("themeAlgorithm"));
+        // } catch {
+        //   storageThemeAlgorithm = ["default"];
+        // }
         this.setState({
           logo: this.getLogo(storageThemeAlgorithm),
           themeAlgorithm: storageThemeAlgorithm,
@@ -440,7 +446,9 @@ class App extends Component {
                     isAiAssistantOpen: true,
                   });
                 }}
-                setLogoAndThemeAlgorithm={(nextThemeAlgorithm) => {
+                setLogoAndThemeAlgorithm={() => {
+                  const nextThemeAlgorithm = ["default"];
+
                   this.setState({
                     themeAlgorithm: nextThemeAlgorithm,
                     logo: this.getLogo(nextThemeAlgorithm),

@@ -87,7 +87,8 @@ export function getAlgorithm(themeAlgorithmNames) {
 }
 
 export function getAlgorithmNames(themeData) {
-  const algorithms = [themeData?.themeType !== "dark" ? "default" : "dark"];
+  const algorithms = ["default"];
+  // const algorithms = [themeData?.themeType !== "dark" ? "default" : "dark"];
   if (themeData?.isCompact === true) {
     algorithms.push("compact");
   }

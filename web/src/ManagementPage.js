@@ -83,7 +83,7 @@ import MfaSetupPage from "./auth/MfaSetupPage";
 import OdicDiscoveryPage from "./auth/OidcDiscoveryPage";
 import * as Conf from "./Conf";
 import LanguageSelect from "./common/select/LanguageSelect";
-// import ThemeSelect from "./common/select/ThemeSelect";
+import ThemeSelect from "./common/select/ThemeSelect";
 import OpenTour from "./common/OpenTour";
 // import OrganizationSelect from "./common/select/OrganizationSelect";
 import AccountAvatar from "./account/AccountAvatar";
@@ -315,9 +315,9 @@ function ManagementPage(props) {
       return (
         <React.Fragment>
           {renderRightDropdown()}
-          {/* <ThemeSelect
+          <ThemeSelect
             themeAlgorithm={props.themeAlgorithm}
-            onChange={props.setLogoAndThemeAlgorithm} /> */}
+            onChange={props.setLogoAndThemeAlgorithm} />
           <LanguageSelect languages={props.account.organization.languages} />
           {/* <Tooltip title="Click to open AI assitant">
             <div className="select-box" onClick={props.openAiAssistant}>
