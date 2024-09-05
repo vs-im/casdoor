@@ -1249,7 +1249,7 @@ class UserEditPage extends React.Component {
 
   render() {
     return (
-      <div style={{maxWidth: "960px", margin: "0 auto"}}>
+      <div style={{maxWidth: "min(960px, 100vw)", margin: "0 auto"}}>
         {
           this.state.loading ? <Spin size="large" style={{marginLeft: "50%", marginTop: "10%"}} /> : (
             this.state.user !== null ? this.renderUser() :
