@@ -37,7 +37,7 @@ class PermissionListPage extends BaseListPage {
       roles: [],
       domains: [],
       resourceType: "Application",
-      resources: ["app-built-in"],
+      resources: ["hasura"],
       actions: ["Read"],
       effect: "Allow",
       isEnabled: true,

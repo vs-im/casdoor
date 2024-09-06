@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	CasdoorApplication  = "app-built-in"
+	CasdoorApplication  = "hasura"
 	CasdoorOrganization = "built-in"
 )
 

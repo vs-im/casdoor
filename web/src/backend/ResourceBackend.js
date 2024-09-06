@@ -71,7 +71,7 @@ export function deleteResource(resource, provider = "") {
 }
 
 export function uploadResource(owner, user, tag, parent, fullFilePath, file, provider = "") {
-  const application = "app-built-in";
+  const application = "hasura";
   const formData = new FormData();
   formData.append("file", file);
   return fetch(`${Setting.ServerUrl}/api/upload-resource?owner=${owner}&user=${user}&application=${application}&tag=${tag}&parent=${parent}&fullFilePath=${encodeURIComponent(fullFilePath)}&provider=${provider}`, {

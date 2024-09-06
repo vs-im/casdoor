@@ -245,7 +245,7 @@ class ApplicationListPage extends BaseListPage {
               <PopconfirmModal
                 title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
                 onConfirm={() => this.deleteApplication(index)}
-                disabled={record.name === "app-built-in"}
+                disabled={record.name === "hasura"}
               >
               </PopconfirmModal>
             </div>

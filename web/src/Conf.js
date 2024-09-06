@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export const DefaultApplication = "app-built-in";
+export const DefaultApplication = "hasura";
 
 export const CasvisorUrl = "";
 
