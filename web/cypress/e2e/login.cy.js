@@ -9,7 +9,7 @@ describe("Login test", () => {
       method: "POST",
       url: "http://localhost:7001/api/login",
       body: {
-        "application": "app-built-in",
+        "application": "hasura",
         "organization": "built-in",
         "username": "admin",
         "password": "123",
@@ -33,7 +33,7 @@ describe("Login test", () => {
       method: "POST",
       url: "http://localhost:7001/api/login",
       body: {
-        "application": "app-built-in",
+        "application": "hasura",
         "organization": "built-in",
         "username": "admin",
         "password": "1234",

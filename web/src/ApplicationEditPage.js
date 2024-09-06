@@ -257,7 +257,7 @@ class ApplicationEditPage extends React.Component {
             {Setting.getLabel(i18next.t("general:Name"), i18next.t("general:Name - Tooltip"))} :
           </Col>
           <Col span={22} >
-            <Input value={this.state.application.name} disabled={this.state.application.name === "app-built-in"} onChange={e => {
+            <Input value={this.state.application.name} disabled={this.state.application.name === "hasura"} onChange={e => {
               this.updateApplicationField("name", e.target.value);
             }} />
           </Col>

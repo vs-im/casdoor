@@ -621,7 +621,7 @@ func UpdateApplication(id string, application *Application) (bool, error) {
 		return false, err
 	}
 
-	if name == "app-built-in" {
+	if name == "hasura" {
 		application.Name = name
 	}
 
@@ -706,7 +706,7 @@ func deleteApplication(application *Application) (bool, error) {
 }
 
 func DeleteApplication(application *Application) (bool, error) {
-	if application.Name == "app-built-in" {
+	if application.Name == "hasura" {
 		return false, nil
 	}
 

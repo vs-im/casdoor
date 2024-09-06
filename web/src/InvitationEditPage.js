@@ -103,7 +103,7 @@ class InvitationEditPage extends React.Component {
           <Button style={{marginLeft: "20px"}} onClick={() => {
             let defaultApplication;
             if (this.state.invitation.owner === "built-in") {
-              defaultApplication = "app-built-in";
+              defaultApplication = "hasura";
             } else {
               defaultApplication = Setting.getArrayItem(this.state.organizations, "name", this.state.invitation.owner).defaultApplication;
             }
@@ -304,7 +304,7 @@ class InvitationEditPage extends React.Component {
           <Button style={{marginLeft: "20px"}} size="large" onClick={() => {
             let defaultApplication;
             if (this.state.invitation.owner === "built-in") {
-              defaultApplication = "app-built-in";
+              defaultApplication = "hasura";
             } else {
               defaultApplication = Setting.getArrayItem(this.state.organizations, "name", this.state.invitation.owner).defaultApplication;
             }

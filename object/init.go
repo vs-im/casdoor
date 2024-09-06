@@ -149,7 +149,7 @@ func initBuiltInUser() {
 		IsAdmin:           true,
 		IsForbidden:       false,
 		IsDeleted:         false,
-		SignupApplication: "app-built-in",
+		SignupApplication: "hasura",
 		CreatedIp:         "127.0.0.1",
 		Properties:        make(map[string]string),
 	}
@@ -160,7 +160,7 @@ func initBuiltInUser() {
 }
 
 func initBuiltInApplication() {
-	application, err := getApplication("admin", "app-built-in")
+	application, err := getApplication("admin", "hasura")
 	if err != nil {
 		panic(err)
 	}
@@ -171,7 +171,7 @@ func initBuiltInApplication() {
 
 	application = &Application{
 		Owner:          "admin",
-		Name:           "app-built-in",
+		Name:           "hasura",
 		CreatedTime:    util.GetCurrentTime(),
 		DisplayName:    "Casdoor",
 		Logo:           fmt.Sprintf("%s/img/casdoor-logo_1185x256.png", conf.GetConfigString("staticBaseUrl")),
@@ -415,7 +415,7 @@ func initBuiltInPermission() {
 		Model:        "user-model-built-in",
 		Adapter:      "",
 		ResourceType: "Application",
-		Resources:    []string{"app-built-in"},
+		Resources:    []string{"hasura"},
 		Actions:      []string{"Read", "Write", "Admin"},
 		Effect:       "Allow",
 		IsEnabled:    true,

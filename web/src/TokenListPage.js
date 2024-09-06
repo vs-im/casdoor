@@ -30,7 +30,7 @@ class TokenListPage extends BaseListPage {
       owner: "admin", // this.props.account.tokenname,
       name: `token_${randomName}`,
       createdTime: moment().format(),
-      application: "app-built-in",
+      application: "hasura",
       organization: organizationName,
       user: "admin",
       accessToken: "",

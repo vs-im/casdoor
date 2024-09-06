@@ -52,7 +52,7 @@ class SamlCallback extends React.Component {
 
     const messages = atob(relayState).split("&");
     const clientId = messages[0] === "" ? "" : messages[0];
-    const application = messages[0] === "" ? "app-built-in" : "";
+    const application = messages[0] === "" ? "hasura" : "";
     const state = messages[1];
     const providerName = messages[2];
     const redirectUri = messages[3];

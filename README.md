@@ -1,5 +1,5 @@
 docker build -t casdoor:latest .
-
+я заменил app-built-in на hasura
 
 <h1 align="center" style="border-bottom: none;">📦⚡️ Casdoor</h1>
 <h3 align="center">An open-source UI-first Identity and Access Management (IAM) / Single-Sign-On (SSO) platform with web UI supporting OAuth 2.0, OIDC, SAML, CAS, LDAP, SCIM, WebAuthn, TOTP, MFA and RADIUS</h3>
