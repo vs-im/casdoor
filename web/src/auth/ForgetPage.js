@@ -468,65 +468,67 @@ class ForgetPage extends React.Component {
       <React.Fragment>
         <CustomGithubCorner />
         <div className="forget-content" style={{padding: Setting.isMobile() ? "0" : null, boxShadow: Setting.isMobile() ? "none" : null}}>
-          <Button type="text" style={{position: "relative", left: Setting.isMobile() ? "10px" : "-90px", top: 0}} size={"large"} onClick={() => {this.stepBack();}}>
-            <ArrowLeftOutlined style={{fontSize: "24px"}} />
-          </Button>
-          <Row>
-            <Col span={24} style={{justifyContent: "center"}}>
-              <Row>
-                <Col span={24}>
-                  <div style={{marginTop: "80px", marginBottom: "10px", textAlign: "center"}}>
-                    {
-                      Setting.renderHelmet(application)
-                    }
-                    {
-                      Setting.renderLogo(application)
-                    }
-                  </div>
-                </Col>
-              </Row>
-              <Row>
-                <Col span={24}>
-                  <div style={{textAlign: "center", fontSize: "28px"}}>
-                    {i18next.t("forget:Reset password")}
-                  </div>
-                </Col>
-              </Row>
-              <Row>
-                <Col span={24}>
-                  <Steps
-                    current={this.state.current}
-                    items={[
+          <div className="forget-content-inner">
+            <Button type="text" style={{position: "relative", left: Setting.isMobile() ? "0px" : "0px", top: 10}} size={"large"} onClick={() => {this.stepBack();}}>
+              <ArrowLeftOutlined style={{fontSize: "24px"}} />
+            </Button>
+            <Row style={{paddingBottom: "50px"}}>
+              <Col span={24} style={{justifyContent: "center"}}>
+                <Row>
+                  <Col span={24}>
+                    <div style={{marginTop: "50px", marginBottom: "10px", textAlign: "center"}}>
                       {
-                        title: i18next.t("forget:Account"),
-                        icon: <UserOutlined />,
-                      },
+                        Setting.renderHelmet(application)
+                      }
                       {
-                        title: i18next.t("forget:Verify"),
-                        icon: <SolutionOutlined />,
-                      },
-                      {
-                        title: i18next.t("forget:Reset"),
-                        icon: <KeyOutlined />,
-                      },
-                    ]}
-                    style={{
-                      width: "90%",
-                      maxWidth: "500px",
-                      margin: "auto",
-                      marginTop: "80px",
-                    }}
-                  >
-                  </Steps>
-                </Col>
-              </Row>
-            </Col>
-            <Col span={24} style={{display: "flex", justifyContent: "center"}}>
-              <div style={{marginTop: "40px", textAlign: "center"}}>
-                {this.renderForm(application)}
-              </div>
-            </Col>
-          </Row>
+                        Setting.renderLogo(application)
+                      }
+                    </div>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col span={24}>
+                    <div style={{textAlign: "center", fontSize: "18px"}}>
+                      {i18next.t("forget:Reset password")}
+                    </div>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col span={24}>
+                    <Steps
+                      current={this.state.current}
+                      items={[
+                        {
+                          title: i18next.t("forget:Account"),
+                          icon: <UserOutlined />,
+                        },
+                        {
+                          title: i18next.t("forget:Verify"),
+                          icon: <SolutionOutlined />,
+                        },
+                        {
+                          title: i18next.t("forget:Reset"),
+                          icon: <KeyOutlined />,
+                        },
+                      ]}
+                      style={{
+                        width: "90%",
+                        maxWidth: "500px",
+                        margin: "auto",
+                        marginTop: "50px",
+                      }}
+                    >
+                    </Steps>
+                  </Col>
+                </Row>
+              </Col>
+              <Col span={24} style={{display: "flex", justifyContent: "center"}}>
+                <div style={{marginTop: "40px", textAlign: "center"}}>
+                  {this.renderForm(application)}
+                </div>
+              </Col>
+            </Row>
+          </div>
         </div>
       </React.Fragment>
     );

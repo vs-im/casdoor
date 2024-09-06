@@ -1139,7 +1139,7 @@ class LoginPage extends React.Component {
         <div>
           <Tabs className="signin-methods" items={items} size={"small"} defaultActiveKey={this.getDefaultLoginMethod(application)} onChange={(key) => {
             this.setState({loginMethod: key});
-          }} centered>
+          }}>
           </Tabs>
         </div>
       );

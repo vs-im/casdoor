@@ -278,7 +278,7 @@ function ManagementPage(props) {
 
     return (
       <Dropdown overlayClassName="header-dropdown" key="/rightDropDown" menu={{items, onClick}} >
-        <div className="rightDropDown" style={{height: "100%", minWidth: "70px"}}>
+        <div className="rightDropDown" style={{height: "100%", minWidth: "70px", display: "flex", alignItems: "center", gap: "16px", padding: "0 20px"}}>
           {
             renderAvatar()
           }

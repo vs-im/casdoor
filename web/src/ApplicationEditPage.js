@@ -1044,6 +1044,7 @@ class ApplicationEditPage extends React.Component {
               colorPrimary: themeData.colorPrimary,
               colorInfo: themeData.colorPrimary,
               borderRadius: themeData.borderRadius,
+              fontSize: 16,
             },
           }}>
             <div style={{position: "relative", width: previewWidth, border: "1px solid rgb(217,217,217)", boxShadow: "10px 10px 5px #888888", overflow: "auto"}}>
@@ -1076,6 +1077,7 @@ class ApplicationEditPage extends React.Component {
               colorPrimary: themeData.colorPrimary,
               colorInfo: themeData.colorPrimary,
               borderRadius: themeData.borderRadius,
+              fontSize: 16,
             },
           }}>
             <div style={{position: "relative", width: previewWidth, border: "1px solid rgb(217,217,217)", boxShadow: "10px 10px 5px #888888", overflow: "auto"}}>
@@ -1109,6 +1111,7 @@ class ApplicationEditPage extends React.Component {
             colorPrimary: themeData.colorPrimary,
             colorInfo: themeData.colorPrimary,
             borderRadius: themeData.borderRadius,
+            fontSize: 16,
           },
         }}>
           <div style={{position: "relative", width: previewWidth, border: "1px solid rgb(217,217,217)", boxShadow: "10px 10px 5px #888888", flexDirection: "column", flex: "auto"}}>

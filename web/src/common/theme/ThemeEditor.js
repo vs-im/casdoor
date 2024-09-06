@@ -73,6 +73,7 @@ export default function ThemeEditor(props) {
       theme={{
         token: {
           ...themeToken,
+          fontSize: 16,
         },
         hashed: true,
         algorithm: algorithmFn,

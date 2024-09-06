@@ -371,6 +371,7 @@ class App extends Component {
           algorithm: Setting.getAlgorithm(["default"]),
           token: {
             marginLG: 4,
+            fontSize: 16,
           },
         }}>
           <StyleProvider hashPriority="high" transformers={[legacyLogicalPropertiesTransformer]}>
@@ -517,6 +518,7 @@ class App extends Component {
             colorPrimary: this.state.themeData.colorPrimary,
             colorInfo: this.state.themeData.colorPrimary,
             borderRadius: this.state.themeData.borderRadius,
+            fontSize: 16,
           },
           algorithm: Setting.getAlgorithm(this.state.themeAlgorithm),
         }}>

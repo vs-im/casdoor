@@ -1155,20 +1155,20 @@ export function getCryptoAlgorithmOptions(cryptoAlgorithm) {
   }
 }
 
-export function renderLogo(application) {
+export function renderLogo(application, style) {
   if (application === null) {
     return null;
   }
 
   if (application.homepageUrl !== "") {
     return (
-      <a target="_blank" rel="noreferrer" href={application.homepageUrl}>
+      <a target="_blank" rel="noreferrer" href={application.homepageUrl} style={style}>
         <img className="panel-logo" width={250} src={application.logo} alt={application.displayName} />
       </a>
     );
   } else {
     return (
-      <img className="panel-logo" width={250} src={application.logo} alt={application.displayName} />
+      <img className="panel-logo" width={250} src={application.logo} alt={application.displayName} style={style} />
     );
   }
 }

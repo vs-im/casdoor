@@ -31,11 +31,11 @@ const GridCards = (props) => {
 
   return (
     Setting.isMobile() ? (
-      <div style={{padding: "12px", maxWidth: "100vw", gap: "12px", display: "flex", flexDirection: "column", overflowX: "hidden", flex: 1, backgroundColor: "#FFF"}}>
+      <div id={"GridCardsMobile"} style={{padding: "12px", maxWidth: "100vw", width: "100%", gap: "12px", display: "flex", flexDirection: "column", overflowX: "hidden", flex: 1, backgroundColor: "#FFF"}}>
         {items.map(item => <SingleCard key={item.link} logo={item.logo} link={item.link} title={item.name} desc={item.description} isSingle={items.length === 1} />)}
       </div>
     ) : (
-      <div style={{margin: "0 15px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px"}}>
+      <div id={"GridCardsDesktop"} style={{borderRadius: "8px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px"}}>
         {items.map(item => <SingleCard logo={item.logo} link={item.link} title={item.name} desc={item.description} time={item.createdTime} isSingle={items.length === 1} key={item.name} />)}
       </div>
     )

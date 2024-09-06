@@ -59,23 +59,45 @@ class SingleCard extends React.Component {
 
   renderCard(logo, link, title, desc, time, isSingle) {
     const silentSigninLink = this.wrappedAsSilentSigninLink(link);
-
+    const date = Setting.getFormattedDateShort(time);
     return (
       // TODO: add borderRadius from app settings
-      <div style={{paddingLeft: "20px", paddingRight: "20px", paddingBottom: "20px", marginBottom: "20px"}}>
-        <Card
-          hoverable
-          cover={
-            <img alt="logo" src={logo} style={{width: "100%", height: "200px", padding: "20px", objectFit: "scale-down"}} />
-          }
+      <div style={{paddingLeft: "20px", paddingRight: "20px", paddingBottom: "20px"}}>
+        <div
           onClick={() => Setting.goToLinkSoft(this, silentSigninLink)}
-          style={isSingle ? {width: "320px", height: "100%"} : {width: "100%", height: "100%"}}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            width: isSingle ? "320px" : "100%",
+            height: "100%",
+            padding: "10px",
+            borderRadius: "13px",
+            border: "1px solid #e6e6e6",
+            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.0)",
+            transition: "box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out",
+            cursor: "pointer",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.boxShadow = "0 6px 12px rgba(0, 0, 0, 0.2)";
+            e.currentTarget.style.transform = "scale(1.02)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.0)";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
         >
-          <Meta title={title} description={desc} />
-          <br />
-          <br />
-          <Meta title={""} description={Setting.getFormattedDateShort(time)} />
-        </Card>
+          <img
+            alt="logo"
+            src={logo}
+            style={{width: "100%", height: "auto", padding: "10px", objectFit: "contain"}}
+          />
+          <div style={{width: "50%", padding: "10px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}}>
+            <h3 style={{margin: 0}}>{title}</h3>
+            {date && <p style={{margin: 0}}>{date}</p>}
+            <p style={{margin: 0}}>{desc}</p>
+          </div>
+        </div>
       </div>
     );
   }

@@ -936,6 +936,7 @@ class SignupPage extends React.Component {
     const showProviders = avaliableProviders.length > 0;
     return (
       <Form
+        id={"SignupPage-renderForm"}
         {...formItemLayout}
         ref={this.form}
         name="signup"
@@ -958,7 +959,7 @@ class SignupPage extends React.Component {
         size="large"
         // layout={Setting.isMobile() ? "vertical" : "horizontal"}
         layout={"vertical"}
-        style={{width: "100%", maxWidth: 320}}
+        style={{width: "100%"}}
         // style={{width: Setting.isMobile() ? "300px" : "400px"}}
       >
         <Form.Item
@@ -997,23 +998,23 @@ class SignupPage extends React.Component {
           <Button type="primary" htmlType="submit" style={{width: "100%"}}>
             {i18next.t("account:Sign Up")}
           </Button>
+          <div style={{padding: "34px 0px 10px 0px"}}>
+            &nbsp;&nbsp;{i18next.t("signup:Have account?")}&nbsp;
+            <a
+              onClick={() => {
+                const linkInStorage = sessionStorage.getItem("signinUrl");
+                if (linkInStorage !== null && linkInStorage !== "") {
+                  Setting.goToLinkSoft(this, linkInStorage);
+                } else {
+                  Setting.redirectToLoginPage(application, this.props.history);
+                }
+              }}
+            >
+              {i18next.t("signup:sign in now")}
+            </a>
+          </div>
           {showProviders && (
             <React.Fragment>
-              <div style={{padding: "34px 0px 10px 0px"}}>
-                &nbsp;&nbsp;{i18next.t("signup:Have account?")}&nbsp;
-                <a
-                  onClick={() => {
-                    const linkInStorage = sessionStorage.getItem("signinUrl");
-                    if (linkInStorage !== null && linkInStorage !== "") {
-                      Setting.goToLinkSoft(this, linkInStorage);
-                    } else {
-                      Setting.redirectToLoginPage(application, this.props.history);
-                    }
-                  }}
-                >
-                  {i18next.t("signup:sign in now")}
-                </a>
-              </div>
               <div className="social-auth-label">
                 <p className="social-auth">{i18next.t("account:or") || "or"}</p>
               </div>
@@ -1094,7 +1095,7 @@ class SignupPage extends React.Component {
             </div>
             <div className="login-form">
               {Setting.renderHelmet(application)}
-              {Setting.renderLogo(application)}
+              {Setting.renderLogo(application, {marginBottom: "27px"})}
               <LanguageSelect
                 languages={application.organizationObj.languages}
                 style={{top: "55px", right: "5px", position: "absolute"}}

@@ -37,7 +37,7 @@ class RegionSelect extends React.Component {
       <Select virtual={false}
         showSearch
         optionFilterProp="label"
-        style={{width: "100%"}}
+        style={{width: "100%", fontSize: 16}}
         defaultValue={this.props.defaultValue || undefined}
         placeholder="Please select country/region"
         onChange={(value => {this.onChange(value);})}
