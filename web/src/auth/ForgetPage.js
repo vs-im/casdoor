@@ -472,17 +472,17 @@ class ForgetPage extends React.Component {
             <Button type="text" style={{position: "relative", left: Setting.isMobile() ? "0px" : "0px", top: 10}} size={"large"} onClick={() => {this.stepBack();}}>
               <ArrowLeftOutlined style={{fontSize: "24px"}} />
             </Button>
-            <Row style={{paddingBottom: "50px"}}>
+            <Row style={{paddingBottom: "20px"}}>
               <Col span={24} style={{justifyContent: "center"}}>
                 <Row>
                   <Col span={24}>
-                    <div style={{marginTop: "50px", marginBottom: "10px", textAlign: "center"}}>
+                    <div style={{marginTop: "0px", marginBottom: "10px", textAlign: "center"}}>
                       {
                         Setting.renderHelmet(application)
                       }
-                      {
+                      {/* {
                         Setting.renderLogo(application)
-                      }
+                      } */}
                     </div>
                   </Col>
                 </Row>
@@ -512,10 +512,9 @@ class ForgetPage extends React.Component {
                         },
                       ]}
                       style={{
-                        width: "90%",
-                        maxWidth: "500px",
-                        margin: "auto",
-                        marginTop: "50px",
+                        display: "flex",
+                        alignItems: "center",
+                        marginTop: "30px",
                       }}
                     >
                     </Steps>
@@ -523,7 +522,7 @@ class ForgetPage extends React.Component {
                 </Row>
               </Col>
               <Col span={24} style={{display: "flex", justifyContent: "center"}}>
-                <div style={{marginTop: "40px", textAlign: "center"}}>
+                <div style={{marginTop: "20px", textAlign: "center"}}>
                   {this.renderForm(application)}
                 </div>
               </Col>

@@ -19,16 +19,13 @@ class SelfLoginButton extends React.Component {
   generateIcon() {
     const avatar = this.props.account.avatar;
     return () => {
-      return <img width={36} height={36} src={avatar} alt="Sign in with Google" />;
+      return <img style={{borderRadius: "50%"}} width={36} height={36} src={avatar} alt="Sign in with Google" />;
     };
   }
 
   getAccountShowName() {
-    let {name, displayName} = this.props.account;
-    if (displayName !== "") {
-      name += " (" + displayName + ")";
-    }
-    return name;
+    const name = this.props.account.name || this.props.account.displayName;
+    return name.length > 20 ? name.substring(0, 20) + "..." : name;
   }
 
   render() {
@@ -40,7 +37,13 @@ class SelfLoginButton extends React.Component {
     };
 
     const SelfLoginButton = createButton(config);
-    return <SelfLoginButton text={this.getAccountShowName()} onClick={this.props.onClick} align={"center"} />;
+    return <SelfLoginButton style={{
+      margin: "0",
+      borderRadius: "12px",
+      width: "100%",
+      transition: "background 0.2s ease, color 0.2s ease",
+      boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.1)",
+    }} text={this.getAccountShowName()} onClick={this.props.onClick} align={"center"} />;
   }
 }
 

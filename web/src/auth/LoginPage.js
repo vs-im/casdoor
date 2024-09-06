@@ -966,7 +966,7 @@ class LoginPage extends React.Component {
     }
 
     return (
-      <div>
+      <div style={{width: "100%"}}>
         <div style={{fontSize: 16, textAlign: "left"}}>
           {i18next.t("login:Continue with")}&nbsp;:
         </div>
