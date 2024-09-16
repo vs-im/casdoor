@@ -621,7 +621,7 @@ class SignupPage extends React.Component {
                   <Input
                     className="signup-phone-input"
                     placeholder={signupItem.placeholder}
-                    style={{width: "65%"}}
+                    style={{width: "65%", minHeight: "40px"}}
                     disabled={
                       this.state.invitation !== undefined &&
                       this.state.invitation.phone !== ""
