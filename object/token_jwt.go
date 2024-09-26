@@ -425,7 +425,7 @@ func generateJwtToken(application *Application, user *User, nonce string, scope 
 			claimsCustom["x-hasura-default-role"] = roleNames[0]
 		} else {
 			claimsCustom["x-hasura-allowed-roles"] = []string{"user"}
-			claimsCustom["x-hasura-default-role"] = []string{"user"}
+			claimsCustom["x-hasura-default-role"] = "user"
 		}
 
 		token = jwt.NewWithClaims(jwtMethod, claimsCustom)
