@@ -16,7 +16,7 @@ docker build -t casdoor:latest .
   <a href="https://github.com/casdoor/casdoor/releases/latest">
     <img alt="GitHub Release" src="https://img.shields.io/github/v/release/casdoor/casdoor.svg">
   </a>
-  <a href="https://hub.docker.com/repository/docker/casbin/casdoor">
+  <a href="https://hub.docker.com/r/casbin/casdoor">
     <img alt="Docker Image Version (latest semver)" src="https://img.shields.io/badge/Docker%20Hub-latest-brightgreen">
   </a>
 </p>

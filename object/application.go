@@ -31,15 +31,17 @@ type SigninMethod struct {
 }
 
 type SignupItem struct {
-	Name        string `json:"name"`
-	Visible     bool   `json:"visible"`
-	Required    bool   `json:"required"`
-	Prompted    bool   `json:"prompted"`
-	CustomCss   string `json:"customCss"`
-	Label       string `json:"label"`
-	Placeholder string `json:"placeholder"`
-	Regex       string `json:"regex"`
-	Rule        string `json:"rule"`
+	Name        string   `json:"name"`
+	Visible     bool     `json:"visible"`
+	Required    bool     `json:"required"`
+	Prompted    bool     `json:"prompted"`
+	Type        string   `json:"type"`
+	CustomCss   string   `json:"customCss"`
+	Label       string   `json:"label"`
+	Placeholder string   `json:"placeholder"`
+	Options     []string `json:"options"`
+	Regex       string   `json:"regex"`
+	Rule        string   `json:"rule"`
 }
 
 type SigninItem struct {
@@ -85,7 +87,7 @@ type Application struct {
 	SamlReplyUrl          string          `xorm:"varchar(100)" json:"samlReplyUrl"`
 	Providers             []*ProviderItem `xorm:"mediumtext" json:"providers"`
 	SigninMethods         []*SigninMethod `xorm:"varchar(2000)" json:"signinMethods"`
-	SignupItems           []*SignupItem   `xorm:"varchar(2000)" json:"signupItems"`
+	SignupItems           []*SignupItem   `xorm:"varchar(3000)" json:"signupItems"`
 	SigninItems           []*SigninItem   `xorm:"mediumtext" json:"signinItems"`
 	GrantTypes            []string        `xorm:"varchar(1000)" json:"grantTypes"`
 	OrganizationObj       *Organization   `xorm:"-" json:"organizationObj"`
