@@ -350,6 +350,11 @@ func generateJwtToken(application *Application, user *User, nonce string, scope 
 	name := util.GenerateId()
 	jti := util.GetId(application.Owner, name)
 
+	var roleNames []string
+	for _, role := range user.Roles {
+		roleNames = append(roleNames, role.Name)
+	}
+
 	claims := Claims{
 		User:      user,
 		TokenType: "access-token",
@@ -412,6 +417,16 @@ func generateJwtToken(application *Application, user *User, nonce string, scope 
 		refreshToken = jwt.NewWithClaims(jwtMethod, claimsShort)
 	} else if application.TokenFormat == "JWT-Custom" {
 		claimsCustom := getClaimsCustom(claims, application.TokenFields)
+
+		claimsCustom["vd"] = "🔥"
+
+		if len(roleNames) > 0 {
+			claimsCustom["x-hasura-allowed-roles"] = roleNames
+			claimsCustom["x-hasura-default-role"] = roleNames[0]
+		} else {
+			claimsCustom["x-hasura-allowed-roles"] = []string{"user"}
+			claimsCustom["x-hasura-default-role"] = []string{"user"}
+		}
 
 		token = jwt.NewWithClaims(jwtMethod, claimsCustom)
 		refreshClaims := getClaimsCustom(claims, application.TokenFields)
