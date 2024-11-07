@@ -95,6 +95,7 @@ type Application struct {
 	Tags                  []string        `xorm:"mediumtext" json:"tags"`
 	SamlAttributes        []*SamlItem     `xorm:"varchar(1000)" json:"samlAttributes"`
 	IsShared              bool            `json:"isShared"`
+	IpRestriction         string          `json:"ipRestriction"`
 
 	ClientId             string     `xorm:"varchar(100)" json:"clientId"`
 	ClientSecret         string     `xorm:"varchar(100)" json:"clientSecret"`
@@ -108,6 +109,7 @@ type Application struct {
 	SigninUrl            string     `xorm:"varchar(200)" json:"signinUrl"`
 	ForgetUrl            string     `xorm:"varchar(200)" json:"forgetUrl"`
 	AffiliationUrl       string     `xorm:"varchar(100)" json:"affiliationUrl"`
+	IpWhitelist          string     `xorm:"varchar(200)" json:"ipWhitelist"`
 	TermsOfUse           string     `xorm:"varchar(100)" json:"termsOfUse"`
 	SignupHtml           string     `xorm:"mediumtext" json:"signupHtml"`
 	SigninHtml           string     `xorm:"mediumtext" json:"signinHtml"`
@@ -721,8 +723,15 @@ func (application *Application) GetId() string {
 }
 
 func (application *Application) IsRedirectUriValid(redirectUri string) bool {
-	redirectUris := append([]string{"http://localhost:", "https://localhost:", "http://127.0.0.1:", "http://casdoor-app", ".chromiumapp.org"}, application.RedirectUris...)
-	for _, targetUri := range redirectUris {
+	isValid, err := util.IsValidOrigin(redirectUri)
+	if err != nil {
+		panic(err)
+	}
+	if isValid {
+		return true
+	}
+
+	for _, targetUri := range application.RedirectUris {
 		targetUriRegex := regexp.MustCompile(targetUri)
 		if targetUriRegex.MatchString(redirectUri) || strings.Contains(redirectUri, targetUri) {
 			return true

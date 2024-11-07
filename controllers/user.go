@@ -364,7 +364,8 @@ func (c *ApiController) AddUser() {
 		return
 	}
 
-	msg := object.CheckUsername(user.Name, c.GetAcceptLanguage())
+	emptyUser := object.User{}
+	msg := object.CheckUpdateUser(&emptyUser, &user, c.GetAcceptLanguage())
 	if msg != "" {
 		c.ResponseError(msg)
 		return
@@ -489,7 +490,12 @@ func (c *ApiController) SetPassword() {
 			c.ResponseError(c.T("general:Missing parameter"))
 			return
 		}
+		if userId != c.GetSession("verifiedUserId") {
+			c.ResponseError(c.T("general:Wrong userId"))
+			return
+		}
 		c.SetSession("verifiedCode", "")
+		c.SetSession("verifiedUserId", "")
 	}
 
 	targetUser, err := object.GetUser(userId)
@@ -532,6 +538,23 @@ func (c *ApiController) SetPassword() {
 	}
 	if organization == nil {
 		c.ResponseError(fmt.Sprintf(c.T("the organization: %s is not found"), targetUser.Owner))
+		return
+	}
+
+	application, err := object.GetApplicationByUser(targetUser)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	if application == nil {
+		c.ResponseError(fmt.Sprintf(c.T("auth:the application for user %s is not found"), userId))
+		return
+	}
+
+	clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
+	err = object.CheckEntryIp(clientIp, targetUser, application, organization, c.GetAcceptLanguage())
+	if err != nil {
+		c.ResponseError(err.Error())
 		return
 	}
 

@@ -34,6 +34,7 @@ import PaymentResultPage from "./PaymentResultPage";
 import QrCodePage from "./QrCodePage";
 import CaptchaPage from "./CaptchaPage";
 import CustomHead from "./basic/CustomHead";
+import * as Util from "./auth/Util";
 
 class EntryPage extends React.Component {
   constructor(props) {
@@ -94,10 +95,20 @@ class EntryPage extends React.Component {
         });
     };
 
+    if (this.state.application?.ipRestriction) {
+      return Util.renderMessageLarge(this, this.state.application.ipRestriction);
+    }
+
+    if (this.state.application?.organizationObj?.ipRestriction) {
+      return Util.renderMessageLarge(this, this.state.application.organizationObj.ipRestriction);
+    }
+
+    const isDarkMode = this.props.themeAlgorithm.includes("dark");
+
     return (
       <React.Fragment>
         <CustomHead headerHtml={this.state.application?.headerHtml} />
-        <div className="loginBackground"
+        <div className={`${isDarkMode ? "loginBackgroundDark" : "loginBackground"}`}
           style={{backgroundImage: Setting.inIframe() || Setting.isMobile() ? null : `url(${this.state.application?.formBackgroundUrl})`}}>
           <Spin size="large" spinning={this.state.application === undefined && this.state.pricing === undefined} tip={i18next.t("login:Loading")}
             style={{margin: "0 auto"}} />
@@ -124,6 +135,7 @@ class EntryPage extends React.Component {
             <Route exact path="/captcha" render={(props) => <CaptchaPage {...props} />} />
           </Switch>
         </div>
+
       </React.Fragment>
     );
   }

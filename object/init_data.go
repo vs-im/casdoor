@@ -48,11 +48,15 @@ type InitData struct {
 	Transactions  []*Transaction        `json:"transactions"`
 }
 
+var initDataNewOnly bool
+
 func InitFromFile() {
 	initDataFile := conf.GetConfigString("initDataFile")
 	if initDataFile == "" {
 		return
 	}
+
+	initDataNewOnly = conf.GetConfigBool("initDataNewOnly")
 
 	initData, err := readInitDataFromFile(initDataFile)
 	if err != nil {
@@ -182,6 +186,9 @@ func readInitDataFromFile(filePath string) (*InitData, error) {
 		if organization.Tags == nil {
 			organization.Tags = []string{}
 		}
+		if organization.AccountItems == nil {
+			organization.AccountItems = []*AccountItem{}
+		}
 	}
 	for _, application := range data.Applications {
 		if application.Providers == nil {
@@ -266,6 +273,9 @@ func initDefinedOrganization(organization *Organization) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := deleteOrganization(organization)
 		if err != nil {
 			panic(err)
@@ -275,7 +285,9 @@ func initDefinedOrganization(organization *Organization) {
 		}
 	}
 	organization.CreatedTime = util.GetCurrentTime()
-	organization.AccountItems = getBuiltInAccountItems()
+	if len(organization.AccountItems) == 0 {
+		organization.AccountItems = getBuiltInAccountItems()
+	}
 
 	_, err = AddOrganization(organization)
 	if err != nil {
@@ -290,6 +302,9 @@ func initDefinedApplication(application *Application) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := deleteApplication(application)
 		if err != nil {
 			panic(err)
@@ -311,6 +326,9 @@ func initDefinedUser(user *User) {
 		panic(err)
 	}
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := deleteUser(user)
 		if err != nil {
 			panic(err)
@@ -337,6 +355,9 @@ func initDefinedCert(cert *Cert) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteCert(cert)
 		if err != nil {
 			panic(err)
@@ -359,6 +380,9 @@ func initDefinedLdap(ldap *Ldap) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteLdap(ldap)
 		if err != nil {
 			panic(err)
@@ -380,6 +404,9 @@ func initDefinedProvider(provider *Provider) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteProvider(provider)
 		if err != nil {
 			panic(err)
@@ -401,6 +428,9 @@ func initDefinedModel(model *Model) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteModel(model)
 		if err != nil {
 			panic(err)
@@ -423,6 +453,9 @@ func initDefinedPermission(permission *Permission) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := deletePermission(permission)
 		if err != nil {
 			panic(err)
@@ -445,6 +478,9 @@ func initDefinedPayment(payment *Payment) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeletePayment(payment)
 		if err != nil {
 			panic(err)
@@ -467,6 +503,9 @@ func initDefinedProduct(product *Product) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteProduct(product)
 		if err != nil {
 			panic(err)
@@ -489,6 +528,9 @@ func initDefinedResource(resource *Resource) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteResource(resource)
 		if err != nil {
 			panic(err)
@@ -511,6 +553,9 @@ func initDefinedRole(role *Role) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := deleteRole(role)
 		if err != nil {
 			panic(err)
@@ -533,6 +578,9 @@ func initDefinedSyncer(syncer *Syncer) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteSyncer(syncer)
 		if err != nil {
 			panic(err)
@@ -555,6 +603,9 @@ func initDefinedToken(token *Token) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteToken(token)
 		if err != nil {
 			panic(err)
@@ -577,6 +628,9 @@ func initDefinedWebhook(webhook *Webhook) {
 	}
 
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteWebhook(webhook)
 		if err != nil {
 			panic(err)
@@ -598,6 +652,9 @@ func initDefinedGroup(group *Group) {
 		panic(err)
 	}
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := deleteGroup(group)
 		if err != nil {
 			panic(err)
@@ -619,6 +676,9 @@ func initDefinedAdapter(adapter *Adapter) {
 		panic(err)
 	}
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteAdapter(adapter)
 		if err != nil {
 			panic(err)
@@ -640,6 +700,9 @@ func initDefinedEnforcer(enforcer *Enforcer) {
 		panic(err)
 	}
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteEnforcer(enforcer)
 		if err != nil {
 			panic(err)
@@ -661,6 +724,9 @@ func initDefinedPlan(plan *Plan) {
 		panic(err)
 	}
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeletePlan(plan)
 		if err != nil {
 			panic(err)
@@ -682,6 +748,9 @@ func initDefinedPricing(pricing *Pricing) {
 		panic(err)
 	}
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeletePricing(pricing)
 		if err != nil {
 			panic(err)
@@ -703,6 +772,9 @@ func initDefinedInvitation(invitation *Invitation) {
 		panic(err)
 	}
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteInvitation(invitation)
 		if err != nil {
 			panic(err)
@@ -738,6 +810,9 @@ func initDefinedSubscription(subscription *Subscription) {
 		panic(err)
 	}
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteSubscription(subscription)
 		if err != nil {
 			panic(err)
@@ -759,6 +834,9 @@ func initDefinedTransaction(transaction *Transaction) {
 		panic(err)
 	}
 	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
 		affected, err := DeleteTransaction(transaction)
 		if err != nil {
 			panic(err)

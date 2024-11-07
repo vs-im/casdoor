@@ -370,6 +370,8 @@ class App extends Component {
         <ConfigProvider theme={{
           algorithm: Setting.getAlgorithm(["default"]),
           token: {
+            colorPrimary: this.state.themeData.colorPrimary,
+            borderRadius: this.state.themeData.borderRadius,
             marginLG: 4,
             fontSize: 16,
           },
@@ -382,6 +384,7 @@ class App extends Component {
                     <EntryPage
                       account={this.state.account}
                       theme={this.state.themeData}
+                      themeAlgorithm={this.state.themeAlgorithm}
                       updateApplication={(application) => {
                         this.setState({
                           application: application,
@@ -458,7 +461,6 @@ class App extends Component {
                 setLogoutState={() => {
                   this.setState({
                     account: null,
-                    themeAlgorithm: ["default"],
                   });
                 }}
               />

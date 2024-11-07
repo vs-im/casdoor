@@ -520,11 +520,46 @@ func CheckUsername(username string, lang string) string {
 	return ""
 }
 
+func CheckUsernameWithEmail(username string, lang string) string {
+	if username == "" {
+		return i18n.Translate(lang, "check:Empty username.")
+	} else if len(username) > 39 {
+		return i18n.Translate(lang, "check:Username is too long (maximum is 39 characters).")
+	}
+
+	// https://stackoverflow.com/questions/58726546/github-username-convention-using-regex
+
+	if !util.ReUserNameWithEmail.MatchString(username) {
+		return i18n.Translate(lang, "check:Username supports email format. Also The username may only contain alphanumeric characters, underlines or hyphens, cannot have consecutive hyphens or underlines, and cannot begin or end with a hyphen or underline. Also pay attention to the email format.")
+	}
+	return ""
+}
+
 func CheckUpdateUser(oldUser, user *User, lang string) string {
 	if oldUser.Name != user.Name {
-		if msg := CheckUsername(user.Name, lang); msg != "" {
-			return msg
+		organizationName := oldUser.Owner
+		if organizationName == "" {
+			organizationName = user.Owner
 		}
+
+		organization, err := getOrganization("admin", organizationName)
+		if err != nil {
+			return err.Error()
+		}
+		if organization == nil {
+			return fmt.Sprintf(i18n.Translate(lang, "auth:The organization: %s does not exist"), organizationName)
+		}
+
+		if organization.UseEmailAsUsername {
+			if msg := CheckUsernameWithEmail(user.Name, lang); msg != "" {
+				return msg
+			}
+		} else {
+			if msg := CheckUsername(user.Name, lang); msg != "" {
+				return msg
+			}
+		}
+
 		if HasUserByField(user.Owner, "name", user.Name) {
 			return i18n.Translate(lang, "check:Username already exists")
 		}
@@ -537,6 +572,11 @@ func CheckUpdateUser(oldUser, user *User, lang string) string {
 	if oldUser.Phone != user.Phone {
 		if HasUserByField(user.Owner, "phone", user.Phone) {
 			return i18n.Translate(lang, "check:Phone already exists")
+		}
+	}
+	if oldUser.IpWhitelist != user.IpWhitelist {
+		if err := CheckIpWhitelist(user.IpWhitelist, lang); err != nil {
+			return err.Error()
 		}
 	}
 

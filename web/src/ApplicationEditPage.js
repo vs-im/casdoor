@@ -46,12 +46,18 @@ require("codemirror/mode/css/css");
 const {Option} = Select;
 
 const template = `<style>
-  .login-panel{
+  .login-panel {
     padding: 40px 70px 0 70px;
     border-radius: 10px;
     background-color: #ffffff;
     box-shadow: 0 0 30px 20px rgba(0, 0, 0, 0.20);
-}
+  }
+  .login-panel-dark {
+    padding: 40px 70px 0 70px;
+    border-radius: 10px;
+    background-color: #333333;
+    box-shadow: 0 0 30px 20px rgba(255, 255, 255, 0.20);
+  }
 </style>`;
 
 const previewGrid = Setting.isMobile() ? 22 : 11;
@@ -594,6 +600,16 @@ class ApplicationEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:IP whitelist"), i18next.t("general:IP whitelist - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input placeholder = {this.state.application.organizationObj?.ipWhitelist} value={this.state.application.ipWhitelist} onChange={e => {
+              this.updateApplicationField("ipWhitelist", e.target.value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("signup:Terms of Use"), i18next.t("signup:Terms of Use - Tooltip"))} :
           </Col>
           <Col span={22} >
@@ -977,6 +993,7 @@ class ApplicationEditPage extends React.Component {
                 <SigninTable
                   title={i18next.t("application:Signin items")}
                   table={this.state.application.signinItems}
+                  themeAlgorithm={this.state.themeAlgorithm}
                   onUpdateTable={(value) => {
                     this.updateApplicationField("signinItems", value);
                   }}
