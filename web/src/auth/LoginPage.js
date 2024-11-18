@@ -44,6 +44,7 @@ class LoginPage extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
+      loading: false,
       classes: props,
       type: props.type,
       applicationName: props.applicationName ?? (props.match?.params?.applicationName ?? null),
@@ -418,6 +419,9 @@ class LoginPage extends React.Component {
       const casParams = Util.getCasParameters();
       values["signinMethod"] = this.getCurrentLoginMethod();
       values["type"] = this.state.type;
+      this.setState({
+        loading: true,
+      });
       AuthBackend.loginCas(values, casParams).then((res) => {
         const loginHandler = (res) => {
           let msg = "Logged in successfully. ";
@@ -458,11 +462,18 @@ class LoginPage extends React.Component {
         } else {
           Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${res.msg}`);
         }
+      }).finally(() => {
+        this.setState({
+          loading: false,
+        });
       });
     } else {
       // OAuth
       const oAuthParams = Util.getOAuthGetParameters();
       this.populateOauthValues(values);
+      this.setState({
+        loading: true,
+      });
       AuthBackend.login(values, oAuthParams)
         .then((res) => {
           const loginHandler = (res) => {
@@ -535,6 +546,10 @@ class LoginPage extends React.Component {
           } else {
             Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${res.msg}`);
           }
+        }).finally(() => {
+          this.setState({
+            loading: false,
+          });
         });
     }
   }
@@ -720,6 +735,7 @@ class LoginPage extends React.Component {
         <Form.Item className="login-button-box">
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <Button
+            disabled={this.state.loading}
             type="primary"
             htmlType="submit"
             className="login-button"

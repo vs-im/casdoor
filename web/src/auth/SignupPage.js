@@ -101,6 +101,7 @@ class SignupPage extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
+      loading: false,
       classes: props,
       applicationName:
         props.applicationName ?? props.match?.params?.applicationName ?? null,
@@ -265,6 +266,9 @@ class SignupPage extends React.Component {
     const params = new URLSearchParams(window.location.search);
     values.plan = params.get("plan");
     values.pricing = params.get("pricing");
+    this.setState({
+      loading: true,
+    });
     AuthBackend.signup(values).then((res) => {
       if (res.status === "ok") {
         // the user's id will be returned by `signup()`, if user signup by phone, the `username` in `values` is undefined.
@@ -297,6 +301,10 @@ class SignupPage extends React.Component {
       } else {
         Setting.showMessage("error", res.msg);
       }
+    }).finally(() => {
+      this.setState({
+        loading: false,
+      });
     });
   }
 
@@ -1043,7 +1051,7 @@ class SignupPage extends React.Component {
           );
         })}
         <Form.Item {...tailFormItemLayout}>
-          <Button type="primary" htmlType="submit" style={{width: "100%"}}>
+          <Button disabled={this.state.loading} type="primary" htmlType="submit" style={{width: "100%"}}>
             {i18next.t("account:Sign Up")}
           </Button>
           <div style={{padding: "34px 0px 10px 0px"}}>
