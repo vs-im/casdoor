@@ -2,10 +2,18 @@
   --border-primary: rgb(191 191 191);
 }
 
+/*
 .social-auth {
   text-align: center;
   padding-bottom: 1em;
   transform: translateY(7.5px);
+}
+*/
+
+.social-auth {
+  text-align: center;
+  padding-top: 2px;
+  transform: translateY(0.5lh);
 }
 
 .social-auth-label {
@@ -13,6 +21,30 @@
 }
 
 .social-auth-label::before {
+  content: "";
+  position: absolute;
+  top: 0%;
+  margin-bottom: 5px;
+  left: 0;
+  width: 50%;
+  height: 1px;
+  background: var(--border-primary);
+  opacity: 0.5;
+}
+
+.social-auth-label::after {
+  content: "";
+  position: absolute;
+  top: 0%;
+  margin-bottom: 5px;
+  right: 0;
+  width: 50%;
+  height: 1px;
+  background: var(--border-primary);
+  opacity: 0.5;
+}
+
+/* .social-auth-label::before {
   content: "";
   position: absolute;
   top: 50%;
@@ -32,7 +64,7 @@
   height: 1px;
   background: var(--border-primary);
   opacity: 0.5;
-}
+}  */
 
 .social-auth-icon {
   margin-top: 12px;

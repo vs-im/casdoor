@@ -161,6 +161,63 @@ export function goToWeb3Url(application, provider, method) {
   }
 }
 
+export function renderProviderLogoProps(provider, application, width, margin, size, location) {
+  const providerReady = Boolean(provider.category && provider.type);
+  const result = {
+    href: null,
+    onClick: null,
+    alt: provider.displayName,
+    src: providerReady ? getProviderLogoURL(provider) : "",
+    style: null,
+    text: null,
+  };
+
+  if (size === "small") {
+    if (provider.category === "OAuth") {
+      if (provider.type === "WeChat" && provider.clientId2 !== "" && provider.clientSecret2 !== "" && provider.disableSsl === true && !navigator.userAgent.includes("MicroMessenger")) {
+        result.onClick = () => providerReady && WechatOfficialAccountModal(application, provider, "signup");
+      } else {
+        result.href = providerReady ? Provider.getAuthUrl(application, provider, "signup") : null;
+      }
+    } else if (provider.category === "SAML") {
+      result.onClick = () => goToSamlUrl(provider, location);
+    } else if (provider.category === "Web3") {
+      result.onClick = () => goToWeb3Url(application, provider, "signup");
+    }
+  } else if (provider.type === "Custom") {
+    const text = i18next.t("login:Sign in with {type}").replace("{type}", provider.displayName);
+    const customAStyle = {display: "block", height: "55px", color: "#000"};
+    const customButtonStyle = {display: "flex", alignItems: "center", width: "calc(100% - 10px)", height: "50px", margin: "5px", padding: "0 10px", backgroundColor: "transparent", boxShadow: "0px 1px 3px rgba(0,0,0,0.5)", border: "0px", borderRadius: "3px", cursor: "pointer"};
+    const customImgStyle = {justifyContent: "space-between"};
+    const customSpanStyle = {textAlign: "center", width: "100%", fontSize: "19px"};
+
+    result.style = customAStyle;
+    result.additionalDivStyle = customButtonStyle;
+    result.additionalImgStyle = customImgStyle;
+    result.text = text;
+    result.additionalSpanStyle = customSpanStyle;
+
+    if (provider.category === "OAuth") {
+      result.href = Provider.getAuthUrl(application, provider, "signup");
+    } else if (provider.category === "SAML") {
+      result.onClick = () => goToSamlUrl(provider, location);
+    }
+  } else {
+    // big button, for disable password signin
+    if (provider.category === "SAML") {
+      result.onClick = () => goToSamlUrl(provider, location);
+    } else if (provider.category === "Web3") {
+      result.onClick = () => goToWeb3Url(application, provider, "signup");
+    } else {
+      result.href = Provider.getAuthUrl(application, provider, "signup");
+    }
+
+    result.additionalComponent = getSigninButton(provider, location?.pathname?.includes("signup") ? "signUp" : "signIn");
+  }
+
+  return result;
+}
+
 export function renderProviderLogo(provider, application, width, margin, size, location) {
   if (size === "small") {
     if (provider.category === "OAuth") {
@@ -225,7 +282,7 @@ export function renderProviderLogo(provider, application, width, margin, size, l
         <div key={provider.displayName} className="provider-big-img">
           <a onClick={() => goToSamlUrl(provider, location)}>
             {
-              getSigninButton(provider, location?.pathname?.includes("signup") ? "signUp" : "signIn")
+              getSigninButton(provider)
             }
           </a>
         </div>
@@ -235,7 +292,7 @@ export function renderProviderLogo(provider, application, width, margin, size, l
         <div key={provider.displayName} className="provider-big-img">
           <a onClick={() => goToWeb3Url(application, provider, "signup")}>
             {
-              getSigninButton(provider, location?.pathname?.includes("signup") ? "signUp" : "signIn")
+              getSigninButton(provider)
             }
           </a>
         </div>
@@ -245,7 +302,7 @@ export function renderProviderLogo(provider, application, width, margin, size, l
         <div key={provider.displayName} className="provider-big-img">
           <a href={Provider.getAuthUrl(application, provider, "signup")}>
             {
-              getSigninButton(provider, location?.pathname?.includes("signup") ? "signUp" : "signIn")
+              getSigninButton(provider)
             }
           </a>
         </div>

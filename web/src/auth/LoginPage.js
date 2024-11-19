@@ -39,12 +39,54 @@ import {GoogleOneTapLoginVirtualButton} from "./GoogleLoginButton";
 import * as ProviderButton from "./ProviderButton";
 const FaceRecognitionModal = lazy(() => import("../common/modal/FaceRecognitionModal"));
 import "./AuthButtons.css";
+/* eslint-disable */
+import {ApplicationConfig} from "../types";
+
+/**
+ * @typedef {Object} LoginPageProps
+ * @property {ApplicationConfig} application - The application configuration.
+ * @property {string} type - The type of login (e.g., "signin", "signup").
+ * @property {string} applicationName - The name of the application.
+ * @property {string} owner - The owner of the application.
+ * @property {string} mode - The mode of the login page, either "signin" or "signup".
+ * @property {Object} match - React Router match object containing route parameters.
+ * @property {Object} location - React Router location object.
+ * @property {Object} history - React Router history object.
+ */
+
+/**
+ * @typedef {Object} LoginPageState
+ * @property {boolean} loading - Indicates if the page is loading.
+ * @property {Object} classes - Contains the props passed to the component.
+ * @property {string} type - The type of login.
+ * @property {string|null} applicationName - The name of the application.
+ * @property {string|null} owner - The owner of the application.
+ * @property {string|null} mode - The mode of the login page ("signup" or "signin").
+ * @property {string|null} msg - Message to display on the login page.
+ * @property {string|null} username - The username or email entered by the user.
+ * @property {boolean} validEmailOrPhone - Indicates if the email or phone is valid.
+ * @property {boolean} validEmail - Indicates if the email is valid.
+ * @property {boolean} openCaptchaModal - Indicates if the captcha modal is open.
+ * @property {boolean} openFaceRecognitionModal - Indicates if the face recognition modal is open.
+ * @property {string|undefined} verifyCaptcha - Captcha verification status.
+ * @property {string} samlResponse - SAML response for authentication.
+ * @property {string} relayState - Relay state for SAML.
+ * @property {string} redirectUrl - URL to redirect after login.
+ * @property {boolean} isTermsOfUseVisible - Indicates if the terms of use are visible.
+ * @property {string} termsOfUseContent - Content of the terms of use.
+ * @property {string|null} orgChoiceMode - Organization choice mode from URL query params.
+ */
+
 
 class LoginPage extends React.Component {
+  /**
+   * @param {LoginPageProps} props
+   */
   constructor(props) {
     super(props);
     this.state = {
       loading: false,
+      redirected: false,
       classes: props,
       type: props.type,
       applicationName: props.applicationName ?? (props.match?.params?.applicationName ?? null),
@@ -88,8 +130,8 @@ class LoginPage extends React.Component {
   }
 
   componentDidUpdate(prevProps, prevState, snapshot) {
+    const application = this.getApplicationObj();
     if (prevState.loginMethod === undefined && this.state.loginMethod === undefined) {
-      const application = this.getApplicationObj();
       this.setState({loginMethod: this.getDefaultLoginMethod(application)});
     }
     if (prevProps.application !== this.props.application) {
@@ -261,6 +303,29 @@ class LoginPage extends React.Component {
 
   onUpdateApplication(application) {
     this.props.onUpdateApplication(application);
+    if (!this.redirected && !!application?.providers) {
+      const loginParams = (this.state.type === "cas") ? Util.getCasLoginParameters("admin", this.state.applicationName) : Util.getOAuthGetParameters();
+      if (!loginParams?.action) return;
+      if (!application || !application.providers || !Array.isArray(application.providers)) return
+      const provider = application.providers.find((p) => p.name === loginParams.action)
+      if (!provider?.provider) return;
+      const {onClick, href} = ProviderButton.renderProviderLogoProps(
+        provider.provider,
+        application,
+        30,
+        5,
+        "medium",
+        this.props.location
+      )
+      this.setState({
+        redirected: true,
+      })
+      if (onClick) {
+        onClick()
+      } else if (href) {
+        window.location.href = href;
+      }
+    }
   }
 
   parseOffset(offset) {
@@ -567,6 +632,7 @@ class LoginPage extends React.Component {
       return null;
     }
 
+    if (!Array.isArray(application.providers)) return null
     for (const providerConf of application.providers) {
       if (providerConf.provider?.type === "Google" && providerConf.rule === "OneTap" && this.props.preview !== "auto") {
         return (
@@ -775,8 +841,8 @@ class LoginPage extends React.Component {
       if (signinItem.rule === "None" || signinItem.rule === "") {
         signinItem.rule = showForm ? "small" : "big";
       }
-      const avaliableProviders = application.providers.filter(providerItem => this.isProviderVisible(providerItem));
-      const showProviders = avaliableProviders.length > 0;
+      const availableProviders = application.providers?.filter(providerItem => this.isProviderVisible(providerItem));
+      const showProviders = availableProviders.length > 0;
       return (
         <div>
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
@@ -792,7 +858,7 @@ class LoginPage extends React.Component {
                 <div
                   style={{display: "flex", flexDirection: "column", gap: "4px"}}
                 >
-                  {avaliableProviders.map((providerItem) => {
+                  {availableProviders.map((providerItem) => {
                     return ProviderButton.renderProviderLogo(
                       providerItem.provider,
                       application,
@@ -962,6 +1028,7 @@ class LoginPage extends React.Component {
   }
 
   renderFooter(application, signinItem) {
+    return null;
     return (
       <div style={{display: "flex", justifyContent: "center", marginTop: "34px", width: "100%"}}>
         {
@@ -1145,7 +1212,7 @@ class LoginPage extends React.Component {
     };
 
     const itemsMap = new Map([
-      [generateItemKey("Password", "All"), {label: i18next.t("general:Password"), key: "password"}],
+      [generateItemKey("Password", "All"), {label: "Sign In" || i18next.t("general:Password"), key: "password"}],
       [generateItemKey("Password", "Non-LDAP"), {label: i18next.t("general:Password"), key: "password"}],
       [generateItemKey("Verification code", "All"), {label: i18next.t("login:Verification code"), key: "verificationCode"}],
       [generateItemKey("Verification code", "Email only"), {label: i18next.t("login:Verification code"), key: "verificationCodeEmail"}],
@@ -1171,10 +1238,33 @@ class LoginPage extends React.Component {
       }
     });
 
+    if (window.location.pathname.startsWith('/login')) {
+      items.push({
+        key: "signup",
+        label: "Sign Up"
+      });
+    } else {
+      items.unshift({
+        key: "signin",
+        label: "Sign In"
+      });
+
+    }
+
+
     if (items.length > 1) {
       return (
         <div>
           <Tabs className="signin-methods" items={items} size={"small"} defaultActiveKey={this.getDefaultLoginMethod(application)} onChange={(key) => {
+            if (["signup", "signin"].includes(key)) {
+              const application = this.getApplicationObj();
+              const [url, text, callback] = Setting.getSignupLink(application);
+              console.log("Tabs changed, signup url", {url});
+              this.props.history.push(url);
+
+              return;
+            }
+            
             this.setState({loginMethod: key});
           }}>
           </Tabs>

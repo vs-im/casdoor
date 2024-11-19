@@ -332,6 +332,9 @@ const authInfo = {
 };
 
 export function getProviderUrl(provider) {
+  if (provider) {
+    return "";
+  }
   if (provider.category === "OAuth") {
     const endpoint = authInfo[provider.type].endpoint;
     const urlObj = new URL(endpoint);
@@ -378,7 +381,7 @@ export function getProviderLogoWidget(provider) {
 }
 
 export function getAuthUrl(application, provider, method, code) {
-  if (application === null || provider === null) {
+  if (application === null || provider === null || !provider.type) {
     return "";
   }
 

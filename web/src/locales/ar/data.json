@@ -1,6 +1,7 @@
 {
   "account": {
     "Logout": "Logout",
+    "or": "Or connect with:",
     "My Account": "My Account",
     "Sign Up": "Sign Up"
   },

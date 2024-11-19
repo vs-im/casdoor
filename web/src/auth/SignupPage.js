@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React from "react";
-import {Button, Form, Input, Radio, Result, Row, Select, message} from "antd";
+import {Button, Form, Input, Radio, Result, Row, Select, Tabs, message} from "antd";
 import * as Setting from "../Setting";
 import * as AuthBackend from "./AuthBackend";
 import * as ProviderButton from "./ProviderButton";
@@ -324,7 +324,31 @@ class SignupPage extends React.Component {
 
     const required = signupItem.required;
 
-    if (signupItem.name === "Username") {
+    if (signupItem.name === "Signin methods") {
+      const items = [{
+        key: "signin",
+        label: "Sign In",
+      }, {
+        key: "signup",
+        label: "Sign Up",
+      }];
+
+      return (
+        <div>
+          <Tabs className="signin-methods" items={items} size={"small"} defaultActiveKey={"signup"} onChange={(key) => {
+            /* eslint-disable */
+            console.log("Tabs changed", key);
+            if ("signin" === key) {
+              const application = this.getApplicationObj();
+              Setting.redirectToLoginPage(application, this.props.history);
+
+              return;
+            }
+          }}>
+          </Tabs>
+        </div>
+      )
+    } else if (signupItem.name === "Username") {
       return (
         <Form.Item
           key="username"
@@ -990,6 +1014,15 @@ class SignupPage extends React.Component {
       this.isProviderVisible(providerItem)
     );
     const showProviders = avaliableProviders.length > 0;
+    /* eslint-disable */
+    console.log("application.signupItems", application.signupItems);
+
+    const signupItems = Array.isArray(application.signupItems) ? [...application.signupItems] : [];
+    signupItems.unshift({
+      name: "Signin methods",
+      visible: true,
+    })
+
     return (
       <Form
         id={"SignupPage-renderForm"}
@@ -1038,7 +1071,7 @@ class SignupPage extends React.Component {
             },
           ]}
         ></Form.Item>
-        {application.signupItems?.map((signupItem, idx) => {
+        {signupItems.map((signupItem, idx) => {
           return (
             <div key={idx}>
               <div
@@ -1054,7 +1087,7 @@ class SignupPage extends React.Component {
           <Button disabled={this.state.loading} type="primary" htmlType="submit" style={{width: "100%"}}>
             {i18next.t("account:Sign Up")}
           </Button>
-          <div style={{padding: "34px 0px 10px 0px"}}>
+          {/* <div style={{padding: "34px 0px 10px 0px"}}>
             &nbsp;&nbsp;{i18next.t("signup:Have account?")}&nbsp;
             <a
               onClick={() => {
@@ -1068,7 +1101,7 @@ class SignupPage extends React.Component {
             >
               {i18next.t("signup:sign in now")}
             </a>
-          </div>
+          </div> */}
           {showProviders && (
             <React.Fragment>
               <div className="social-auth-label">

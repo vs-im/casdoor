@@ -141,6 +141,7 @@ export function getOAuthGetParameters(params) {
   const samlRequest = getRefinedValue(queries.get("SAMLRequest"));
   const relayState = getRefinedValue(queries.get("RelayState"));
   const noRedirect = getRefinedValue(queries.get("noRedirect"));
+  const action = getRefinedValue(queries.get("action"));
 
   if (clientId === "" && samlRequest === "") {
     // login
@@ -160,6 +161,7 @@ export function getOAuthGetParameters(params) {
       relayState: relayState,
       noRedirect: noRedirect,
       type: "code",
+      action: action,
     };
   }
 }

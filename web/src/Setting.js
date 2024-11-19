@@ -941,6 +941,9 @@ export function getProviderLogoURL(provider) {
   if (provider.category === "OAuth") {
     return `${StaticBaseUrl}/img/social_${provider.type.toLowerCase()}.png`;
   } else {
+    if (!provider.category || !provider.type) {
+      return "";
+    }
     const info = OtherProviderInfo[provider.category][provider.type];
     // avoid crash when provider is not found
     if (info) {
@@ -1255,7 +1258,12 @@ function renderLink(url, text, onClick) {
   }
 }
 
-export function renderSignupLink(application, text) {
+/**
+ * @param {Object} application - The application object.
+ * @param {string} text - The text to display for the link.
+ * @returns {[string, string, function]} - signup URL, the display text, and a function to store the signin URL in session storage.
+ */
+export function getSignupLink(application, text) {
   let url;
   if (application === null) {
     url = null;
@@ -1275,7 +1283,11 @@ export function renderSignupLink(application, text) {
     sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
   };
 
-  return renderLink(url + window.location.search, text, storeSigninUrl);
+  return [url + window.location.search, text, storeSigninUrl];
+}
+
+export function renderSignupLink(application, text) {
+  return renderLink(...getSignupLink(application, text));
 }
 
 export function renderForgetLink(application, text) {
