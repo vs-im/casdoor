@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/beevik/etree"
@@ -222,10 +223,13 @@ func GetSamlMeta(application *Application, host string, enablePostBinding bool) 
 	originFrontend, originBackend := getOriginFromHost(host)
 
 	idpLocation := ""
+	idpBinding := ""
 	if enablePostBinding {
 		idpLocation = fmt.Sprintf("%s/api/saml/redirect/%s/%s", originBackend, application.Owner, application.Name)
+		idpBinding = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
 	} else {
 		idpLocation = fmt.Sprintf("%s/login/saml/authorize/%s/%s", originFrontend, application.Owner, application.Name)
+		idpBinding = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
 	}
 
 	d := IdpEntityDescriptor{
@@ -258,7 +262,7 @@ func GetSamlMeta(application *Application, host string, enablePostBinding bool) 
 				{Xmlns: "urn:oasis:names:tc:SAML:2.0:assertion", Name: "Name", NameFormat: "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", FriendlyName: "Name"},
 			},
 			SingleSignOnService: SingleSignOnService{
-				Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+				Binding:  idpBinding,
 				Location: idpLocation,
 			},
 			ProtocolSupportEnumeration: "urn:oasis:names:tc:SAML:2.0:protocol",
@@ -273,29 +277,38 @@ func GetSamlMeta(application *Application, host string, enablePostBinding bool) 
 func GetSamlResponse(application *Application, user *User, samlRequest string, host string) (string, string, string, error) {
 	// request type
 	method := "GET"
-
+	samlRequest = strings.ReplaceAll(samlRequest, " ", "+")
 	// base64 decode
 	defated, err := base64.StdEncoding.DecodeString(samlRequest)
 	if err != nil {
 		return "", "", "", fmt.Errorf("err: Failed to decode SAML request, %s", err.Error())
 	}
 
-	// decompress
-	var buffer bytes.Buffer
-	rdr := flate.NewReader(bytes.NewReader(defated))
+	var requestByte []byte
 
-	for {
-		_, err = io.CopyN(&buffer, rdr, 1024)
-		if err != nil {
-			if err == io.EOF {
-				break
+	if strings.Contains(string(defated), "xmlns:") {
+		requestByte = defated
+	} else {
+		// decompress
+		var buffer bytes.Buffer
+		rdr := flate.NewReader(bytes.NewReader(defated))
+
+		for {
+
+			_, err = io.CopyN(&buffer, rdr, 1024)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return "", "", "", err
 			}
-			return "", "", "", err
 		}
+
+		requestByte = buffer.Bytes()
 	}
 
 	var authnRequest saml.AuthNRequest
-	err = xml.Unmarshal(buffer.Bytes(), &authnRequest)
+	err = xml.Unmarshal(requestByte, &authnRequest)
 	if err != nil {
 		return "", "", "", fmt.Errorf("err: Failed to unmarshal AuthnRequest, please check the SAML request, %s", err.Error())
 	}

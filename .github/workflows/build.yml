@@ -114,12 +114,12 @@ jobs:
           wait-on-timeout: 210
           working-directory: ./web
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: cypress-screenshots
           path: ./web/cypress/screenshots
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cypress-videos
@@ -147,7 +147,7 @@ jobs:
       - name: Release
         run: yarn global add semantic-release@17.4.4 && semantic-release
         env:
-          GH_TOKEN: ${{ secrets.GH_BOT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fetch Current version
         id: get-current-tag

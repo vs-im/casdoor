@@ -325,7 +325,7 @@ function ManagementPage(props) {
           </div>}
 
           <OpenTour />
-          {/* {Setting.isAdminUser(props.account) && !Setting.isMobile() && (props.uri.indexOf("/trees") === -1) &&
+          {/* {Setting.isAdminUser(props.account) && (props.uri.indexOf("/trees") === -1) &&
                         <OrganizationSelect
                           initValue={Setting.getOrganization()}
                           withAll={true}
