@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "验证码",
     "Email code": "邮箱验证码",
+    "Confirmation code": "确认码",
     "Empty code": "验证码为空",
     "Enter your code": "输入你的验证码",
     "Phone code": "手机验证码",

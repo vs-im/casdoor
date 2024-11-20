@@ -332,7 +332,7 @@ const authInfo = {
 };
 
 export function getProviderUrl(provider) {
-  if (provider) {
+  if (!provider) {
     return "";
   }
   if (provider.category === "OAuth") {

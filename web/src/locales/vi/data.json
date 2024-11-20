@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "Mã bạn nhận được",
     "Email code": "Mã email",
+    "Confirmation code": "Mã xác nhận",
     "Empty code": "Mã trống",
     "Enter your code": "Nhập mã của bạn",
     "Phone code": "Mã điện thoại",
@@ -955,7 +956,7 @@
   "signup": {
     "Accept": "Chấp nhận",
     "Agreement": "Thỏa thuận",
-    "Confirm": "Xác nhận",
+    "Confirm": "Xác nhận mật khẩu",
     "Decline": "Từ chối",
     "Have account?": "Có tài khoản không?",
     "Label": "Label",

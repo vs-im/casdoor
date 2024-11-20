@@ -2,7 +2,7 @@
   "account": {
     "Logout": "Odhlásit se",
     "My Account": "Můj účet",
-    "Sign Up": "Zaregistrovat se"
+    "Sign Up": "Vytvořit účet"
   },
   "adapter": {
     "Duplicated policy rules": "Duplicitní pravidla politiky",
@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "Kód, který jste obdrželi",
     "Email code": "Emailový kód",
+    "Confirmation code": "Ověřovací kód",
     "Empty code": "Prázdný kód",
     "Enter your code": "Zadejte svůj kód",
     "Phone code": "Telefonní kód",
@@ -955,9 +956,9 @@
   "signup": {
     "Accept": "Přijmout",
     "Agreement": "Smlouva",
-    "Confirm": "Potvrdit",
+    "Confirm": "Potvrďte heslo",
     "Decline": "Odmítnout",
-    "Have account?": "Máte účet?",
+    "Have account?": "Již máte účet?",
     "Label": "Štítek",
     "Label HTML": "HTML štítek",
     "Options": "Options",

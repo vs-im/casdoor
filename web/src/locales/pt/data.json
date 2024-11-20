@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "Código que você recebeu",
     "Email code": "Código de e-mail",
+    "Confirmation code": "Código de confirmação",
     "Empty code": "Código vazio",
     "Enter your code": "Digite seu código",
     "Phone code": "Código de telefone",
@@ -955,7 +956,7 @@
   "signup": {
     "Accept": "Aceitar",
     "Agreement": "Acordo",
-    "Confirm": "Confirmar",
+    "Confirm": "Confirmar senha",
     "Decline": "Recusar",
     "Have account?": "Já possui uma conta?",
     "Label": "Label",

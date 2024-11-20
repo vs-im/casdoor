@@ -11,9 +11,34 @@
 */
 
 .social-auth {
+  margin-top: 0;
   text-align: center;
-  padding-top: 2px;
+  padding-bottom: 1em;
   transform: translateY(0.5lh);
+}
+
+.password-validation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 8px 15px;
+}
+
+.password-validation p,
+.password-validation s {
+  text-align: left;
+}
+
+.form-header span {
+  font-size: 1.5rem;
+  color: rgb(0 0 0 / 60%);
+  font-weight: bold;
+}
+
+.form-header {
+  margin: 0 0 15px;
 }
 
 .social-auth-label {
@@ -23,30 +48,6 @@
 .social-auth-label::before {
   content: "";
   position: absolute;
-  top: 0%;
-  margin-bottom: 5px;
-  left: 0;
-  width: 50%;
-  height: 1px;
-  background: var(--border-primary);
-  opacity: 0.5;
-}
-
-.social-auth-label::after {
-  content: "";
-  position: absolute;
-  top: 0%;
-  margin-bottom: 5px;
-  right: 0;
-  width: 50%;
-  height: 1px;
-  background: var(--border-primary);
-  opacity: 0.5;
-}
-
-/* .social-auth-label::before {
-  content: "";
-  position: absolute;
   top: 50%;
   left: 0;
   width: 37%;
@@ -64,7 +65,7 @@
   height: 1px;
   background: var(--border-primary);
   opacity: 0.5;
-}  */
+}
 
 .social-auth-icon {
   margin-top: 12px;

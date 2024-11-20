@@ -2,7 +2,7 @@
   "account": {
     "Logout": "خروج",
     "My Account": "حساب من",
-    "Sign Up": "ثبت نام"
+    "Sign Up": "ایجاد حساب"
   },
   "adapter": {
     "Duplicated policy rules": "قوانین تکراری",
@@ -955,7 +955,7 @@
   "signup": {
     "Accept": "Accept",
     "Agreement": "Agreement",
-    "Confirm": "Confirm",
+    "Confirm": "Confirm password",
     "Decline": "Decline",
     "Have account?": "Have account?",
     "Label": "Label",
@@ -996,7 +996,7 @@
     "Username - Tooltip": "Username - Tooltip",
     "Your account has been created!": "Your account has been created!",
     "Your confirmed password is inconsistent with the password!": "Your confirmed password is inconsistent with the password!",
-    "sign in now": "sign in now"
+    "sign in now": "Sign In"
   },
   "subscription": {
     "Active": "Active",

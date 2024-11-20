@@ -1,9 +1,9 @@
 {
   "account": {
-    "or": "Или подключиться с:",
+    "or": "или",
     "Logout": "Выход",
     "My Account": "Мой аккаунт",
-    "Sign Up": "Зарегистрироваться"
+    "Sign Up": "Создать аккаунт"
   },
   "adapter": {
     "Duplicated policy rules": "Дублирование правил политики",
@@ -152,7 +152,8 @@
   },
   "code": {
     "Code you received": "Код, который вы получили",
-    "Email code": "Электронный код письма",
+    "Email code": "Код из письма",
+    "Confirmation code": "Код подтверждения",
     "Empty code": "Пустой код",
     "Enter your code": "Введите свой код",
     "Phone code": "Код телефона",
@@ -957,9 +958,9 @@
   "signup": {
     "Accept": "Принимать",
     "Agreement": "Соглашение",
-    "Confirm": "Подтвердить",
+    "Confirm": "Подтвердите пароль",
     "Decline": "Снижение",
-    "Have account?": "У вас есть аккаунт?",
+    "Have account?": "Уже есть аккаунт?",
     "Label": "Label",
     "Label HTML": "Label HTML",
     "Options": "Options",
@@ -998,7 +999,7 @@
     "Username - Tooltip": "Username - Tooltip",
     "Your account has been created!": "Ваш аккаунт был создан!",
     "Your confirmed password is inconsistent with the password!": "Ваш подтвержденный пароль не соответствует паролю!",
-    "sign in now": "войти сейчас"
+    "sign in now": "Войти"
   },
   "subscription": {
     "Active": "Active",

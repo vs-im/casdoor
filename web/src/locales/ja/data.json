@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "受け取ったコード",
     "Email code": "メールコード",
+    "Confirmation code": "確認コード",
     "Empty code": "空のコード",
     "Enter your code": "あなたのコードを入力してください",
     "Phone code": "電話番号コード",
@@ -955,7 +956,7 @@
   "signup": {
     "Accept": "受け入れる",
     "Agreement": "協定",
-    "Confirm": "確認",
+    "Confirm": "パスワードを確認する",
     "Decline": "拒否",
     "Have account?": "アカウントはありますか？",
     "Label": "Label",

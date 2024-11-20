@@ -3,7 +3,7 @@
     "or": "ou",
     "Logout": "Déconnexion",
     "My Account": "Mon Compte",
-    "Sign Up": "S'inscrire"
+    "Sign Up": "Créer un compte"
   },
   "adapter": {
     "Duplicated policy rules": "Règles dupliquées",
@@ -153,6 +153,7 @@
   "code": {
     "Code you received": "Le code que vous avez reçu",
     "Email code": "Code de vérification de l'adresse e-mail",
+    "Confirmation code": "Code de confirmation",
     "Empty code": "Code vide",
     "Enter your code": "Entrez votre code",
     "Phone code": "Code de vérification du numéro de téléphone",
@@ -956,7 +957,7 @@
   "signup": {
     "Accept": "Accepter",
     "Agreement": "Accord",
-    "Confirm": "Confirmer",
+    "Confirm": "Confirmer le mot de passe",
     "Decline": "Décliner",
     "Have account?": "Avez-vous un compte ?",
     "Label": "Label",

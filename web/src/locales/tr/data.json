@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "Code you received",
     "Email code": "E-posta doğrulama kodu",
+    "Confirmation code": "Onay kodu",
     "Empty code": "Empty code",
     "Enter your code": "Size gönderilen code 'u giriniz",
     "Phone code": "Phone code",
@@ -955,7 +956,7 @@
   "signup": {
     "Accept": "Kabul Et",
     "Agreement": "Agreement",
-    "Confirm": "Şifre doğrula",
+    "Confirm": "Parolanızı onaylayın",
     "Decline": "Decline",
     "Have account?": "Zaten bir hesabınız var mı?",
     "Label": "Label",

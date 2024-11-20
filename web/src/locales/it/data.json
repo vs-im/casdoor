@@ -2,7 +2,7 @@
   "account": {
     "Logout": "Esci",
     "My Account": "Profilo",
-    "Sign Up": "Registrati"
+    "Sign Up": "Creare un account"
   },
   "adapter": {
     "Duplicated policy rules": "Policy Duplicate",
@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "Code you received",
     "Email code": "Email code",
+    "Confirmation code": "Confirmation code",
     "Empty code": "Empty code",
     "Enter your code": "Enter your code",
     "Phone code": "Phone code",
@@ -955,7 +956,7 @@
   "signup": {
     "Accept": "Accept",
     "Agreement": "Agreement",
-    "Confirm": "Confirm",
+    "Confirm": "Confirm password",
     "Decline": "Decline",
     "Have account?": "Have account?",
     "Label": "Label",

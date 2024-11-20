@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "Kód, ktorý ste dostali",
     "Email code": "Emailový kód",
+    "Confirmation code": "Potvrdzovací kód",
     "Empty code": "Prázdny kód",
     "Enter your code": "Zadajte svoj kód",
     "Phone code": "Telefónny kód",
@@ -955,7 +956,7 @@
   "signup": {
     "Accept": "Akceptovať",
     "Agreement": "Dohoda",
-    "Confirm": "Potvrdiť",
+    "Confirm": "Potvrdiť heslo",
     "Decline": "Odmietnuť",
     "Have account?": "Máte účet?",
     "Label": "Štítok",

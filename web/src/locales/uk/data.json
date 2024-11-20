@@ -2,7 +2,7 @@
   "account": {
     "Logout": "Вийти",
     "My Account": "Мій обліковий запис",
-    "Sign Up": "Реєстрація"
+    "Sign Up": "Створити обліковий запис"
   },
   "adapter": {
     "Duplicated policy rules": "Дубльовані правила політики",
@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "Код, який ви отримали",
     "Email code": "Код електронної пошти",
+    "Confirmation code": "Код підтвердження",
     "Empty code": "Порожній код",
     "Enter your code": "введіть ваш код",
     "Phone code": "Телефонний код",
@@ -955,7 +956,7 @@
   "signup": {
     "Accept": "прийняти",
     "Agreement": "Угода",
-    "Confirm": "Підтвердити",
+    "Confirm": "Підтвердьте пароль",
     "Decline": "відхилити",
     "Have account?": "Є акаунт?",
     "Label": "Мітка",

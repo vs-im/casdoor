@@ -1031,7 +1031,6 @@ class LoginPage extends React.Component {
   }
 
   renderFooter(application, signinItem) {
-    return null;
     return (
       <div style={{display: "flex", justifyContent: "center", marginTop: "34px", width: "100%"}}>
         {
@@ -1215,7 +1214,7 @@ class LoginPage extends React.Component {
     };
 
     const itemsMap = new Map([
-      [generateItemKey("Password", "All"), {label: "Sign In" || i18next.t("general:Password"), key: "password"}],
+      [generateItemKey("Password", "All"), {label: i18next.t("general:Password"), key: "password"}],
       [generateItemKey("Password", "Non-LDAP"), {label: i18next.t("general:Password"), key: "password"}],
       [generateItemKey("Verification code", "All"), {label: i18next.t("login:Verification code"), key: "verificationCode"}],
       [generateItemKey("Verification code", "Email only"), {label: i18next.t("login:Verification code"), key: "verificationCodeEmail"}],
@@ -1241,18 +1240,17 @@ class LoginPage extends React.Component {
       }
     });
 
-    if (window.location.pathname.startsWith('/login')) {
-      items.push({
-        key: "signup",
-        label: "Sign Up"
-      });
-    } else {
-      items.unshift({
-        key: "signin",
-        label: "Sign In"
-      });
-
-    }
+    // if (window.location.pathname.startsWith('/login')) {
+    //   items.push({
+    //     key: "signup",
+    //     label: "Sign Up"
+    //   });
+    // } else {
+    //   items.unshift({
+    //     key: "signin",
+    //     label: "Sign In"
+    //   });
+    // }
 
 
     if (items.length > 1) {
@@ -1261,8 +1259,7 @@ class LoginPage extends React.Component {
           <Tabs className="signin-methods" items={items} size={"small"} defaultActiveKey={this.getDefaultLoginMethod(application)} onChange={(key) => {
             if (["signup", "signin"].includes(key)) {
               const application = this.getApplicationObj();
-              const [url, text, callback] = Setting.getSignupLink(application);
-              console.log("Tabs changed, signup url", {url});
+              const [url] = Setting.getSignupLink(application);
               this.props.history.push(url);
 
               return;

@@ -53,8 +53,14 @@ function isValidOption_NoRepeat(password) {
 }
 
 export function checkPasswordComplexity(password, options) {
+  const checkersResults = [];
   if (password.length === 0) {
-    return i18next.t("login:Please input your password!");
+    const errorMessage = i18next.t("login:Please input your password!");
+    checkersResults.push({
+      failed: true,
+      value: errorMessage,
+    });
+    return [errorMessage, checkersResults];
   }
 
   if (!options || options.length === 0) {
@@ -62,21 +68,30 @@ export function checkPasswordComplexity(password, options) {
   }
 
   const checkers = {
-    AtLeast6: isValidOption_AtLeast6,
     AtLeast8: isValidOption_AtLeast8,
+    AtLeast6: isValidOption_AtLeast6,
     Aa123: isValidOption_Aa123,
     SpecialChar: isValidOption_SpecialChar,
     NoRepeat: isValidOption_NoRepeat,
   };
 
   for (const option of options) {
+    if (option === "AtLeast6" && options.includes("AtLeast8")) {
+      continue;
+    }
     const checkerFunc = checkers[option];
     if (checkerFunc) {
-      const errorMsg = checkerFunc(password);
-      if (errorMsg !== "") {
-        return errorMsg;
+      const failed = checkerFunc(password);
+      const errorMessage = checkerFunc("aa");
+      checkersResults.push({
+        failed: !!failed,
+        value: errorMessage,
+      });
+
+      if (failed) {
+        return [failed, checkersResults];
       }
     }
   }
-  return "";
+  return ["", checkersResults];
 }

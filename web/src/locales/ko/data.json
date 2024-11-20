@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "받은 코드",
     "Email code": "이메일 코드",
+    "Confirmation code": "확인 코드",
     "Empty code": "빈 코드",
     "Enter your code": "당신의 코드를 입력하세요",
     "Phone code": "핸드폰 코드",
@@ -955,7 +956,7 @@
   "signup": {
     "Accept": "수락하다",
     "Agreement": "합의",
-    "Confirm": "확인하다",
+    "Confirm": "비밀번호 확인",
     "Decline": "쇠퇴하다",
     "Have account?": "계정이 있나요?",
     "Label": "Label",

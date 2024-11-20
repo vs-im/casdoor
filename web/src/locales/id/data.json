@@ -2,7 +2,7 @@
   "account": {
     "Logout": "Keluar",
     "My Account": "Akun Saya",
-    "Sign Up": "Mendaftar"
+    "Sign Up": "Buat akun"
   },
   "adapter": {
     "Duplicated policy rules": "Aturan kebijakan yang diduplikasi",
@@ -152,6 +152,7 @@
   "code": {
     "Code you received": "Kode yang kamu terima",
     "Email code": "Kode email",
+    "Confirmation code": "Kode konfirmasi",
     "Empty code": "Kode kosong",
     "Enter your code": "Masukkan kode Anda",
     "Phone code": "Kode telepon",
@@ -955,9 +956,9 @@
   "signup": {
     "Accept": "Menerima",
     "Agreement": "Kesepakatan",
-    "Confirm": "Konfirmasi",
+    "Confirm": "Konfirmasi kata sandi",
     "Decline": "Menurun",
-    "Have account?": "Punya akun?",
+    "Have account?": "Sudah memiliki akun?",
     "Label": "Label",
     "Label HTML": "Label HTML",
     "Options": "Options",

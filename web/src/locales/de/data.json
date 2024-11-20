@@ -3,7 +3,7 @@
     "or": "oder",
     "Logout": "Abmeldung",
     "My Account": "Mein Konto",
-    "Sign Up": "Anmelden"
+    "Sign Up": "Ein Konto erstellen"
   },
   "adapter": {
     "Duplicated policy rules": "Doppelte Richtlinienregeln",
@@ -153,6 +153,7 @@
   "code": {
     "Code you received": "Der Code, den Sie erhalten haben",
     "Email code": "E-Mail-Code",
+    "Confirmation code": "Bestätigungscode",
     "Empty code": "Leerer Code",
     "Enter your code": "Geben Sie Ihren Code ein",
     "Phone code": "Telefoncode",
@@ -956,7 +957,7 @@
   "signup": {
     "Accept": "Akzeptieren",
     "Agreement": "Vereinbarung",
-    "Confirm": "Bestätigen",
+    "Confirm": "Passwort bestätigen",
     "Decline": "Abnahme",
     "Have account?": "Haben Sie ein Konto?",
     "Label": "Label",

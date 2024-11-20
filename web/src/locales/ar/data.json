@@ -1,9 +1,9 @@
 {
   "account": {
     "Logout": "Logout",
-    "or": "Or connect with:",
+    "or": "or",
     "My Account": "My Account",
-    "Sign Up": "Sign Up"
+    "Sign Up": "Create account"
   },
   "adapter": {
     "Duplicated policy rules": "Duplicated policy rules",
@@ -153,6 +153,7 @@
   "code": {
     "Code you received": "Code you received",
     "Email code": "Email code",
+    "Confirmation code": "Confirmation code",
     "Empty code": "Empty code",
     "Enter your code": "Enter your code",
     "Phone code": "Phone code",
@@ -956,9 +957,9 @@
   "signup": {
     "Accept": "Accept",
     "Agreement": "Agreement",
-    "Confirm": "Confirm",
+    "Confirm": "Confirm password",
     "Decline": "Decline",
-    "Have account?": "Have account?",
+    "Have account?": "Already have an account?",
     "Label": "Label",
     "Label HTML": "Label HTML",
     "Options": "Options",
@@ -997,7 +998,7 @@
     "Username - Tooltip": "Username - Tooltip",
     "Your account has been created!": "Your account has been created!",
     "Your confirmed password is inconsistent with the password!": "Your confirmed password is inconsistent with the password!",
-    "sign in now": "sign in now"
+    "sign in now": "Sign In"
   },
   "subscription": {
     "Active": "Active",

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React from "react";
-import {Button, Form, Input, Radio, Result, Row, Select, Tabs, message} from "antd";
+import {Button, Form, Input, Radio, Result, Row, Select, message} from "antd";
 import * as Setting from "../Setting";
 import * as AuthBackend from "./AuthBackend";
 import * as ProviderButton from "./ProviderButton";
@@ -102,6 +102,10 @@ class SignupPage extends React.Component {
     super(props);
     this.state = {
       loading: false,
+      password: "",
+      confirmPassword: "",
+      isPasswordDirty: false,
+      isConfirmPasswordDirty: false,
       classes: props,
       applicationName:
         props.applicationName ?? props.match?.params?.applicationName ?? null,
@@ -324,31 +328,7 @@ class SignupPage extends React.Component {
 
     const required = signupItem.required;
 
-    if (signupItem.name === "Signin methods") {
-      const items = [{
-        key: "signin",
-        label: "Sign In",
-      }, {
-        key: "signup",
-        label: "Sign Up",
-      }];
-
-      return (
-        <div>
-          <Tabs className="signin-methods" items={items} size={"small"} defaultActiveKey={"signup"} onChange={(key) => {
-            /* eslint-disable */
-            console.log("Tabs changed", key);
-            if ("signin" === key) {
-              const application = this.getApplicationObj();
-              Setting.redirectToLoginPage(application, this.props.history);
-
-              return;
-            }
-          }}>
-          </Tabs>
-        </div>
-      )
-    } else if (signupItem.name === "Username") {
+    if (signupItem.name === "Username") {
       return (
         <Form.Item
           key="username"
@@ -602,7 +582,7 @@ class SignupPage extends React.Component {
                 label={
                   signupItem.label
                     ? signupItem.label
-                    : i18next.t("code:Email code")
+                    : i18next.t("code:Confirmation code") || i18next.t("code:Email code")
                 }
                 rules={[
                   {
@@ -802,72 +782,96 @@ class SignupPage extends React.Component {
         return null;
       }
     } else if (signupItem.name === "Password") {
+      const [, map] = PasswordChecker.checkPasswordComplexity(
+        this.state.password ?? "",
+        application.organizationObj.passwordOptions
+      );
+
+      const render = this.state.isPasswordDirty && map.length !== 0;
       return (
-        <Form.Item
-          key="password"
-          name="password"
-          className="signup-password"
-          label={
-            signupItem.label ? signupItem.label : i18next.t("general:Password")
-          }
-          rules={[
-            {
-              required: required,
-              validateTrigger: "onChange",
-              validator: (rule, value) => {
-                const errorMsg = PasswordChecker.checkPasswordComplexity(
-                  value,
-                  application.organizationObj.passwordOptions
-                );
-                if (errorMsg === "") {
-                  return Promise.resolve();
-                } else {
-                  return Promise.reject(errorMsg);
-                }
+        <>
+          <Form.Item
+            key="password"
+            name="password"
+            className="signup-password"
+            onChange={(e) => {
+              this.setState({password: e.target.value, isPasswordDirty: true});
+            }}
+            label={
+              signupItem.label ? signupItem.label : i18next.t("general:Password")
+            }
+            rules={[
+              {
+                required: required,
+                validateTrigger: "onChange",
+                validator: (_, value) => {
+                  const [errorMsg] = PasswordChecker.checkPasswordComplexity(
+                    value,
+                    application.organizationObj.passwordOptions
+                  );
+                  if (errorMsg === "") {
+                    return Promise.resolve();
+                  } else {
+                    return Promise.reject("");
+                  }
+                },
               },
-            },
-          ]}
-          hasFeedback
-        >
-          <Input.Password
-            className="signup-password-input"
-            placeholder={signupItem.placeholder}
-          />
-        </Form.Item>
+            ]}
+            hasFeedback
+          >
+            <Input.Password
+              className="signup-password-input"
+              placeholder={signupItem.placeholder}
+            />
+          </Form.Item>
+          {render && <div className="password-validation">{map.map(({value, failed}) => {
+            if (!failed) {
+              return <s style={{color: "grey"}} key={value}>{value}</s>;
+            }
+            return <div style={{color: "red"}} key={value}>{value}</div>;
+          })}</div>}
+        </>
       );
     } else if (signupItem.name === "Confirm password") {
+      const isInconsistent = this.state.password !== this.state.confirmPassword;
+      let errorMsg = this.state.isConfirmPasswordDirty && isInconsistent ? i18next.t("signup:Please confirm your password!") : "";
+      if (this.state.confirmPassword && isInconsistent && this.state.isConfirmPasswordDirty) {
+        errorMsg = i18next.t("signup:Your confirmed password is inconsistent with the password!");
+      }
       return (
-        <Form.Item
-          key="confirm-password"
-          name="confirm"
-          className="signup-confirm"
-          label={
-            signupItem.label ? signupItem.label : i18next.t("signup:Confirm")
-          }
-          dependencies={["password"]}
-          hasFeedback
-          rules={[
-            {
-              required: required,
-              message: i18next.t("signup:Please confirm your password!"),
-            },
-            ({getFieldValue}) => ({
-              validator(rule, value) {
-                if (!value || getFieldValue("password") === value) {
-                  return Promise.resolve();
-                }
-
-                return Promise.reject(
-                  i18next.t(
-                    "signup:Your confirmed password is inconsistent with the password!"
-                  )
-                );
+        <>
+          <Form.Item
+            key="confirm-password"
+            name="confirm"
+            className="signup-confirm"
+            label={
+              signupItem.label ? signupItem.label : i18next.t("signup:Confirm")
+            }
+            dependencies={["password"]}
+            hasFeedback
+            onChange={(e) => {
+              this.setState({confirmPassword: e.target.value, isConfirmPasswordDirty: true});
+            }}
+            rules={[
+              {
+                required: required,
+                message: "",
               },
-            }),
-          ]}
-        >
-          <Input.Password placeholder={signupItem.placeholder} />
-        </Form.Item>
+              ({getFieldValue}) => ({
+                validator(rule, value) {
+                  if (!value || getFieldValue("password") === value) {
+                    return Promise.resolve();
+                  }
+
+                  return Promise.reject("");
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder={signupItem.placeholder} />
+          </Form.Item>
+          {errorMsg && <div className="password-validation"><div style={{color: "red"}}>{errorMsg}</div></div>}
+        </>
       );
     } else if (signupItem.name === "Invitation code") {
       return (
@@ -987,7 +991,7 @@ class SignupPage extends React.Component {
               {i18next.t("login:Sign In")}
             </Button>,
           ]}
-        ></Result>
+        />
       );
     }
     if (this.state.invitation !== undefined) {
@@ -1014,14 +1018,8 @@ class SignupPage extends React.Component {
       this.isProviderVisible(providerItem)
     );
     const showProviders = avaliableProviders.length > 0;
-    /* eslint-disable */
-    console.log("application.signupItems", application.signupItems);
 
     const signupItems = Array.isArray(application.signupItems) ? [...application.signupItems] : [];
-    signupItems.unshift({
-      name: "Signin methods",
-      visible: true,
-    })
 
     return (
       <Form
@@ -1051,6 +1049,9 @@ class SignupPage extends React.Component {
         style={{width: "100%"}}
         // style={{width: Setting.isMobile() ? "300px" : "400px"}}
       >
+        <div className="form-header">
+          <span>Create account</span>
+        </div>
         <Form.Item
           name="application"
           hidden={true}
@@ -1087,7 +1088,7 @@ class SignupPage extends React.Component {
           <Button disabled={this.state.loading} type="primary" htmlType="submit" style={{width: "100%"}}>
             {i18next.t("account:Sign Up")}
           </Button>
-          {/* <div style={{padding: "34px 0px 10px 0px"}}>
+          <div style={{padding: "34px 0px 10px 0px"}}>
             &nbsp;&nbsp;{i18next.t("signup:Have account?")}&nbsp;
             <a
               onClick={() => {
@@ -1101,7 +1102,7 @@ class SignupPage extends React.Component {
             >
               {i18next.t("signup:sign in now")}
             </a>
-          </div> */}
+          </div>
           {showProviders && (
             <React.Fragment>
               <div className="social-auth-label">
@@ -1167,7 +1168,7 @@ class SignupPage extends React.Component {
             </div>
             <div className="login-form">
               {Setting.renderHelmet(application)}
-              {Setting.renderLogo(application, {marginBottom: "27px"})}
+              {Setting.renderLogo(application)}
               <LanguageSelect
                 languages={application.organizationObj.languages}
                 style={{top: "55px", right: "5px", position: "absolute"}}
