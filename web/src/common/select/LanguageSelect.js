@@ -71,13 +71,18 @@ class LanguageSelect extends React.Component {
     const onClick = (e) => {
       Setting.setLanguage(e.key);
     };
-
+    const lang = Setting.getLanguage() || "en";
+    const langItem = languageItems.find((i) => i.key === lang);
+    const src = langItem?.icon?.props?.src;
+    const width = langItem?.icon?.props.width || "50px";
     return (
-      <Dropdown menu={{items: languageItems, onClick}} >
-        <div className="select-box" style={{display: languageItems.length === 0 ? "none" : null, ...this.props.style}} >
-          <GlobalIcon />
-        </div>
-      </Dropdown>
+      <>
+        <Dropdown menu={{items: languageItems, onClick}} >
+          <div className="select-box" style={{display: languageItems.length === 0 ? "none" : null, ...this.props.style}} >
+            {src ? <img src={src} style={{width}} /> : <GlobalIcon />}
+          </div>
+        </Dropdown>
+      </>
     );
   }
 }
