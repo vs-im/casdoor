@@ -31,6 +31,7 @@ import {CountryCodeSelect} from "../common/select/CountryCodeSelect";
 import * as PasswordChecker from "../common/PasswordChecker";
 import * as InvitationBackend from "../backend/InvitationBackend";
 import "./AuthButtons.css";
+import {EmailInputGroup} from "../common/EmailInputGroup";
 ProviderButton;
 
 const formItemLayout = {
@@ -273,6 +274,9 @@ class SignupPage extends React.Component {
     this.setState({
       loading: true,
     });
+    if (!values.email) {
+      values.email = this.state.email || "";
+    }
     AuthBackend.signup(values).then((res) => {
       if (res.status === "ok") {
         // the user's id will be returned by `signup()`, if user signup by phone, the `username` in `values` is undefined.
@@ -521,6 +525,7 @@ class SignupPage extends React.Component {
       signupItem.name === "Email or Phone" ||
       signupItem.name === "Phone or Email"
     ) {
+      /* eslint-disable */
       const renderEmailItem = () => {
         return (
           <React.Fragment>
@@ -726,7 +731,16 @@ class SignupPage extends React.Component {
       };
 
       if (signupItem.name === "Email") {
-        return renderEmailItem();
+        return <EmailInputGroup
+          email={this.state.email}
+          required={required}
+          validEmail={this.state.validEmail}
+          invitation={this.state.invitation}
+          signupItem={signupItem}
+          application={application}
+          setState={(...args) => this.setState(...args)}
+       />;
+        // return renderEmailItem();
       } else if (signupItem.name === "Phone") {
         return renderPhoneItem();
       } else if (
@@ -774,7 +788,15 @@ class SignupPage extends React.Component {
               </Radio.Group>
             </Row>
             {emailOrPhoneMode === "Email"
-              ? renderEmailItem()
+              ? <EmailInputGroup
+                  email={this.state.email}
+                  required={required}
+                  validEmail={this.state.validEmail}
+                  invitation={this.state.invitation}
+                  signupItem={signupItem}
+                  application={application}
+                  setState={(...args) => this.setState(...args)}
+                />
               : renderPhoneItem()}
           </React.Fragment>
         );
