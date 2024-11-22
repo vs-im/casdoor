@@ -529,7 +529,7 @@
     "Verification code": "Ověřovací kód",
     "WebAuthn": "WebAuthn",
     "sign up now": "zaregistrujte se nyní",
-    "username, Email or phone": "uživatelské jméno, Email nebo telefon"
+    "username, Email or phone": "Uživatelské jméno, Email nebo telefon"
   },
   "mfa": {
     "Each time you sign in to your Account, you'll need your password and a authentication code": "Pokaždé, když se přihlásíte ke svému účtu, budete potřebovat své heslo a ověřovací kód",
@@ -1196,6 +1196,11 @@
     "The password must have at least 8 characters": "Heslo musí mít alespoň 8 znaků",
     "The password must not contain any repeated characters": "Heslo nesmí obsahovat žádné opakující se znaky",
     "This field value doesn't match the pattern rule": "Hodnota tohoto pole neodpovídá pravidlu vzoru",
+    "At least one special character": "Alespoň jeden speciální znak",
+    "At least one uppercase letter, one lowercase letter and one digit": "Alespoň jedno velké písmeno, jedno malé písmeno a jedna číslice",
+    "At least 6 characters": "Alespoň 6 znaků",
+    "At least 8 characters": "Alespoň 8 znaků",
+    "Not contain any repeated characters": "Nesmí obsahovat žádné opakující se znaky",
     "Title": "Titul",
     "Title - Tooltip": "Pozice v rámci příslušnosti",
     "Two passwords you typed do not match.": "Dvě zadaná hesla se neshodují.",

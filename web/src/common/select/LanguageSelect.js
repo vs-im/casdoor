@@ -78,7 +78,7 @@ class LanguageSelect extends React.Component {
     return (
       <>
         <Dropdown menu={{items: languageItems, onClick}} >
-          <div className="select-box" style={{display: languageItems.length === 0 ? "none" : null, ...this.props.style}} >
+          <div className="language-select-box" style={{display: languageItems.length === 0 ? "none" : null, ...this.props.style}} >
             {src ? <img src={src} style={{width}} /> : <GlobalIcon />}
           </div>
         </Dropdown>

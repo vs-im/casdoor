@@ -54,6 +54,11 @@ img {
   }
 }
 
+.language-select-box {
+  cursor: pointer;
+  padding: 7px;
+}
+
 .rightDropDown {
   display: flex;
   align-items: center;
@@ -89,6 +94,13 @@ img {
   max-width: 400px;
   background: transparent;
 }
+
+/* stylelint-disable selector-id-pattern */
+#SignupPage-renderForm .ant-form-item-required::before,
+#SignupPage-renderForm .ant-form-item-required::after {
+  display: none !important;
+}
+/* stylelint-enable selector-id-pattern */
 
 .login-panel {
   margin-top: 50px;

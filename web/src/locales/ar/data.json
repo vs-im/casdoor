@@ -530,7 +530,7 @@
     "Verification code": "Verification code",
     "WebAuthn": "WebAuthn",
     "sign up now": "sign up now",
-    "username, Email or phone": "username, Email or phone"
+    "username, Email or phone": "Username, Email or Phone"
   },
   "mfa": {
     "Each time you sign in to your Account, you'll need your password and a authentication code": "Each time you sign in to your Account, you'll need your password and a authentication code",
@@ -1197,6 +1197,11 @@
     "The password must have at least 8 characters": "The password must have at least 8 characters",
     "The password must not contain any repeated characters": "The password must not contain any repeated characters",
     "This field value doesn't match the pattern rule": "This field value doesn't match the pattern rule",
+    "At least one special character": "At least one special character",
+    "At least one uppercase letter, one lowercase letter and one digit": "At least one uppercase letter, one lowercase letter and one digit",
+    "At least 6 characters": "At least 6 characters",
+    "At least 8 characters": "At least 8 characters",
+    "Not contain any repeated characters": "Not contain any repeated characters",
     "Title": "Title",
     "Title - Tooltip": "Position in the affiliation",
     "Two passwords you typed do not match.": "Two passwords you typed do not match.",

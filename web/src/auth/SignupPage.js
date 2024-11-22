@@ -32,7 +32,7 @@ import * as PasswordChecker from "../common/PasswordChecker";
 import * as InvitationBackend from "../backend/InvitationBackend";
 import "./AuthButtons.css";
 import {EmailInputGroup} from "../common/EmailInputGroup";
-ProviderButton;
+import {CheckOutlined} from "@ant-design/icons";
 
 const formItemLayout = {
   labelCol: {
@@ -106,6 +106,7 @@ class SignupPage extends React.Component {
       password: "",
       confirmPassword: "",
       isPasswordDirty: false,
+      isPasswordFocus: false,
       isConfirmPasswordDirty: false,
       classes: props,
       applicationName:
@@ -250,6 +251,11 @@ class SignupPage extends React.Component {
   }
 
   onFinish(values) {
+    if (!values.emailCode) {
+      Setting.showMessage("error", i18next.t("code:Send Code"));
+      return;
+    }
+
     const application = this.getApplicationObj();
 
     if (Array.isArray(values.gender)) {
@@ -271,6 +277,7 @@ class SignupPage extends React.Component {
     const params = new URLSearchParams(window.location.search);
     values.plan = params.get("plan");
     values.pricing = params.get("pricing");
+
     this.setState({
       loading: true,
     });
@@ -809,9 +816,9 @@ class SignupPage extends React.Component {
         application.organizationObj.passwordOptions
       );
 
-      const render = this.state.isPasswordDirty && map.length !== 0;
+      const render = this.state.isPasswordDirty && map.length !== 0 && this.state.isPasswordFocus;
       return (
-        <>
+        <div style={{position: "relative"}}>
           <Form.Item
             key="password"
             name="password"
@@ -819,6 +826,8 @@ class SignupPage extends React.Component {
             onChange={(e) => {
               this.setState({password: e.target.value, isPasswordDirty: true});
             }}
+            onFocus={() => this.setState({isPasswordFocus: true})}
+            onBlur={() => this.setState({isPasswordFocus: false})}
             label={
               signupItem.label ? signupItem.label : i18next.t("general:Password")
             }
@@ -846,20 +855,22 @@ class SignupPage extends React.Component {
               placeholder={signupItem.placeholder}
             />
           </Form.Item>
-          {render && <div className="password-validation">{map.map(({value, failed}) => {
-            if (!failed) {
-              return <s style={{color: "grey"}} key={value}>{value}</s>;
-            }
-            return <div style={{color: "red"}} key={value}>{value}</div>;
-          })}</div>}
-        </>
+          {render && (
+            <div className="password-validation">
+            <div style={{marginBottom: "4px"}}>{i18next.t("user:Password requirements") + ":"}</div>
+              <div style={{marginInlineStart: "6px"}}>
+                {map.map(({value, failed, short}) => {
+                  return <p style={{textAlign: "start", margin: 0, color: failed ? "grey" : undefined}} key={value}>
+                    {!failed && <CheckOutlined style={{color: "#52c41a", marginRight: "5px"}}/>}
+                    {short}
+                  </p>;
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       );
     } else if (signupItem.name === "Confirm password") {
-      const isInconsistent = this.state.password !== this.state.confirmPassword;
-      let errorMsg = this.state.isConfirmPasswordDirty && isInconsistent ? i18next.t("signup:Please confirm your password!") : "";
-      if (this.state.confirmPassword && isInconsistent && this.state.isConfirmPasswordDirty) {
-        errorMsg = i18next.t("signup:Your confirmed password is inconsistent with the password!");
-      }
       return (
         <>
           <Form.Item
@@ -877,7 +888,7 @@ class SignupPage extends React.Component {
             rules={[
               {
                 required: required,
-                message: "",
+                message: i18next.t("signup:Please confirm your password!"),
               },
               ({getFieldValue}) => ({
                 validator(rule, value) {
@@ -885,14 +896,15 @@ class SignupPage extends React.Component {
                     return Promise.resolve();
                   }
 
-                  return Promise.reject("");
+                  return Promise.reject(i18next.t(
+                    "signup:Your confirmed password is inconsistent with the password!"
+                  ));
                 },
               }),
             ]}
           >
             <Input.Password placeholder={signupItem.placeholder} />
           </Form.Item>
-          {errorMsg && <div className="password-validation"><div style={{color: "red"}}>{errorMsg}</div></div>}
         </>
       );
     } else if (signupItem.name === "Invitation code") {

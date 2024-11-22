@@ -1,5 +1,5 @@
 import {Button, Form, Input} from "antd";
-import React from "react";
+import React, {useRef} from "react";
 import * as Setting from "../Setting";
 import i18next from "i18next";
 import {CaptchaModal} from "./modal/CaptchaModal";
@@ -34,6 +34,7 @@ export function EmailInputGroup(props) {
     application,
   } = props;
 
+  const [confirmationSend, setConfirmationSend] = React.useState(false);
   const [visible, setVisible] = React.useState(false);
   const [buttonLeftTime, setButtonLeftTime] = React.useState(0);
   const [buttonLoading, setButtonLoading] = React.useState(false);
@@ -52,6 +53,8 @@ export function EmailInputGroup(props) {
     Setting.getApplicationName(application),
   ];
 
+  const inputRef = useRef(null);
+
   const handleCountDown = (leftTime = 60) => {
     let leftTimeSecond = leftTime;
     setButtonLeftTime(leftTimeSecond);
@@ -64,22 +67,30 @@ export function EmailInputGroup(props) {
       setTimeout(countDown, 1000);
     };
     setTimeout(countDown, 1000);
+    setTimeout(() => {
+      typeof inputRef.current?.focus === "function" && inputRef.current.focus();
+    }, 500);
   };
 
   const handleOk = (captchaType, captchaToken, clintSecret) => {
     setVisible(false);
     setButtonLoading(true);
-    setTimeout(() => {
-      setButtonLoading(false);
-      handleCountDown(60);
-    }, 500);
-    const a = 5;
-    if (5 === a) {
-      return;
-    }
+    // if (process.env.NODE_ENV !== "production") {
+    //   setTimeout(() => {
+    //     setButtonLoading(false);
+    //     handleCountDown(60);
+    //     setConfirmationSend(true);
+    //   }, 500);
+    //   const a = 5;
+    //   if (5 === a) {
+    //     return;
+    //   }
+    // }
+
     UserBackend.sendCode(captchaType, captchaToken, clintSecret, "signup", undefined, ...onButtonClickArgs).then(res => {
       setButtonLoading(false);
       if (res) {
+        setConfirmationSend(true);
         handleCountDown(60);
       }
     });
@@ -92,6 +103,7 @@ export function EmailInputGroup(props) {
   const withVerification = signupItem.rule !== "No verification";
 
   let emailInput = <Input
+    ref={inputRef}
     className="signup-email-input"
     prefix={withVerification ? <SafetyOutlined /> : undefined}
     placeholder={withVerification ? i18next.t("code:Enter your code") : signupItem.placeholder}
@@ -107,10 +119,11 @@ export function EmailInputGroup(props) {
   let emailConfirmationInput = null;
 
   if (withVerification) {
-    emailConfirmationInput = emailInput;
+    emailConfirmationInput = confirmationSend ? emailInput : null;
     emailInput = (
       <>
         <Search
+          required
           className="signup-email-input"
           disabled={buttonLoading}
           style={{minHight: "40px"}}
