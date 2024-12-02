@@ -11,6 +11,7 @@
 
 .password-validation {
   z-index: 1200;
+  width: calc(100% - 10px);
   background: white;
   bottom: 74px;
   position: absolute;
@@ -18,21 +19,17 @@
   flex-direction: column;
   align-items: flex-start;
   border: 1px solid #d9d9d9;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 20%);
   border-radius: 8px;
   padding: 8px 15px;
+  transform: translate(3px, 10px);
+}
 
-  &::after {
-    content: "";
-    position: absolute;
-    left: 10%;
-    bottom: -15px;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 15px solid transparent;
-    border-right: 15px solid transparent;
-    border-top: 15px solid white;
-  }
+.password-validation-triangle {
+  position: absolute;
+  right: 0;
+  bottom: -15px;
+  transform: translate(-50%) rotate(-180deg);
 }
 
 .password-validation p,

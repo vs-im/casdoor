@@ -857,7 +857,7 @@ class SignupPage extends React.Component {
           </Form.Item>
           {render && (
             <div className="password-validation">
-            <div style={{marginBottom: "4px"}}>{i18next.t("user:Password requirements") + ":"}</div>
+              <div style={{marginBottom: "4px"}}>{i18next.t("user:Password requirements") + ":"}</div>
               <div style={{marginInlineStart: "6px"}}>
                 {map.map(({value, failed, short}) => {
                   return <p style={{textAlign: "start", margin: 0, color: failed ? "grey" : undefined}} key={value}>
@@ -866,6 +866,21 @@ class SignupPage extends React.Component {
                   </p>;
                 })}
               </div>
+              <svg
+                className="password-validation-triangle"
+                width="30"
+                height="15"
+                viewBox="0 0 30 15"
+                xmlns="http://www.w3.org/2000/svg"
+                >
+                <defs>
+                  <filter id="triangle-shadow" x="0" y="0" width="200%" height="200%">
+                    <feDropShadow dx="-2" dy="2" stdDeviation="2" flood-color="rgba(0, 0, 0, 0.2)" />
+                    <feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="rgba(0, 0, 0, 0.2)" />
+                  </filter>
+                </defs>
+                <polygon points="15,0 30,15 0,15" fill="white" filter="url(#triangle-shadow)" />
+              </svg>
             </div>
           )}
         </div>

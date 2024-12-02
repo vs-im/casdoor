@@ -35,7 +35,7 @@ function isValidOption_Aa123(password) {
   return {
     value: i18next.t("user:The password must contain at least one uppercase letter, one lowercase letter and one digit"),
     short: i18next.t("user:At least one uppercase letter, one lowercase letter and one digit"),
-    failed: !regex.test(password),
+    failed: !regex.test(password) || !password,
   };
 }
 
@@ -53,20 +53,18 @@ function isValidOption_NoRepeat(password) {
   return {
     value: i18next.t("user:The password must not contain any repeated characters"),
     short: i18next.t("user:Not contain any repeated characters"),
-    failed: regex.test(password),
+    failed: regex.test(password) || !password,
   };
 }
 
 export function checkPasswordComplexity(password, options) {
-  let firstError = "";
+  let firstError = password.length === 0 ? i18next.t("login:Please input your password!") : "";
   const checkersResults = [];
   if (password.length === 0) {
-    const errorMessage = i18next.t("login:Please input your password!");
     checkersResults.push({
       failed: true,
-      value: errorMessage,
+      value: firstError,
     });
-    return [errorMessage, checkersResults];
   }
 
   if (!options || options.length === 0) {
