@@ -296,7 +296,7 @@ class LoginPage extends React.Component {
     case "verificationCodeEmail": return i18next.t("login:Email");
     case "verificationCodePhone": return i18next.t("login:Phone");
     case "ldap": return i18next.t("login:LDAP username, Email or phone");
-    default: return i18next.t("login:username, Email or phone");
+    default: return i18next.t("login:Email"); // i18next.t("login:username, Email or phone");
     }
   }
 
@@ -721,7 +721,8 @@ class LoginPage extends React.Component {
                   case "ldap":
                     return i18next.t("login:Please input your LDAP username!");
                   default:
-                    return i18next.t("login:Please input your Email or Phone!");
+                    return i18next.t("login:Please input your Email!");
+                    // return i18next.t("login:Please input your Email or Phone!");
                   }
                 },
               },
