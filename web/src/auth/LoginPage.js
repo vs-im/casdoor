@@ -1180,6 +1180,7 @@ class LoginPage extends React.Component {
                 className="login-password-input"
                 prefix={<LockOutlined className="site-form-item-icon" />}
                 type="password"
+                autoComplete="current-password"
                 placeholder={signinItem.placeholder ? signinItem.placeholder : i18next.t("general:Password")}
                 disabled={this.state.loginMethod === "password" ? !Setting.isPasswordEnabled(application) : !Setting.isLdapEnabled(application)}
               />

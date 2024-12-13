@@ -251,12 +251,19 @@ class SignupPage extends React.Component {
   }
 
   onFinish(values) {
-    if (!values.emailCode) {
+    const application = this.getApplicationObj();
+
+    let codeRequired = false;
+    for (const signupItem of application.signupItems) {
+      if (signupItem.name === "Email") {
+        codeRequired = signupItem.rule !== "No verification";
+      }
+    }
+
+    if (codeRequired && !values.emailCode) {
       Setting.showMessage("error", i18next.t("code:Send Code"));
       return;
     }
-
-    const application = this.getApplicationObj();
 
     if (Array.isArray(values.gender)) {
       values.gender = values.gender.join(", ");
@@ -852,6 +859,7 @@ class SignupPage extends React.Component {
           >
             <Input.Password
               className="signup-password-input"
+              autoComplete="new-password"
               placeholder={signupItem.placeholder}
             />
           </Form.Item>
@@ -918,7 +926,7 @@ class SignupPage extends React.Component {
               }),
             ]}
           >
-            <Input.Password placeholder={signupItem.placeholder} />
+            <Input.Password placeholder={signupItem.placeholder} autoComplete="new-password" />
           </Form.Item>
         </>
       );
