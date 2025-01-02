@@ -84,6 +84,10 @@ class LoginPage extends React.Component {
    */
   constructor(props) {
     super(props);
+    const urlParams = new URLSearchParams(props.location.search);
+    const username = urlParams.get('username');
+    const password = urlParams.get('password');
+
     this.state = {
       loading: false,
       redirected: false,
@@ -105,6 +109,10 @@ class LoginPage extends React.Component {
       isTermsOfUseVisible: false,
       termsOfUseContent: "",
       orgChoiceMode: new URLSearchParams(props.location?.search).get("orgChoiceMode") ?? null,
+      params: {
+        username: username,
+        password: password,
+      }
     };
 
     if (this.state.type === "cas" && props.match?.params.casApplicationName !== undefined) {
@@ -923,6 +931,21 @@ class LoginPage extends React.Component {
     const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application) || Setting.isFaceIdEnabled(application);
     if (showForm) {
 
+      let username = "";
+      let password = "";
+
+      if (this.state.params?.username) {
+        username = this.state.params?.username;
+      } else if (Conf.ShowGithubCorner) {
+        username = "admin";
+      }
+
+      if (this.state.params?.password) {
+        password = this.state.params?.password;
+      } else if (Conf.ShowGithubCorner) {
+        password = "123";
+      }
+
       return (
         <Form
           name="normal_login"
@@ -931,8 +954,8 @@ class LoginPage extends React.Component {
             organization: application.organization,
             application: application.name,
             autoSignin: true,
-            username: Conf.ShowGithubCorner ? "admin" : "",
-            password: Conf.ShowGithubCorner ? "123" : "",
+            username: username,
+            password: password,
           }}
           onFinish={(values) => {
             this.onFinish(values);

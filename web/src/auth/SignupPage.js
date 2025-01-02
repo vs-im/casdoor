@@ -101,17 +101,22 @@ export const tailFormItemLayout = {
 class SignupPage extends React.Component {
   constructor(props) {
     super(props);
+
+    const urlParams = new URLSearchParams(props.location.search);
+    const username = urlParams.get("username");
+    const password = urlParams.get("password");
+
     this.state = {
       loading: false,
-      password: "",
-      confirmPassword: "",
+      password: password ?? "",
+      confirmPassword: password ?? "",
       isPasswordDirty: false,
       isPasswordFocus: false,
       isConfirmPasswordDirty: false,
       classes: props,
       applicationName:
         props.applicationName ?? props.match?.params?.applicationName ?? null,
-      email: "",
+      email: username ?? "",
       phone: "",
       emailOrPhoneMode: "",
       countryCode: "",
@@ -122,6 +127,10 @@ class SignupPage extends React.Component {
       region: "",
       isTermsOfUseVisible: false,
       termsOfUseContent: "",
+      params: {
+        username: username,
+        password: password,
+      },
     };
 
     this.form = React.createRef();
