@@ -19,234 +19,81 @@ import (
 	"time"
 )
 
-type Dashboard struct {
-	OrganizationCounts []int `json:"organizationCounts"`
-	UserCounts         []int `json:"userCounts"`
-	ProviderCounts     []int `json:"providerCounts"`
-	ApplicationCounts  []int `json:"applicationCounts"`
-	SubscriptionCounts []int `json:"subscriptionCounts"`
-	RoleCounts         []int `json:"roleCounts"`
-	GroupCounts        []int `json:"groupCounts"`
-	ResourceCounts     []int `json:"resourceCounts"`
-	CertCounts         []int `json:"certCounts"`
-	PermissionCounts   []int `json:"permissionCounts"`
-	TransactionCounts  []int `json:"transactionCounts"`
+type DashboardDateItem struct {
+	CreatedTime string `json:"createTime"`
 }
 
-func GetDashboard(owner string) (*Dashboard, error) {
+type DashboardMapItem struct {
+	dashboardDateItems []DashboardDateItem
+	itemCount          int64
+}
+
+func GetDashboard(owner string) (*map[string][]int64, error) {
 	if owner == "All" {
 		owner = ""
 	}
 
-	dashboard := &Dashboard{
-		OrganizationCounts: make([]int, 31),
-		UserCounts:         make([]int, 31),
-		ProviderCounts:     make([]int, 31),
-		ApplicationCounts:  make([]int, 31),
-		SubscriptionCounts: make([]int, 31),
-		RoleCounts:         make([]int, 31),
-		GroupCounts:        make([]int, 31),
-		ResourceCounts:     make([]int, 31),
-		CertCounts:         make([]int, 31),
-		PermissionCounts:   make([]int, 31),
-		TransactionCounts:  make([]int, 31),
+	dashboard := make(map[string][]int64)
+	dashboardMap := sync.Map{}
+	tableNames := []string{"organization", "user", "provider", "application", "subscription", "role", "group", "resource", "cert", "permission", "transaction", "model", "adapter", "enforcer"}
+
+	time30day := time.Now().AddDate(0, 0, -30)
+	var wg sync.WaitGroup
+	var err error
+	wg.Add(len(tableNames))
+
+	for _, tableName := range tableNames {
+		dashboard[tableName+"Counts"] = make([]int64, 31)
+		tableName := tableName
+		go func() {
+			defer wg.Done()
+			dashboardDateItems := []DashboardDateItem{}
+			var countResult int64
+
+			dbQueryBefore := ormer.Engine.Cols("created_time")
+			dbQueryAfter := ormer.Engine.Cols("created_time")
+
+			if owner != "" {
+				dbQueryAfter = dbQueryAfter.And("owner = ?", owner)
+				dbQueryBefore = dbQueryBefore.And("owner = ?", owner)
+			}
+
+			if countResult, err = dbQueryBefore.And("created_time < ?", time30day).Table(tableName).Count(); err != nil {
+				panic(err)
+			}
+			if err = dbQueryAfter.And("created_time >= ?", time30day).Table(tableName).Find(&dashboardDateItems); err != nil {
+				panic(err)
+			}
+
+			dashboardMap.Store(tableName, DashboardMapItem{
+				dashboardDateItems: dashboardDateItems,
+				itemCount:          countResult,
+			})
+		}()
 	}
 
-	organizations := []Organization{}
-	users := []User{}
-	providers := []Provider{}
-	applications := []Application{}
-	subscriptions := []Subscription{}
-	roles := []Role{}
-	groups := []Group{}
-	resources := []Resource{}
-	certs := []Cert{}
-	permissions := []Permission{}
-	transactions := []Transaction{}
-
-	var wg sync.WaitGroup
-	wg.Add(11)
-	go func() {
-		defer wg.Done()
-		if err := ormer.Engine.Find(&organizations, &Organization{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-
-		if err := ormer.Engine.Find(&users, &User{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-
-		if err := ormer.Engine.Find(&providers, &Provider{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-
-		if err := ormer.Engine.Find(&applications, &Application{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-
-		if err := ormer.Engine.Find(&subscriptions, &Subscription{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-
-		if err := ormer.Engine.Find(&roles, &Role{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-
-		if err := ormer.Engine.Find(&groups, &Group{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		if err := ormer.Engine.Find(&resources, &Resource{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		if err := ormer.Engine.Find(&certs, &Cert{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		if err := ormer.Engine.Find(&permissions, &Permission{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		if err := ormer.Engine.Find(&transactions, &Transaction{Owner: owner}); err != nil {
-			panic(err)
-		}
-	}()
 	wg.Wait()
 
 	nowTime := time.Now()
 	for i := 30; i >= 0; i-- {
 		cutTime := nowTime.AddDate(0, 0, -i)
-		dashboard.OrganizationCounts[30-i] = countCreatedBefore(organizations, cutTime)
-		dashboard.UserCounts[30-i] = countCreatedBefore(users, cutTime)
-		dashboard.ProviderCounts[30-i] = countCreatedBefore(providers, cutTime)
-		dashboard.ApplicationCounts[30-i] = countCreatedBefore(applications, cutTime)
-		dashboard.SubscriptionCounts[30-i] = countCreatedBefore(subscriptions, cutTime)
-		dashboard.RoleCounts[30-i] = countCreatedBefore(roles, cutTime)
-		dashboard.GroupCounts[30-i] = countCreatedBefore(groups, cutTime)
-		dashboard.ResourceCounts[30-i] = countCreatedBefore(resources, cutTime)
-		dashboard.CertCounts[30-i] = countCreatedBefore(certs, cutTime)
-		dashboard.PermissionCounts[30-i] = countCreatedBefore(permissions, cutTime)
-		dashboard.TransactionCounts[30-i] = countCreatedBefore(transactions, cutTime)
+		for _, tableName := range tableNames {
+			item, exist := dashboardMap.Load(tableName)
+			if !exist {
+				continue
+			}
+			dashboard[tableName+"Counts"][30-i] = countCreatedBefore(item.(DashboardMapItem), cutTime)
+		}
 	}
-	return dashboard, nil
+	return &dashboard, nil
 }
 
-func countCreatedBefore(objects interface{}, before time.Time) int {
-	count := 0
-	switch obj := objects.(type) {
-	case []Organization:
-		for _, o := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", o.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []User:
-		for _, u := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", u.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []Provider:
-		for _, p := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", p.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []Application:
-		for _, a := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", a.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []Subscription:
-		for _, s := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", s.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []Role:
-		for _, r := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", r.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []Group:
-		for _, g := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", g.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []Resource:
-		for _, r := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", r.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []Cert:
-		for _, c := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", c.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []Permission:
-		for _, p := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", p.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
-		}
-	case []Transaction:
-		for _, t := range obj {
-			createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", t.CreatedTime)
-			if createdTime.Before(before) {
-				count++
-			}
+func countCreatedBefore(dashboardMapItem DashboardMapItem, before time.Time) int64 {
+	count := dashboardMapItem.itemCount
+	for _, e := range dashboardMapItem.dashboardDateItems {
+		createdTime, _ := time.Parse("2006-01-02T15:04:05-07:00", e.CreatedTime)
+		if createdTime.Before(before) {
+			count++
 		}
 	}
 	return count

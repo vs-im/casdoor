@@ -106,6 +106,18 @@ class MfaAccountTable extends React.Component {
         },
       },
       {
+        title: i18next.t("mfaAccount:Origin"),
+        dataIndex: "origin",
+        key: "origin",
+        render: (text, record, index) => {
+          return (
+            <Input value={text} onChange={e => {
+              this.updateField(table, index, "origin", e.target.value);
+            }} />
+          );
+        },
+      },
+      {
         title: i18next.t("mfaAccount:Secret Key"),
         dataIndex: "secretKey",
         key: "secretKey",
@@ -176,7 +188,7 @@ class MfaAccountTable extends React.Component {
               content={<CasdoorAppUrl accessToken={this.props.accessToken} />}
             >
               <Button type="primary" size="small">
-                {i18next.t("general:Show URL")}
+                {i18next.t("general:URL")}
               </Button>
             </Popover>
           </div>

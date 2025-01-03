@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import CryptoJS from "crypto-js";
-import i18next from "i18next";
 import {Buffer} from "buffer";
 
 export function getRandomKeyForObfuscator(obfuscatorType) {
@@ -46,17 +45,17 @@ function encrypt(cipher, key, iv, password) {
 
 export function checkPasswordObfuscator(passwordObfuscatorType, passwordObfuscatorKey) {
   if (passwordObfuscatorType === undefined) {
-    return i18next.t("organization:failed to get password obfuscator");
+    return "passwordObfuscatorType should not be undefined";
   } else if (passwordObfuscatorType === "Plain" || passwordObfuscatorType === "") {
     return "";
   } else if (passwordObfuscatorType === "AES" || passwordObfuscatorType === "DES") {
     if (passwordObfuscatorKeyRegexes[passwordObfuscatorType].test(passwordObfuscatorKey)) {
       return "";
     } else {
-      return `${i18next.t("organization:The password obfuscator key doesn't match the regex")}: ${passwordObfuscatorKeyRegexes[passwordObfuscatorType].source}`;
+      return `The password obfuscator key doesn't match the regex: ${passwordObfuscatorKeyRegexes[passwordObfuscatorType].source}`;
     }
   } else {
-    return `${i18next.t("organization:unsupported password obfuscator type")}: ${passwordObfuscatorType}`;
+    return `unsupported password obfuscator type: ${passwordObfuscatorType}`;
   }
 }
 

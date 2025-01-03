@@ -13,13 +13,14 @@
 // limitations under the License.
 
 import * as Setting from "./Setting";
-import {Avatar, Button, Card, Drawer, Dropdown, Menu, Result} from "antd";
+import {Avatar, Button, Card, Drawer, Dropdown, Menu, Result, Tooltip} from "antd";
 import EnableMfaNotification from "./common/notifaction/EnableMfaNotification";
 import {Link, Redirect, Route, Switch, withRouter} from "react-router-dom";
 import React, {forwardRef, memo, useEffect, useState} from "react";
 import i18next from "i18next";
 import {
   AppstoreTwoTone,
+  DeploymentUnitOutlined,
   DollarTwoTone,
   HomeTwoTone,
   LockTwoTone, LogoutOutlined,
@@ -315,15 +316,18 @@ function ManagementPage(props) {
             themeAlgorithm={props.themeAlgorithm}
             onChange={props.setLogoAndThemeAlgorithm} /> */}
           <LanguageSelect languages={props.account.organization.languages} />
-          {/* <Tooltip title="Click to open AI assitant">
-            <div className="select-box" onClick={props.openAiAssistant}>
-              <DeploymentUnitOutlined style={{fontSize: "24px"}} />
-            </div>
-          </Tooltip> */}
+          {
+            Conf.AiAssistantUrl?.trim() && (
+              <Tooltip title="Click to open AI assistant">
+                <div className="select-box" onClick={props.openAiAssistant}>
+                  <DeploymentUnitOutlined style={{fontSize: "24px"}} />
+                </div>
+              </Tooltip>
+            )
+          }
           {!location.startsWith("/apps") && <div className="select-box" onClick={redirectToApp} >
             <BackToAppIcon />
           </div>}
-
           <OpenTour />
           {/* {Setting.isAdminUser(props.account) && (props.uri.indexOf("/trees") === -1) &&
                         <OrganizationSelect

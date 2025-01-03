@@ -238,6 +238,10 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/casdoor.png`,
       url: "https://casdoor.org/docs/provider/storage/overview",
     },
+    "CUCloud OSS": {
+      logo: `${StaticBaseUrl}/img/social_cucloud.png`,
+      url: "https://www.cucloud.cn/product/oss.html",
+    },
   },
   SAML: {
     "Aliyun IDaaS": {
@@ -927,7 +931,7 @@ export function getClickable(text) {
   return (
     <a onClick={() => {
       copy(text);
-      showMessage("success", "Copied to clipboard");
+      showMessage("success", i18next.t("general:Copied to clipboard successfully"));
     }}>
       {text}
     </a>
@@ -1088,6 +1092,7 @@ export function getProviderTypeOptions(category) {
         {id: "Google Cloud Storage", name: "Google Cloud Storage"},
         {id: "Synology", name: "Synology"},
         {id: "Casdoor", name: "Casdoor"},
+        {id: "CUCloud OSS", name: "CUCloud OSS"},
       ]
     );
   } else if (category === "SAML") {
@@ -1181,7 +1186,7 @@ export function renderLogo(application, style) {
 
 function isSigninMethodEnabled(application, signinMethod) {
   if (application && application.signinMethods) {
-    return application.signinMethods.filter(item => item.name === signinMethod && item.rule !== "Hide-Password").length > 0;
+    return application.signinMethods.filter(item => item.name === signinMethod && item.rule !== "Hide password").length > 0;
   } else {
     return false;
   }
@@ -1569,25 +1574,25 @@ export function getDefaultHtmlEmailContent() {
 
 export function getCurrencyText(product) {
   if (product?.currency === "USD") {
-    return i18next.t("product:USD");
+    return i18next.t("currency:USD");
   } else if (product?.currency === "CNY") {
-    return i18next.t("product:CNY");
+    return i18next.t("currency:CNY");
   } else if (product?.currency === "EUR") {
-    return i18next.t("product:EUR");
+    return i18next.t("currency:EUR");
   } else if (product?.currency === "JPY") {
-    return i18next.t("product:JPY");
+    return i18next.t("currency:JPY");
   } else if (product?.currency === "GBP") {
-    return i18next.t("product:GBP");
+    return i18next.t("currency:GBP");
   } else if (product?.currency === "AUD") {
-    return i18next.t("product:AUD");
+    return i18next.t("currency:AUD");
   } else if (product?.currency === "CAD") {
-    return i18next.t("product:CAD");
+    return i18next.t("currency:CAD");
   } else if (product?.currency === "CHF") {
-    return i18next.t("product:CHF");
+    return i18next.t("currency:CHF");
   } else if (product?.currency === "HKD") {
-    return i18next.t("product:HKD");
+    return i18next.t("currency:HKD");
   } else if (product?.currency === "SGD") {
-    return i18next.t("product:SGD");
+    return i18next.t("currency:SGD");
   } else {
     return "(Unknown currency)";
   }

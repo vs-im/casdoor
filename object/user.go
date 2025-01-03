@@ -237,6 +237,7 @@ type MfaAccount struct {
 	AccountName string `xorm:"varchar(100)" json:"accountName"`
 	Issuer      string `xorm:"varchar(100)" json:"issuer"`
 	SecretKey   string `xorm:"varchar(100)" json:"secretKey"`
+	Origin      string `xorm:"varchar(100)" json:"origin"`
 }
 
 type FaceId struct {
@@ -677,6 +678,10 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 
 	if user.Password == "***" {
 		user.Password = oldUser.Password
+	}
+
+	if user.Id != oldUser.Id && user.Id == "" {
+		user.Id = oldUser.Id
 	}
 
 	if user.Avatar != oldUser.Avatar && user.Avatar != "" && user.PermanentAvatar != "*" {
