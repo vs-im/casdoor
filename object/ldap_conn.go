@@ -15,6 +15,8 @@
 package object
 
 import (
+	"crypto/md5"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
@@ -373,7 +375,7 @@ func GetExistUuids(owner string, uuids []string) ([]string, error) {
 	return existUuids, nil
 }
 
-func ResetLdapPassword(user *User, newPassword string, lang string) error {
+func ResetLdapPassword(user *User, oldPassword string, newPassword string, lang string) error {
 	ldaps, err := GetLdaps(user.Owner)
 	if err != nil {
 		return err
@@ -416,8 +418,32 @@ func ResetLdapPassword(user *User, newPassword string, lang string) error {
 			}
 			modifyPasswordRequest.Replace("unicodePwd", []string{pwdEncoded})
 			modifyPasswordRequest.Replace("userAccountControl", []string{"512"})
+		} else if oldPassword != "" {
+			modifyPasswordRequestWithOldPassword := goldap.NewPasswordModifyRequest(userDn, oldPassword, newPassword)
+			_, err = conn.Conn.PasswordModify(modifyPasswordRequestWithOldPassword)
+			if err != nil {
+				conn.Close()
+				return err
+			}
+			conn.Close()
+			return nil
 		} else {
-			pwdEncoded = newPassword
+			switch ldapServer.PasswordType {
+			case "SSHA":
+				pwdEncoded, err = generateSSHA(newPassword)
+				break
+			case "MD5":
+				md5Byte := md5.Sum([]byte(newPassword))
+				md5Password := base64.StdEncoding.EncodeToString(md5Byte[:])
+				pwdEncoded = "{MD5}" + md5Password
+				break
+			case "Plain":
+				pwdEncoded = newPassword
+				break
+			default:
+				pwdEncoded = newPassword
+				break
+			}
 			modifyPasswordRequest.Replace("userPassword", []string{pwdEncoded})
 		}
 

@@ -1,4 +1,4 @@
-// Copyright 2023 The Casdoor Authors. All Rights Reserved.
+// Copyright 2025 The Casdoor Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,21 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controllers
+package notification
 
 import (
-	"strings"
-
-	"github.com/casdoor/casdoor/scim"
+	"github.com/casdoor/notify"
+	"github.com/casdoor/notify/service/cucloud"
 )
 
-func (c *RootController) HandleScim() {
-	_, ok := c.RequireAdmin()
-	if !ok {
-		return
-	}
+func NewCucloudProvider(accessKey, secretKey, topicName, messageTitle, cloudRegionCode, accountId, notifyType string) (notify.Notifier, error) {
+	cucloud := cucloud.New(accessKey, secretKey, topicName, messageTitle, cloudRegionCode, accountId, notifyType)
 
-	path := c.Ctx.Request.URL.Path
-	c.Ctx.Request.URL.Path = strings.TrimPrefix(path, "/scim")
-	scim.Server.ServeHTTP(c.Ctx.ResponseWriter, c.Ctx.Request)
+	notifier := notify.New()
+	notifier.UseServices(cucloud)
+
+	return notifier, nil
 }

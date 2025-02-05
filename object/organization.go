@@ -69,8 +69,8 @@ type Organization struct {
 	Tags                   []string   `xorm:"mediumtext" json:"tags"`
 	Languages              []string   `xorm:"varchar(255)" json:"languages"`
 	ThemeData              *ThemeData `xorm:"json" json:"themeData"`
-	MasterPassword         string     `xorm:"varchar(100)" json:"masterPassword"`
-	DefaultPassword        string     `xorm:"varchar(100)" json:"defaultPassword"`
+	MasterPassword         string     `xorm:"varchar(200)" json:"masterPassword"`
+	DefaultPassword        string     `xorm:"varchar(200)" json:"defaultPassword"`
 	MasterVerificationCode string     `xorm:"varchar(100)" json:"masterVerificationCode"`
 	IpWhitelist            string     `xorm:"varchar(200)" json:"ipWhitelist"`
 	InitScore              int        `json:"initScore"`
@@ -79,6 +79,7 @@ type Organization struct {
 	UseEmailAsUsername     bool       `json:"useEmailAsUsername"`
 	EnableTour             bool       `json:"enableTour"`
 	IpRestriction          string     `json:"ipRestriction"`
+	NavItems               []string   `xorm:"varchar(500)" json:"navItems"`
 
 	MfaItems     []*MfaItem     `xorm:"varchar(300)" json:"mfaItems"`
 	AccountItems []*AccountItem `xorm:"varchar(5000)" json:"accountItems"`
@@ -151,7 +152,10 @@ func getOrganization(owner string, name string) (*Organization, error) {
 }
 
 func GetOrganization(id string) (*Organization, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return nil, err
+	}
 	return getOrganization(owner, name)
 }
 
@@ -192,9 +196,10 @@ func GetMaskedOrganizations(organizations []*Organization, errs ...error) ([]*Or
 	return organizations, nil
 }
 
-func UpdateOrganization(id string, organization *Organization) (bool, error) {
+func UpdateOrganization(id string, organization *Organization, isGlobalAdmin bool) (bool, error) {
 	owner, name := util.GetOwnerAndNameFromId(id)
-	if org, err := getOrganization(owner, name); err != nil {
+	org, err := getOrganization(owner, name)
+	if err != nil {
 		return false, err
 	} else if org == nil {
 		return false, nil
@@ -217,6 +222,10 @@ func UpdateOrganization(id string, organization *Organization) (bool, error) {
 			hashedPassword := credManager.GetHashedPassword(organization.MasterPassword, "", organization.PasswordSalt)
 			organization.MasterPassword = hashedPassword
 		}
+	}
+
+	if !isGlobalAdmin {
+		organization.NavItems = org.NavItems
 	}
 
 	session := ormer.Engine.ID(core.PK{owner, name}).AllCols()

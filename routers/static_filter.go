@@ -80,6 +80,15 @@ func fastAutoSignin(ctx *context.Context) (string, error) {
 		return "", nil
 	}
 
+	isAllowed, err := object.CheckLoginPermission(userId, application)
+	if err != nil {
+		return "", err
+	}
+
+	if !isAllowed {
+		return "", nil
+	}
+
 	code, err := object.GetOAuthCode(userId, clientId, responseType, redirectUri, scope, state, nonce, codeChallenge, ctx.Request.Host, getAcceptLanguage(ctx))
 	if err != nil {
 		return "", err
@@ -133,6 +142,14 @@ func StaticFilter(ctx *context.Context) {
 		path += urlPath
 	}
 
+	// Preventing synchronization problems from concurrency
+	ctx.Input.CruSession = nil
+
+	organizationThemeCookie, err := appendThemeCookie(ctx, urlPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	if strings.Contains(path, "/../") || !util.FileExist(path) {
 		path = webBuildFolder + "/index.html"
 	}
@@ -149,13 +166,13 @@ func StaticFilter(ctx *context.Context) {
 	}
 
 	if oldStaticBaseUrl == newStaticBaseUrl {
-		makeGzipResponse(ctx.ResponseWriter, ctx.Request, path)
+		makeGzipResponse(ctx.ResponseWriter, ctx.Request, path, organizationThemeCookie)
 	} else {
-		serveFileWithReplace(ctx.ResponseWriter, ctx.Request, path)
+		serveFileWithReplace(ctx.ResponseWriter, ctx.Request, path, organizationThemeCookie)
 	}
 }
 
-func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string) {
+func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, organizationThemeCookie *OrganizationThemeCookie) {
 	f, err := os.Open(filepath.Clean(name))
 	if err != nil {
 		panic(err)
@@ -168,7 +185,13 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string) {
 	}
 
 	oldContent := util.ReadStringFromPath(name)
-	newContent := strings.ReplaceAll(oldContent, oldStaticBaseUrl, newStaticBaseUrl)
+	newContent := oldContent
+	if organizationThemeCookie != nil {
+		newContent = strings.ReplaceAll(newContent, "https://cdn.casbin.org/img/favicon.png", organizationThemeCookie.Favicon)
+		newContent = strings.ReplaceAll(newContent, "<title>Casdoor</title>", fmt.Sprintf("<title>%s</title>", organizationThemeCookie.DisplayName))
+	}
+
+	newContent = strings.ReplaceAll(newContent, oldStaticBaseUrl, newStaticBaseUrl)
 
 	http.ServeContent(w, r, d.Name(), d.ModTime(), strings.NewReader(newContent))
 }
@@ -182,14 +205,14 @@ func (w gzipResponseWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
 
-func makeGzipResponse(w http.ResponseWriter, r *http.Request, path string) {
+func makeGzipResponse(w http.ResponseWriter, r *http.Request, path string, organizationThemeCookie *OrganizationThemeCookie) {
 	if !enableGzip || !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		serveFileWithReplace(w, r, path)
+		serveFileWithReplace(w, r, path, organizationThemeCookie)
 		return
 	}
 	w.Header().Set("Content-Encoding", "gzip")
 	gz := gzip.NewWriter(w)
 	defer gz.Close()
 	gzw := gzipResponseWriter{Writer: gz, ResponseWriter: w}
-	serveFileWithReplace(gzw, r, path)
+	serveFileWithReplace(gzw, r, path, organizationThemeCookie)
 }

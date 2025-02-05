@@ -107,7 +107,7 @@ export const PasswordModal = (props) => {
       });
   };
 
-  const hasOldPassword = user.password !== "";
+  const hasOldPassword = (user.password !== "" || user.ldap !== "");
 
   return (
     <Row style={style}>

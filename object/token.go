@@ -123,8 +123,7 @@ func GetTokenByRefreshToken(refreshToken string) (*Token, error) {
 
 func GetTokenByTokenValue(tokenValue, tokenTypeHint string) (*Token, error) {
 	switch tokenTypeHint {
-	case "access_token":
-	case "access-token":
+	case "access_token", "access-token":
 		token, err := GetTokenByAccessToken(tokenValue)
 		if err != nil {
 			return nil, err
@@ -132,8 +131,7 @@ func GetTokenByTokenValue(tokenValue, tokenTypeHint string) (*Token, error) {
 		if token != nil {
 			return token, nil
 		}
-	case "refresh_token":
-	case "refresh-token":
+	case "refresh_token", "refresh-token":
 		token, err := GetTokenByRefreshToken(tokenValue)
 		if err != nil {
 			return nil, err
@@ -146,13 +144,13 @@ func GetTokenByTokenValue(tokenValue, tokenTypeHint string) (*Token, error) {
 	return nil, nil
 }
 
-func updateUsedByCode(token *Token) bool {
+func updateUsedByCode(token *Token) (bool, error) {
 	affected, err := ormer.Engine.Where("code=?", token.Code).Cols("code_is_used").Update(token)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 
-	return affected != 0
+	return affected != 0, nil
 }
 
 func GetToken(id string) (*Token, error) {

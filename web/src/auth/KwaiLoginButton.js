@@ -1,4 +1,4 @@
-// Copyright 2023 The Casdoor Authors. All Rights Reserved.
+// Copyright 2024 The Casdoor Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,21 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controllers
+import {createButton} from "react-social-login-buttons";
+import {StaticBaseUrl} from "../Setting";
 
-import (
-	"strings"
-
-	"github.com/casdoor/casdoor/scim"
-)
-
-func (c *RootController) HandleScim() {
-	_, ok := c.RequireAdmin()
-	if !ok {
-		return
-	}
-
-	path := c.Ctx.Request.URL.Path
-	c.Ctx.Request.URL.Path = strings.TrimPrefix(path, "/scim")
-	scim.Server.ServeHTTP(c.Ctx.ResponseWriter, c.Ctx.Request)
+function Icon({width = 24, height = 24}) {
+  return <img src={`${StaticBaseUrl}/buttons/kwai.svg`} alt="Sign in with Kwai" style={{width: width, height: height}} />;
 }
+
+const config = {
+  text: "Sign in with Kwai",
+  icon: Icon,
+  style: {background: "#ffffff", color: "#000000"},
+  activeStyle: {background: "#ededee"},
+};
+
+const KwaiLoginButton = createButton(config);
+
+export default KwaiLoginButton;

@@ -34,7 +34,7 @@ import {SendCodeInput} from "../common/SendCodeInput";
 import LanguageSelect from "../common/select/LanguageSelect";
 import {CaptchaModal, CaptchaRule} from "../common/modal/CaptchaModal";
 import RedirectForm from "../common/RedirectForm";
-import {MfaAuthVerifyForm, NextMfa, RequiredMfa} from "./mfa/MfaAuthVerifyForm";
+import {RequiredMfa} from "./mfa/MfaAuthVerifyForm";
 import {GoogleOneTapLoginVirtualButton} from "./GoogleLoginButton";
 import * as ProviderButton from "./ProviderButton";
 const FaceRecognitionModal = lazy(() => import("../common/modal/FaceRecognitionModal"));
@@ -516,25 +516,7 @@ class LoginPage extends React.Component {
         };
 
         if (res.status === "ok") {
-          if (res.data === NextMfa) {
-            this.setState({
-              getVerifyTotp: () => {
-                return (
-                  <MfaAuthVerifyForm
-                    mfaProps={res.data2}
-                    formValues={values}
-                    authParams={casParams}
-                    application={this.getApplicationObj()}
-                    onFail={(errorMessage) => {
-                      Setting.showMessage("error", errorMessage);
-                    }}
-                    onSuccess={(res) => loginHandler(res)}
-                  />);
-              },
-            });
-          } else {
-            loginHandler(res);
-          }
+          Setting.checkLoginMfa(res, values, casParams, loginHandler, this);
         } else {
           Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${res.msg}`);
         }
@@ -590,39 +572,13 @@ class LoginPage extends React.Component {
               } else {
                 const SAMLResponse = res.data;
                 const redirectUri = res.data2.redirectUrl;
-                Setting.goToLink(`${redirectUri}?SAMLResponse=${encodeURIComponent(SAMLResponse)}&RelayState=${oAuthParams.relayState}`);
+                Setting.goToLink(`${redirectUri}${redirectUri.includes("?") ? "&" : "?"}SAMLResponse=${encodeURIComponent(SAMLResponse)}&RelayState=${oAuthParams.relayState}`);
               }
             }
           };
 
           if (res.status === "ok") {
-            if (res.data === NextMfa) {
-              this.setState({
-                getVerifyTotp: () => {
-                  return (
-                    <MfaAuthVerifyForm
-                      mfaProps={res.data2}
-                      formValues={values}
-                      authParams={oAuthParams}
-                      application={this.getApplicationObj()}
-                      onFail={(errorMessage) => {
-                        Setting.showMessage("error", errorMessage);
-                      }}
-                      onSuccess={(res) => loginHandler(res)}
-                    />);
-                },
-              });
-            } else if (res.data === "SelectPlan") {
-              // paid-user does not have active or pending subscription, go to application default pricing page to select-plan
-              const pricing = res.data2;
-              Setting.goToLink(`/select-plan/${pricing.owner}/${pricing.name}?user=${values.username}`);
-            } else if (res.data === "BuyPlanResult") {
-              // paid-user has pending subscription, go to buy-plan/result apge to notify payment result
-              const sub = res.data2;
-              Setting.goToLink(`/buy-plan/${sub.owner}/${sub.pricing}/result?subscription=${sub.name}`);
-            } else {
-              loginHandler(res);
-            }
+            Setting.checkLoginMfa(res, values, oAuthParams, loginHandler, this);
           } else {
             Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${res.msg}`);
           }

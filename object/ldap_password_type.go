@@ -1,4 +1,4 @@
-// Copyright 2023 The Casdoor Authors. All Rights Reserved.
+// Copyright 2025 The Casdoor Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,21 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controllers
+package object
 
 import (
-	"strings"
-
-	"github.com/casdoor/casdoor/scim"
+	"crypto/rand"
+	"crypto/sha1"
+	"encoding/base64"
 )
 
-func (c *RootController) HandleScim() {
-	_, ok := c.RequireAdmin()
-	if !ok {
-		return
+func generateSSHA(password string) (string, error) {
+	salt := make([]byte, 4)
+	_, err := rand.Read(salt)
+	if err != nil {
+		return "", err
 	}
 
-	path := c.Ctx.Request.URL.Path
-	c.Ctx.Request.URL.Path = strings.TrimPrefix(path, "/scim")
-	scim.Server.ServeHTTP(c.Ctx.ResponseWriter, c.Ctx.Request)
+	combined := append([]byte(password), salt...)
+	hash := sha1.Sum(combined)
+	hashWithSalt := append(hash[:], salt...)
+	encoded := base64.StdEncoding.EncodeToString(hashWithSalt)
+
+	return "{SSHA}" + encoded, nil
 }
