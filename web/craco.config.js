@@ -95,10 +95,10 @@ module.exports = {
         fs: false,
       };
 
-      webpackConfig.output = {
-        filename: "static/js/[name].[contenthash:8].js",
-        chunkFilename: "static/js/[name].[contenthash:8].chunk.js",
-      }
+      // webpackConfig.output = {
+      //   filename: "static/js/[name].[contenthash:8].js",
+      //   chunkFilename: "static/js/[name].[contenthash:8].chunk.js",
+      // }
 
       return webpackConfig;
     },
