@@ -25,10 +25,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/casdoor/casdoor/captcha"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/form"
+	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/idp"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/proxy"
@@ -54,6 +56,11 @@ func tokenToResponse(token *object.Token) *Response {
 
 // HandleLoggedIn ...
 func (c *ApiController) HandleLoggedIn(application *object.Application, user *object.User, form *form.AuthForm) (resp *Response) {
+	if user.IsForbidden {
+		c.ResponseError(c.T("check:The user is forbidden to sign in, please contact the administrator"))
+		return
+	}
+
 	userId := user.GetId()
 
 	clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
@@ -140,7 +147,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			c.ResponseError(c.T("auth:Challenge method should be S256"))
 			return
 		}
-		code, err := object.GetOAuthCode(userId, clientId, responseType, redirectUri, scope, state, nonce, codeChallenge, c.Ctx.Request.Host, c.GetAcceptLanguage())
+		code, err := object.GetOAuthCode(userId, clientId, form.Provider, responseType, redirectUri, scope, state, nonce, codeChallenge, c.Ctx.Request.Host, c.GetAcceptLanguage())
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
 			return
@@ -163,6 +170,32 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 
 			resp.Data2 = user.NeedUpdatePassword
 		}
+	} else if form.Type == ResponseTypeDevice {
+		authCache, ok := object.DeviceAuthMap.LoadAndDelete(form.UserCode)
+		if !ok {
+			c.ResponseError(c.T("auth:UserCode Expired"))
+			return
+		}
+
+		authCacheCast := authCache.(object.DeviceAuthCache)
+		if authCacheCast.RequestAt.Add(time.Second * 120).Before(time.Now()) {
+			c.ResponseError(c.T("auth:UserCode Expired"))
+			return
+		}
+
+		deviceAuthCacheDeviceCode, ok := object.DeviceAuthMap.Load(authCacheCast.UserName)
+		if !ok {
+			c.ResponseError(c.T("auth:DeviceCode Invalid"))
+			return
+		}
+
+		deviceAuthCacheDeviceCodeCast := deviceAuthCacheDeviceCode.(object.DeviceAuthCache)
+		deviceAuthCacheDeviceCodeCast.UserName = user.Name
+		deviceAuthCacheDeviceCodeCast.UserSignIn = true
+
+		object.DeviceAuthMap.Store(authCacheCast.UserName, deviceAuthCacheDeviceCodeCast)
+
+		resp = &Response{Status: "ok", Msg: "", Data: userId, Data2: user.NeedUpdatePassword}
 	} else if form.Type == ResponseTypeSaml { // saml flow
 		res, redirectUrl, method, err := object.GetSamlResponse(application, user, form.SamlRequest, c.Ctx.Request.Host)
 		if err != nil {
@@ -236,6 +269,7 @@ func (c *ApiController) GetApplicationLogin() {
 	state := c.Input().Get("state")
 	id := c.Input().Get("id")
 	loginType := c.Input().Get("type")
+	userCode := c.Input().Get("userCode")
 
 	var application *object.Application
 	var msg string
@@ -258,6 +292,19 @@ func (c *ApiController) GetApplicationLogin() {
 		}
 
 		err = object.CheckCasLogin(application, c.GetAcceptLanguage(), redirectUri)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+	} else if loginType == "device" {
+		deviceAuthCache, ok := object.DeviceAuthMap.Load(userCode)
+		if !ok {
+			c.ResponseError(c.T("auth:UserCode Invalid"))
+			return
+		}
+
+		deviceAuthCacheCast := deviceAuthCache.(object.DeviceAuthCache)
+		application, err = object.GetApplication(deviceAuthCacheCast.ApplicationId)
 		if err != nil {
 			c.ResponseError(err.Error())
 			return
@@ -397,11 +444,27 @@ func (c *ApiController) Login() {
 				return
 			}
 
-			if err := object.CheckFaceId(user, authForm.FaceId, c.GetAcceptLanguage()); err != nil {
-				c.ResponseError(err.Error(), nil)
-				return
+			faceIdProvider, err := object.GetFaceIdProviderByApplication(util.GetId(application.Owner, application.Name), "false", c.GetAcceptLanguage())
+			if err != nil {
+				c.ResponseError(err.Error())
 			}
 
+			if faceIdProvider == nil {
+				if err := object.CheckFaceId(user, authForm.FaceId, c.GetAcceptLanguage()); err != nil {
+					c.ResponseError(err.Error(), nil)
+					return
+				}
+			} else {
+				ok, err := user.CheckUserFace(authForm.FaceIdImage, faceIdProvider)
+				if err != nil {
+					c.ResponseError(err.Error(), nil)
+				}
+
+				if !ok {
+					c.ResponseError(i18n.Translate(c.GetAcceptLanguage(), "check:Face data does not exist, cannot log in"))
+					return
+				}
+			}
 		} else if authForm.Password == "" {
 			if user, err = object.GetUserByFields(authForm.Organization, authForm.Username); err != nil {
 				c.ResponseError(err.Error(), nil)
@@ -461,6 +524,14 @@ func (c *ApiController) Login() {
 				verificationType = "sms"
 			} else {
 				verificationType = "email"
+				if !user.EmailVerified {
+					user.EmailVerified = true
+					_, err = object.UpdateUser(user.GetId(), user, []string{"email_verified"}, false)
+					if err != nil {
+						c.ResponseError(err.Error(), nil)
+						return
+					}
+				}
 			}
 		} else {
 			var application *object.Application
@@ -593,6 +664,9 @@ func (c *ApiController) Login() {
 			c.ResponseError(err.Error())
 			return
 		}
+		if provider == nil {
+			c.ResponseError(fmt.Sprintf(c.T("auth:The provider: %s does not exist"), authForm.Provider))
+		}
 
 		providerItem := application.GetProviderItem(provider.Name)
 		if !providerItem.IsProviderVisible() {
@@ -678,10 +752,6 @@ func (c *ApiController) Login() {
 
 			if user != nil && !user.IsDeleted {
 				// Sign in via OAuth (want to sign up but already have account)
-
-				if user.IsForbidden {
-					c.ResponseError(c.T("check:The user is forbidden to sign in, please contact the administrator"))
-				}
 				// sync info from 3rd-party if possible
 				_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo)
 				if err != nil {
@@ -910,11 +980,20 @@ func (c *ApiController) Login() {
 				return
 			}
 
-			err = mfaUtil.Verify(authForm.Passcode)
+			passed, err := c.checkOrgMasterVerificationCode(user, authForm.Passcode)
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
 			}
+
+			if !passed {
+				err = mfaUtil.Verify(authForm.Passcode)
+				if err != nil {
+					c.ResponseError(err.Error())
+					return
+				}
+			}
+
 			c.SetSession("verificationCodeType", "")
 		} else if authForm.RecoveryCode != "" {
 			err = object.MfaRecover(user, authForm.RecoveryCode)
@@ -973,6 +1052,18 @@ func (c *ApiController) Login() {
 		} else {
 			c.ResponseError(fmt.Sprintf(c.T("auth:Unknown authentication type (not password or provider), form = %s"), util.StructToJson(authForm)))
 			return
+		}
+	}
+
+	if authForm.Language != "" {
+		user := c.getCurrentUser()
+		if user != nil {
+			user.Language = authForm.Language
+			_, err = object.UpdateUser(user.GetId(), user, []string{"language"}, user.IsAdmin)
+			if err != nil {
+				c.ResponseError(err.Error())
+				return
+			}
 		}
 	}
 
@@ -1164,4 +1255,76 @@ func (c *ApiController) Callback() {
 
 	frontendCallbackUrl := fmt.Sprintf("/callback?code=%s&state=%s", code, state)
 	c.Ctx.Redirect(http.StatusFound, frontendCallbackUrl)
+}
+
+// DeviceAuth
+// @Title DeviceAuth
+// @Tag Device Authorization Endpoint
+// @Description Endpoint for the device authorization flow
+// @router /device-auth [post]
+// @Success 200 {object} object.DeviceAuthResponse The Response object
+func (c *ApiController) DeviceAuth() {
+	clientId := c.Input().Get("client_id")
+	scope := c.Input().Get("scope")
+	application, err := object.GetApplicationByClientId(clientId)
+	if err != nil {
+		c.Data["json"] = object.TokenError{
+			Error:            err.Error(),
+			ErrorDescription: err.Error(),
+		}
+		c.ServeJSON()
+		return
+	}
+
+	if application == nil {
+		c.Data["json"] = object.TokenError{
+			Error:            c.T("token:Invalid client_id"),
+			ErrorDescription: c.T("token:Invalid client_id"),
+		}
+		c.ServeJSON()
+		return
+	}
+
+	deviceCode := util.GenerateId()
+	userCode := util.GetRandomName()
+
+	generateTime := 0
+	for {
+		if generateTime > 5 {
+			c.Data["json"] = object.TokenError{
+				Error:            "userCode gen",
+				ErrorDescription: c.T("token:Invalid client_id"),
+			}
+			c.ServeJSON()
+			return
+		}
+		_, ok := object.DeviceAuthMap.Load(userCode)
+		if !ok {
+			break
+		}
+
+		generateTime++
+	}
+
+	deviceAuthCache := object.DeviceAuthCache{
+		UserSignIn:    false,
+		UserName:      "",
+		Scope:         scope,
+		ApplicationId: application.GetId(),
+		RequestAt:     time.Now(),
+	}
+
+	userAuthCache := object.DeviceAuthCache{
+		UserSignIn:    false,
+		UserName:      deviceCode,
+		Scope:         scope,
+		ApplicationId: application.GetId(),
+		RequestAt:     time.Now(),
+	}
+
+	object.DeviceAuthMap.Store(deviceCode, deviceAuthCache)
+	object.DeviceAuthMap.Store(userCode, userAuthCache)
+
+	c.Data["json"] = object.GetDeviceAuthResponse(deviceCode, userCode, c.Ctx.Request.Host)
+	c.ServeJSON()
 }

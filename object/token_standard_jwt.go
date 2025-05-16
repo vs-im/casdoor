@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	"github.com/casdoor/casdoor/util"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type ClaimsStandard struct {
@@ -32,6 +32,8 @@ type ClaimsStandard struct {
 	Nonce               string      `json:"nonce,omitempty"`
 	Scope               string      `json:"scope,omitempty"`
 	Address             OIDCAddress `json:"address,omitempty"`
+	Azp                 string      `json:"azp,omitempty"`
+	Provider            string      `json:"provider,omitempty"`
 
 	jwt.RegisteredClaims
 }
@@ -52,6 +54,8 @@ func getStandardClaims(claims Claims) ClaimsStandard {
 		Nonce:            claims.Nonce,
 		Scope:            claims.Scope,
 		RegisteredClaims: claims.RegisteredClaims,
+		Azp:              claims.Azp,
+		Provider:         claims.Provider,
 	}
 
 	res.Phone = ""

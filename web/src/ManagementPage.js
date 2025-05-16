@@ -20,8 +20,7 @@ import React, {forwardRef, memo, useEffect, useState} from "react";
 import i18next from "i18next";
 import {
   AppstoreTwoTone,
-  DeploymentUnitOutlined,
-  DollarTwoTone,
+  BarsOutlined, DeploymentUnitOutlined, DollarTwoTone, DownOutlined,
   HomeTwoTone,
   LockTwoTone, LogoutOutlined,
   SafetyCertificateTwoTone, SettingOutlined, SettingTwoTone,
@@ -84,9 +83,9 @@ import MfaSetupPage from "./auth/MfaSetupPage";
 import OdicDiscoveryPage from "./auth/OidcDiscoveryPage";
 import * as Conf from "./Conf";
 import LanguageSelect from "./common/select/LanguageSelect";
-// import ThemeSelect from "./common/select/ThemeSelect";
+import ThemeSelect from "./common/select/ThemeSelect";
 import OpenTour from "./common/OpenTour";
-// import OrganizationSelect from "./common/select/OrganizationSelect";
+import OrganizationSelect from "./common/select/OrganizationSelect";
 import AccountAvatar from "./account/AccountAvatar";
 import {Content, Header} from "antd/es/layout/layout";
 import * as AuthBackend from "./auth/AuthBackend";
@@ -96,36 +95,6 @@ import TransactionEditPage from "./TransactionEditPage";
 import VerificationListPage from "./VerificationListPage";
 import * as ApplicationBackend from "./backend/ApplicationBackend";
 // import SingleCard from "./basic/SingleCard";
-
-const DownCustomSvg = (
-  props,
-  ref
-) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={28}
-    height={28}
-    fill="none"
-    ref={ref}
-    {...props}
-  >
-    <g clipPath="url(#a)">
-      <path
-        fill="#8897AD"
-        d="M14.184 20.48c.293 0 .586-.117.785-.34l9.07-9.292c.2-.2.316-.457.316-.75 0-.61-.457-1.078-1.066-1.078-.293 0-.562.117-.762.304L13.551 18.5h1.254L5.828 9.324a1.07 1.07 0 0 0-.762-.304C4.457 9.02 4 9.488 4 10.098c0 .293.117.55.316.761l9.07 9.282a1.1 1.1 0 0 0 .798.34Z"
-      />
-    </g>
-    <defs>
-      <clipPath id="a">
-        <path fill="#fff" d="M4 8h20.355v12.48H4z" />
-      </clipPath>
-    </defs>
-  </svg>
-);
-
-const DownCustomForwardRef = forwardRef(DownCustomSvg);
-// eslint-disable-next-line
-const DownCustomIcon = memo(DownCustomForwardRef);
 
 const SvgComponent = (props, ref) => (
   <svg
@@ -148,32 +117,11 @@ const SvgComponent = (props, ref) => (
 const BackToAppForwardRef = forwardRef(SvgComponent);
 const BackToAppIcon = memo(BackToAppForwardRef);
 
-const BarsSvgComponent = (props, ref) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={28}
-    height={28}
-    fill="none"
-    ref={ref}
-    {...props}
-  >
-    <g fill="#8897AD" clipPath="url(#a)">
-      <path d="M17.004 24.598h5.332c1.488 0 2.238-.739 2.238-2.285v-5.25c0-1.536-.75-2.286-2.238-2.286h-5.332c-1.5 0-2.25.75-2.25 2.286v5.25c0 1.546.75 2.285 2.25 2.285Zm.023-1.653c-.422 0-.62-.21-.62-.633v-5.238c0-.433.198-.644.62-.644h5.285c.41 0 .61.21.61.644v5.238c0 .422-.2.633-.61.633h-5.285ZM5.238 24.598h5.344c1.488 0 2.238-.739 2.238-2.285v-5.25c0-1.536-.75-2.286-2.238-2.286H5.238c-1.488 0-2.238.75-2.238 2.286v5.25c0 1.546.75 2.285 2.238 2.285Zm.024-1.653c-.41 0-.61-.21-.61-.633v-5.238c0-.433.2-.644.61-.644h5.285c.41 0 .621.21.621.644v5.238c0 .422-.211.633-.621.633H5.262ZM17.004 12.844h5.332c1.488 0 2.238-.75 2.238-2.297V5.309c0-1.547-.75-2.286-2.238-2.286h-5.332c-1.5 0-2.25.739-2.25 2.286v5.238c0 1.547.75 2.297 2.25 2.297Zm.023-1.653c-.422 0-.62-.21-.62-.644V5.309c0-.422.198-.633.62-.633h5.285c.41 0 .61.21.61.633v5.238c0 .433-.2.644-.61.644h-5.285ZM5.238 12.844h5.344c1.488 0 2.238-.75 2.238-2.297V5.309c0-1.547-.75-2.286-2.238-2.286H5.238C3.75 3.023 3 3.762 3 5.31v5.238c0 1.547.75 2.297 2.238 2.297Zm.024-1.653c-.41 0-.61-.21-.61-.644V5.309c0-.422.2-.633.61-.633h5.285c.41 0 .621.21.621.633v5.238c0 .433-.211.644-.621.644H5.262Z" />
-    </g>
-    <defs>
-      <clipPath id="a">
-        <path fill="#fff" d="M3 3h21.574v21.598H3z" />
-      </clipPath>
-    </defs>
-  </svg>
-);
-
-const BardForwardRef = forwardRef(BarsSvgComponent);
-const BarsOutlined = memo(BardForwardRef);
-
 function ManagementPage(props) {
 
   const [menuVisible, setMenuVisible] = useState(false);
+  const navItems = props.account?.organization?.navItems;
+  const widgetItems = props.account?.organization?.widgetItems;
 
   const [applications, setApplications] = useState(null);
 
@@ -278,12 +226,17 @@ function ManagementPage(props) {
     };
 
     return (
-      <Dropdown overlayClassName="header-dropdown" key="/rightDropDown" menu={{items, onClick}} >
-        <div className="rightDropDown" style={{height: "100%", minWidth: "70px", display: "flex", alignItems: "center", gap: "16px", padding: "0 20px"}}>
+      <Dropdown key="/rightDropDown" menu={{items, onClick}} >
+        <div className="rightDropDown">
           {
             renderAvatar()
           }
-          {Setting.isMobile() ? null : Setting.getShortText(Setting.getNameAtLeast(props.account.displayName), 30)}
+                    &nbsp;
+                    &nbsp;
+          {Setting.isMobile() ? null : Setting.getShortText(Setting.getNameAtLeast(props.account.displayName), 30)} &nbsp; <DownOutlined />
+                    &nbsp;
+                    &nbsp;
+                    &nbsp;
         </div>
       </Dropdown>
     );
@@ -299,6 +252,42 @@ function ManagementPage(props) {
     }
   }
 
+  function navItemsIsAll() {
+    return !Array.isArray(navItems) || !!navItems?.includes("all");
+  }
+
+  function widgetItemsIsAll() {
+    return !Array.isArray(widgetItems) || !!widgetItems?.includes("all");
+  }
+
+  function renderWidgets() {
+    const widgets = [
+      Setting.getItem(<ThemeSelect themeAlgorithm={props.themeAlgorithm} onChange={props.setLogoAndThemeAlgorithm} />, "theme"),
+      Setting.getItem(<LanguageSelect languages={props.account.organization.languages} />, "language"),
+      Setting.getItem(Conf.AiAssistantUrl?.trim() && (
+        <Tooltip title="Click to open AI assistant">
+          <div className="select-box" onClick={props.openAiAssistant}>
+            <DeploymentUnitOutlined style={{fontSize: "24px"}} />
+          </div>
+        </Tooltip>
+      ), "ai-assistant"),
+    ];
+
+    if (!location.startsWith("/apps")) {
+      widgets.push(<div className="select-box" onClick={redirectToApp} >
+        <BackToAppIcon />
+      </div>);
+    }
+
+    widgets.push(Setting.getItem(<OpenTour />, "tour"));
+
+    if (widgetItemsIsAll()) {
+      return widgets.map(item => item.label);
+    }
+
+    return widgets.filter(item => widgetItems.includes(item.key)).map(item => item.label);
+  }
+
   function renderAccountMenu() {
     if (props.account === undefined) {
       return null;
@@ -312,34 +301,18 @@ function ManagementPage(props) {
       return (
         <React.Fragment>
           {renderRightDropdown()}
-          {/* <ThemeSelect
-            themeAlgorithm={props.themeAlgorithm}
-            onChange={props.setLogoAndThemeAlgorithm} /> */}
-          <LanguageSelect languages={props.account.organization.languages} />
-          {
-            Conf.AiAssistantUrl?.trim() && (
-              <Tooltip title="Click to open AI assistant">
-                <div className="select-box" onClick={props.openAiAssistant}>
-                  <DeploymentUnitOutlined style={{fontSize: "24px"}} />
-                </div>
-              </Tooltip>
-            )
-          }
-          {!location.startsWith("/apps") && <div className="select-box" onClick={redirectToApp} >
-            <BackToAppIcon />
-          </div>}
-          <OpenTour />
-          {/* {Setting.isAdminUser(props.account) && (props.uri.indexOf("/trees") === -1) &&
+          {renderWidgets()}
+          {Setting.isAdminUser(props.account) && (props.uri.indexOf("/trees") === -1) &&
                         <OrganizationSelect
                           initValue={Setting.getOrganization()}
                           withAll={true}
-                          style={{marginRight: "20px", width: "180px", display: "flex"}}
+                          className="org-select"
+                          style={{display: Setting.isMobile() ? "none" : "flex"}}
                           onChange={(value) => {
                             Setting.setOrganization(value);
                           }}
-                          className="select-box"
                         />
-          } */}
+          }
         </React.Fragment>
       );
     }
@@ -362,8 +335,8 @@ function ManagementPage(props) {
       }
       textColor = "white";
     }
-    const logoDisabled = true;
-    !Setting.isMobile() && !logoDisabled ? res.push({
+
+    !Setting.isMobile() ? res.push({
       label:
             <Link to="/">
               <img className="logo" src={logo ?? props.logo} alt="logo" />
@@ -380,7 +353,7 @@ function ManagementPage(props) {
       Setting.getItem(<Link to="/shortcuts">{i18next.t("general:Shortcuts")}</Link>, "/shortcuts"),
       Setting.getItem(<Link to="/apps">{i18next.t("general:Apps")}</Link>, "/apps"),
     ].filter(item => {
-      return Setting.isLocalAdminUser(props.account) || item.key === "/apps";
+      return Setting.isLocalAdminUser(props.account);
     })));
 
     if (Setting.isLocalAdminUser(props.account)) {
@@ -450,13 +423,7 @@ function ManagementPage(props) {
       }
     }
 
-    const navItems = props.account.organization.navItems;
-
-    if (!Array.isArray(navItems)) {
-      return res;
-    }
-
-    if (navItems.includes("all")) {
+    if (navItemsIsAll()) {
       return res;
     }
 
@@ -583,34 +550,40 @@ function ManagementPage(props) {
   return (
     <React.Fragment>
       <EnableMfaNotification account={props.account} />
-      <Header style={{padding: "0", marginBottom: "3px", backgroundColor: props.themeAlgorithm.includes("dark") ? "black" : "white"}} >
-        {props.requiredEnableMfa || (Setting.isMobile() ?
-          <React.Fragment>
-            <Drawer width="280px" title={i18next.t("general:Close")} placement="left" visible={menuVisible} onClose={onClose}>
-              <Menu
-                items={getMenuItems()}
-                mode={"inline"}
-                selectedKeys={[props.selectedMenuKey]}
-                style={{lineHeight: "64px"}}
-                onClick={onClose}
-              >
-              </Menu>
-            </Drawer>
-            <div style={{width: "66px", height: "100%", float: "left", display: "flex", justifyContent: "center", alignItems: "center"}}>
-              <Button style={{padding: 0}} icon={<BarsOutlined />} onClick={showMenu} type="icon" />
-            </div>
-          </React.Fragment> :
-          <Menu
-            onClick={onClose}
-            items={getMenuItems()}
-            mode={"horizontal"}
-            selectedKeys={[props.selectedMenuKey]}
-            style={{position: "absolute", left: 0, right: menuStyleRight, backgroundColor: props.themeAlgorithm.includes("dark") ? "black" : "white"}}
-          />
-        )}
+      <Header style={{display: "flex", justifyContent: "space-between", alignItems: Setting.isMobile() ? "center" : undefined, padding: "0", marginBottom: "4px", backgroundColor: props.themeAlgorithm.includes("dark") ? "black" : "white"}} >
         {
-          renderAccountMenu()
+          props.requiredEnableMfa || (Setting.isMobile() ? (
+            <React.Fragment>
+              <Drawer title={i18next.t("general:Close")} placement="left" open={menuVisible} onClose={onClose}>
+                <Menu
+                  items={getMenuItems()}
+                  mode={"inline"}
+                  selectedKeys={[props.selectedMenuKey]}
+                  style={{lineHeight: "64px"}}
+                  onClick={onClose}
+                >
+                </Menu>
+              </Drawer>
+              <Button icon={<BarsOutlined />} onClick={showMenu} type="text">
+                {i18next.t("general:Menu")}
+              </Button>
+            </React.Fragment>
+          ) : (
+            // Padding 1px for Menu Item Highlight border
+            <div style={{flex: 1, overflow: "hidden", paddingBottom: "1px"}}>
+              <Menu
+                onClick={onClose}
+                items={getMenuItems()}
+                mode={"horizontal"}
+                selectedKeys={[props.selectedMenuKey]}
+                style={{position: "absolute", left: 0, right: menuStyleRight, backgroundColor: props.themeAlgorithm.includes("dark") ? "black" : "white"}}
+              />
+            </div>
+          ))
         }
+        <div style={{flexShrink: 0}}>
+          {renderAccountMenu()}
+        </div>
       </Header>
       <Content style={{display: "flex", flexDirection: "column"}} >
         {isWithoutCard() ?

@@ -63,9 +63,10 @@ type Organization struct {
 	PasswordObfuscatorType string     `xorm:"varchar(100)" json:"passwordObfuscatorType"`
 	PasswordObfuscatorKey  string     `xorm:"varchar(100)" json:"passwordObfuscatorKey"`
 	PasswordExpireDays     int        `json:"passwordExpireDays"`
-	CountryCodes           []string   `xorm:"varchar(200)"  json:"countryCodes"`
+	CountryCodes           []string   `xorm:"mediumtext"  json:"countryCodes"`
 	DefaultAvatar          string     `xorm:"varchar(200)" json:"defaultAvatar"`
 	DefaultApplication     string     `xorm:"varchar(100)" json:"defaultApplication"`
+	UserTypes              []string   `xorm:"mediumtext" json:"userTypes"`
 	Tags                   []string   `xorm:"mediumtext" json:"tags"`
 	Languages              []string   `xorm:"varchar(255)" json:"languages"`
 	ThemeData              *ThemeData `xorm:"json" json:"themeData"`
@@ -79,7 +80,8 @@ type Organization struct {
 	UseEmailAsUsername     bool       `json:"useEmailAsUsername"`
 	EnableTour             bool       `json:"enableTour"`
 	IpRestriction          string     `json:"ipRestriction"`
-	NavItems               []string   `xorm:"varchar(500)" json:"navItems"`
+	NavItems               []string   `xorm:"varchar(1000)" json:"navItems"`
+	WidgetItems            []string   `xorm:"varchar(1000)" json:"widgetItems"`
 
 	MfaItems     []*MfaItem     `xorm:"varchar(300)" json:"mfaItems"`
 	AccountItems []*AccountItem `xorm:"varchar(5000)" json:"accountItems"`
@@ -226,6 +228,7 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 
 	if !isGlobalAdmin {
 		organization.NavItems = org.NavItems
+		organization.WidgetItems = org.WidgetItems
 	}
 
 	session := ormer.Engine.ID(core.PK{owner, name}).AllCols()

@@ -284,6 +284,10 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_stripe.png`,
       url: "https://stripe.com/",
     },
+    "AirWallex": {
+      logo: `${StaticBaseUrl}/img/payment_airwallex.svg`,
+      url: "https://airwallex.com/",
+    },
     "GC": {
       logo: `${StaticBaseUrl}/img/payment_gc.png`,
       url: "https://gc.org",
@@ -415,6 +419,12 @@ export const OtherProviderInfo = {
     "CUCloud": {
       logo: `${StaticBaseUrl}/img/cucloud.png`,
       url: "https://www.cucloud.cn/",
+    },
+  },
+  "Face ID": {
+    "Alibaba Cloud Facebody": {
+      logo: `${StaticBaseUrl}/img/social_aliyun.png`,
+      url: "https://vision.aliyun.com/facebody",
     },
   },
 };
@@ -1116,6 +1126,7 @@ export function getProviderTypeOptions(category) {
       {id: "WeChat Pay", name: "WeChat Pay"},
       {id: "PayPal", name: "PayPal"},
       {id: "Stripe", name: "Stripe"},
+      {id: "AirWallex", name: "AirWallex"},
       {id: "GC", name: "GC"},
     ]);
   } else if (category === "Captcha") {
@@ -1154,6 +1165,10 @@ export function getProviderTypeOptions(category) {
       {id: "Rocket Chat", name: "Rocket Chat"},
       {id: "Viber", name: "Viber"},
       {id: "CUCloud", name: "CUCloud"},
+    ]);
+  } else if (category === "Face ID") {
+    return ([
+      {id: "Alibaba Cloud Facebody", name: "Alibaba Cloud Facebody"},
     ]);
   } else {
     return [];
@@ -1417,7 +1432,13 @@ export function getTag(color, text, icon) {
 }
 
 export function getApplicationName(application) {
-  return `${application?.owner}/${application?.name}`;
+  let name = `${application?.owner}/${application?.name}`;
+
+  if (application?.isShared && application?.organization) {
+    name += `-org-${application.organization}`;
+  }
+
+  return name;
 }
 
 export function getApplicationDisplayName(application) {
@@ -1530,7 +1551,7 @@ export function getUserCommonFields() {
 }
 
 export function getDefaultFooterContent() {
-  return "Powered by <a target=\"_blank\" href=\"https://casdoor.org\" rel=\"noreferrer\"><img style=\"padding-bottom: 3px\" height=\"20\" alt=\"Casdoor\" src=\"https://cdn.casbin.org/img/casdoor-logo_1185x256.png\"/></a>";
+  return `Powered by <a target="_blank" href="https://casdoor.org" rel="noreferrer"><img style="padding-bottom: 3px" height="20" alt="Casdoor" src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png"/></a>`;
 }
 
 export function getEmptyFooterContent() {
@@ -1562,7 +1583,7 @@ export function getDefaultHtmlEmailContent() {
 <div class="email-container">
   <div class="header">
         <h3>Casbin Organization</h3>
-        <img src="https://cdn.casbin.org/img/casdoor-logo_1185x256.png" alt="Casdoor Logo" width="300">
+        <img src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png" alt="Casdoor Logo" width="300">
     </div>
     <p><strong>%{user.friendlyName}</strong>, here is your verification code</p>
     <p>Use this code for your transaction. It's valid for 5 minutes</p>
@@ -1601,6 +1622,8 @@ export function getCurrencyText(product) {
     return i18next.t("currency:HKD");
   } else if (product?.currency === "SGD") {
     return i18next.t("currency:SGD");
+  } else if (product?.currency === "BRL") {
+    return i18next.t("currency:BRL");
   } else {
     return "(Unknown currency)";
   }
@@ -1612,7 +1635,7 @@ export function isDarkTheme(themeAlgorithm) {
 
 function getPreferredMfaProp(mfaProps) {
   for (const i in mfaProps) {
-    if (mfaProps[i].isPreffered) {
+    if (mfaProps[i].isPreferred) {
       return mfaProps[i];
     }
   }

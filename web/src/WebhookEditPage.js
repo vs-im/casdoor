@@ -21,10 +21,7 @@ import * as Setting from "./Setting";
 import i18next from "i18next";
 import WebhookHeaderTable from "./table/WebhookHeaderTable";
 
-import {Controlled as CodeMirror} from "react-codemirror2";
-import "codemirror/lib/codemirror.css";
-require("codemirror/theme/material-darker.css");
-require("codemirror/mode/javascript/javascript");
+import Editor from "./common/Editor";
 
 const {Option} = Select;
 
@@ -147,6 +144,9 @@ class WebhookEditPage extends React.Component {
     if (["port"].includes(key)) {
       value = Setting.myParseInt(value);
     }
+    if (key === "objectFields") {
+      value = value.includes("All") ? ["All"] : value;
+    }
     return value;
   }
 
@@ -177,7 +177,16 @@ class WebhookEditPage extends React.Component {
   renderWebhook() {
     const preview = Setting.deepCopy(previewTemplate);
     if (this.state.webhook.isUserExtended) {
-      preview["extendedUser"] = userTemplate;
+      if (this.state.webhook.tokenFields && this.state.webhook.tokenFields.length !== 0) {
+        const extendedUser = {};
+        this.state.webhook.tokenFields.forEach(field => {
+          const fieldTrans = field.replace(field[0], field[0].toLowerCase());
+          extendedUser[fieldTrans] = userTemplate[fieldTrans];
+        });
+        preview["extendedUser"] = extendedUser;
+      } else {
+        preview["extendedUser"] = userTemplate;
+      }
     }
     const previewText = JSON.stringify(preview, null, 2);
 
@@ -289,6 +298,19 @@ class WebhookEditPage extends React.Component {
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("webhook:Object fields"), i18next.t("webhook:Object fields - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} mode="tags" showSearch style={{width: "100%"}} value={this.state.webhook.objectFields} onChange={(value => {this.updateWebhookField("objectFields", value);})}>
+              <Option key="All" value="All">{i18next.t("general:All")}</Option>
+              {
+                ["owner", "name", "createdTime", "updatedTime", "deletedTime", "id", "displayName"].map((item, index) => <Option key={index} value={item}>{item}</Option>)
+              }
+            </Select>
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
             {Setting.getLabel(i18next.t("webhook:Is user extended"), i18next.t("webhook:Is user extended - Tooltip"))} :
           </Col>
@@ -300,15 +322,23 @@ class WebhookEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("webhook:Extended user fields"), i18next.t("webhook:Extended user fields - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} mode="tags" showSearch style={{width: "100%"}} value={this.state.webhook.tokenFields} onChange={(value => {this.updateWebhookField("tokenFields", value);})}>
+              {
+                Setting.getUserCommonFields().map((item, index) => <Option key={index} value={item}>{item}</Option>)
+              }
+            </Select>
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("general:Preview"), i18next.t("general:Preview - Tooltip"))} :
           </Col>
           <Col span={22} >
             <div style={{width: "900px", height: "300px"}} >
-              <CodeMirror
-                value={previewText}
-                options={{mode: "javascript", theme: "material-darker"}}
-                onBeforeChange={(editor, data, value) => {}}
-              />
+              <Editor value={previewText} lang="js" fillHeight readOnly dark />
             </div>
           </Col>
         </Row>

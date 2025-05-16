@@ -1,7 +1,8 @@
 FROM --platform=$BUILDPLATFORM node:20-alpine AS FRONT
 WORKDIR /web
 COPY ./web .
-RUN yarn install --frozen-lockfile --network-timeout 1000000 && yarn run build && rm -rf node_modules
+RUN yarn install --frozen-lockfile --network-timeout 1000000 && NODE_OPTIONS="--max-old-space-size=4096" yarn run build
+
 
 FROM --platform=$BUILDPLATFORM golang:latest AS BACK
 WORKDIR /go/src/casdoor

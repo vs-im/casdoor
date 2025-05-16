@@ -139,6 +139,8 @@ class ProductBuyPage extends React.Component {
       return "HK$";
     } else if (product?.currency === "SGD") {
       return "S$";
+    } else if (product?.currency === "BRL") {
+      return "R$";
     } else {
       return "(Unknown currency)";
     }
@@ -238,6 +240,8 @@ class ProductBuyPage extends React.Component {
       text = i18next.t("product:PayPal");
     } else if (provider.type === "Stripe") {
       text = i18next.t("product:Stripe");
+    } else if (provider.type === "AirWallex") {
+      text = i18next.t("product:AirWallex");
     }
 
     return (

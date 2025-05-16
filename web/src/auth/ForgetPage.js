@@ -393,7 +393,7 @@ class ForgetPage extends React.Component {
                   required: true,
                   validateTrigger: "onChange",
                   validator: (rule, value) => {
-                    const [errorMsg] = PasswordChecker.checkPasswordComplexity(value, application.organizationObj.passwordOptions);
+                    const errorMsg = PasswordChecker.checkPasswordComplexity(value, application.organizationObj.passwordOptions);
                     if (errorMsg === "") {
                       return Promise.resolve();
                     } else {
@@ -472,26 +472,31 @@ class ForgetPage extends React.Component {
         <CustomGithubCorner />
         <div className="forget-content" style={{padding: Setting.isMobile() ? "0" : null, boxShadow: Setting.isMobile() ? "none" : null}}>
           <div className="forget-content-inner">
-            <Button type="text" style={{position: "relative", left: Setting.isMobile() ? "0px" : "0px", top: 10}} size={"large"} onClick={() => {this.stepBack();}}>
-              <ArrowLeftOutlined style={{fontSize: "24px"}} />
-            </Button>
-            <Row style={{paddingBottom: "20px"}}>
+            {Setting.inIframe() || Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCss}} />}
+            {Setting.inIframe() || !Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCssMobile}} />}
+            <Button type="text"
+              style={{position: "relative", left: Setting.isMobile() ? "10px" : "-90px", top: 0}}
+              icon={<ArrowLeftOutlined style={{fontSize: "24px"}} />}
+              size={"large"}
+              onClick={() => {this.stepBack();}}
+            />
+            <Row>
               <Col span={24} style={{justifyContent: "center"}}>
                 <Row>
                   <Col span={24}>
-                    <div style={{marginTop: "0px", marginBottom: "10px", textAlign: "center"}}>
+                    <div style={{marginTop: "80px", marginBottom: "10px", textAlign: "center"}}>
                       {
                         Setting.renderHelmet(application)
                       }
-                      {/* {
+                      {
                         Setting.renderLogo(application)
-                      } */}
+                      }
                     </div>
                   </Col>
                 </Row>
                 <Row>
                   <Col span={24}>
-                    <div style={{textAlign: "center", fontSize: "18px"}}>
+                    <div style={{textAlign: "center", fontSize: "28px"}}>
                       {i18next.t("forget:Reset password")}
                     </div>
                   </Col>
@@ -518,14 +523,16 @@ class ForgetPage extends React.Component {
                         display: "flex",
                         alignItems: "center",
                         marginTop: "30px",
+                        width: "90%",
+                        maxWidth: "500px",
+                        margin: "auto",
                       }}
-                    >
-                    </Steps>
+                    ></Steps>
                   </Col>
                 </Row>
               </Col>
               <Col span={24} style={{display: "flex", justifyContent: "center"}}>
-                <div style={{marginTop: "20px", textAlign: "center"}}>
+                <div style={{marginTop: "40px", textAlign: "center"}}>
                   {this.renderForm(application)}
                 </div>
               </Col>

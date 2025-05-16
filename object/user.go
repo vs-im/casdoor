@@ -15,13 +15,17 @@
 package object
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/casdoor/casdoor/conf"
+	"github.com/casdoor/casdoor/faceId"
+	"github.com/casdoor/casdoor/proxy"
 	"github.com/casdoor/casdoor/util"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/xorm-io/builder"
@@ -48,7 +52,7 @@ func InitUserManager() {
 
 type User struct {
 	Owner       string `xorm:"varchar(100) notnull pk" json:"owner"`
-	Name        string `xorm:"varchar(100) notnull pk" json:"name"`
+	Name        string `xorm:"varchar(255) notnull pk" json:"name"`
 	CreatedTime string `xorm:"varchar(100) index" json:"createdTime"`
 	UpdatedTime string `xorm:"varchar(100)" json:"updatedTime"`
 	DeletedTime string `xorm:"varchar(100)" json:"deletedTime"`
@@ -244,6 +248,7 @@ type MfaAccount struct {
 type FaceId struct {
 	Name       string    `xorm:"varchar(100) notnull pk" json:"name"`
 	FaceIdData []float64 `json:"faceIdData"`
+	ImageUrl   string    `json:"ImageUrl"`
 }
 
 func GetUserFieldStringValue(user *User, fieldName string) (bool, string, error) {
@@ -452,6 +457,31 @@ func GetUserByEmail(owner string, email string) (*User, error) {
 	} else {
 		return nil, nil
 	}
+}
+
+func GetUserByWebauthID(webauthId string) (*User, error) {
+	user := User{}
+	existed := false
+	var err error
+
+	if ormer.driverName == "postgres" {
+		existed, err = ormer.Engine.Where(builder.Like{"\"webauthnCredentials\"", webauthId}).Get(&user)
+	} else if ormer.driverName == "mssql" {
+		existed, err = ormer.Engine.Where("CAST(webauthnCredentials AS VARCHAR(MAX)) like ?", "%"+webauthId+"%").Get(&user)
+	} else if ormer.driverName == "sqlite" {
+		existed, err = ormer.Engine.Where("CAST(webauthnCredentials AS text) like ?", "%"+webauthId+"%").Get(&user)
+	} else {
+		existed, err = ormer.Engine.Where("webauthnCredentials like ?", "%"+webauthId+"%").Get(&user)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if !existed {
+		return nil, fmt.Errorf("user not exist")
+	}
+
+	return &user, err
 }
 
 func GetUserByEmailOnly(email string) (*User, error) {
@@ -807,12 +837,26 @@ func AddUser(user *User) (bool, error) {
 		return false, fmt.Errorf("the user's owner and name should not be empty")
 	}
 
+	if CheckUsernameWithEmail(user.Name, "en") != "" {
+		user.Name = util.GetRandomName()
+	}
+
 	organization, err := GetOrganizationByUser(user)
 	if err != nil {
 		return false, err
 	}
 	if organization == nil {
 		return false, fmt.Errorf("the organization: %s is not found", user.Owner)
+	}
+
+	if user.Owner != "built-in" {
+		applicationCount, err := GetOrganizationApplicationCount(organization.Owner, organization.Name, "", "")
+		if err != nil {
+			return false, err
+		}
+		if applicationCount == 0 {
+			return false, fmt.Errorf("The organization: %s should have one application at least", organization.Owner)
+		}
 	}
 
 	if organization.DefaultPassword != "" && user.Password == "123" {
@@ -1177,6 +1221,40 @@ func (user *User) IsGlobalAdmin() bool {
 	}
 
 	return user.Owner == "built-in"
+}
+
+func (user *User) CheckUserFace(faceIdImage []string, provider *Provider) (bool, error) {
+	faceIdChecker := faceId.GetFaceIdProvider(provider.Type, provider.ClientId, provider.ClientSecret, provider.Endpoint)
+	httpClient := proxy.DefaultHttpClient
+	errList := []error{}
+	for _, userFaceId := range user.FaceIds {
+		if userFaceId.ImageUrl != "" {
+			imgResp, err := httpClient.Get(userFaceId.ImageUrl)
+			if err != nil {
+				continue
+			}
+			imgByte, err := io.ReadAll(imgResp.Body)
+			if err != nil {
+				continue
+			}
+
+			base64Img := base64.StdEncoding.EncodeToString(imgByte)
+			for _, imgBase64 := range faceIdImage {
+				isSuccess, err := faceIdChecker.Check(imgBase64, base64Img)
+				if err != nil {
+					errList = append(errList, err)
+					continue
+				}
+				if isSuccess {
+					return true, nil
+				}
+			}
+		}
+	}
+	if len(errList) > 0 {
+		return false, errList[0]
+	}
+	return false, nil
 }
 
 func GenerateIdForNewUser(application *Application) (string, error) {

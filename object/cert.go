@@ -63,7 +63,11 @@ func GetCertCount(owner, field, value string) (int64, error) {
 
 func GetCerts(owner string) ([]*Cert, error) {
 	certs := []*Cert{}
-	err := ormer.Engine.Where("owner = ? or owner = ? ", "admin", owner).Desc("created_time").Find(&certs, &Cert{})
+	db := ormer.Engine.NewSession()
+	if owner != "" {
+		db = db.Where("owner = ? or owner = ? ", "admin", owner)
+	}
+	err := db.Desc("created_time").Find(&certs, &Cert{})
 	if err != nil {
 		return certs, err
 	}
@@ -146,7 +150,12 @@ func getCertByName(name string) (*Cert, error) {
 
 func GetCert(id string) (*Cert, error) {
 	owner, name := util.GetOwnerAndNameFromId(id)
-	return getCert(owner, name)
+	cert, err := getCert(owner, name)
+	if cert == nil && owner != "admin" {
+		return getCert("admin", name)
+	} else {
+		return cert, err
+	}
 }
 
 func UpdateCert(id string, cert *Cert) (bool, error) {

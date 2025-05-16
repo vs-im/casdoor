@@ -252,7 +252,7 @@ func CheckPassword(user *User, password string, lang string, options ...bool) er
 	credManager := cred.GetCredManager(passwordType)
 	if credManager != nil {
 		if organization.MasterPassword != "" {
-			if credManager.IsPasswordCorrect(password, organization.MasterPassword, "", organization.PasswordSalt) {
+			if password == organization.MasterPassword || credManager.IsPasswordCorrect(password, organization.MasterPassword, "", organization.PasswordSalt) {
 				return resetUserSigninErrorTimes(user)
 			}
 		}
@@ -517,8 +517,8 @@ func CheckLoginPermission(userId string, application *Application) (bool, error)
 func CheckUsername(username string, lang string) string {
 	if username == "" {
 		return i18n.Translate(lang, "check:Empty username.")
-	} else if len(username) > 39 {
-		return i18n.Translate(lang, "check:Username is too long (maximum is 39 characters).")
+	} else if len(username) > 255 {
+		return i18n.Translate(lang, "check:Username is too long (maximum is 255 characters).")
 	}
 
 	// https://stackoverflow.com/questions/58726546/github-username-convention-using-regex
@@ -533,8 +533,8 @@ func CheckUsername(username string, lang string) string {
 func CheckUsernameWithEmail(username string, lang string) string {
 	if username == "" {
 		return i18n.Translate(lang, "check:Empty username.")
-	} else if len(username) > 39 {
-		return i18n.Translate(lang, "check:Username is too long (maximum is 39 characters).")
+	} else if len(username) > 255 {
+		return i18n.Translate(lang, "check:Username is too long (maximum is 255 characters).")
 	}
 
 	// https://stackoverflow.com/questions/58726546/github-username-convention-using-regex

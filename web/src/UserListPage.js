@@ -188,8 +188,8 @@ class UserListPage extends BaseListPage {
 
     return (
       <Upload {...props}>
-        <Button id="upload-button" type="primary" size="small">
-          <UploadOutlined /> {i18next.t("user:Upload (.xlsx)")}
+        <Button icon={<UploadOutlined />} id="upload-button" type="primary" size="small">
+          {i18next.t("user:Upload (.xlsx)")}
         </Button>
       </Upload>
     );
@@ -319,6 +319,14 @@ class UserListPage extends BaseListPage {
         },
       },
       {
+        title: i18next.t("general:User type"),
+        dataIndex: "type",
+        key: "type",
+        width: "120px",
+        sorter: true,
+        ...this.getColumnSearchProps("type"),
+      },
+      {
         title: i18next.t("user:Tag"),
         dataIndex: "tag",
         key: "tag",
@@ -343,7 +351,7 @@ class UserListPage extends BaseListPage {
         title: i18next.t("user:Is admin"),
         dataIndex: "isAdmin",
         key: "isAdmin",
-        width: "110px",
+        width: "120px",
         sorter: true,
         render: (text, record, index) => {
           return (

@@ -35,22 +35,22 @@ import {EmailInputGroup} from "../common/EmailInputGroup";
 import {CheckOutlined} from "@ant-design/icons";
 
 const formItemLayout = {
-  labelCol: {
-    xs: {
-      span: 24,
-    },
-    sm: {
-      span: 8,
-    },
-  },
-  wrapperCol: {
-    xs: {
-      span: 24,
-    },
-    sm: {
-      span: 16,
-    },
-  },
+  // labelCol: {
+  //   xs: {
+  //     span: 24,
+  //   },
+  //   sm: {
+  //     span: 8,
+  //   },
+  // },
+  // wrapperCol: {
+  //   xs: {
+  //     span: 24,
+  //   },
+  //   sm: {
+  //     span: 16,
+  //   },
+  // },
 };
 
 const renderFormItem = (signupItem) => {
@@ -86,16 +86,16 @@ const renderFormItem = (signupItem) => {
 };
 
 export const tailFormItemLayout = {
-  wrapperCol: {
-    xs: {
-      span: 24,
-      offset: 0,
-    },
-    sm: {
-      span: 0, // 16
-      offset: 0, // 8
-    },
-  },
+  // wrapperCol: {
+  //   xs: {
+  //     span: 24,
+  //     offset: 0,
+  //   },
+  //   sm: {
+  //     span: 16, // 16
+  //     offset: 8, // 8
+  //   },
+  // },
 };
 
 class SignupPage extends React.Component {
@@ -1093,8 +1093,6 @@ class SignupPage extends React.Component {
         {...formItemLayout}
         ref={this.form}
         name="signup"
-        labelCol={{span: 0}}
-        wrapperCol={{span: 0}}
         onFinish={(values) => this.onFinish(values)}
         onFinishFailed={(errorInfo) =>
           this.onFinishFailed(

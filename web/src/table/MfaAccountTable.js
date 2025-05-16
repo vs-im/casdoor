@@ -80,7 +80,7 @@ class MfaAccountTable extends React.Component {
   renderTable(table) {
     const columns = [
       {
-        title: i18next.t("mfaAccount:Account Name"),
+        title: i18next.t("forget:Account"),
         dataIndex: "accountName",
         key: "accountName",
         width: "400px",
@@ -93,7 +93,7 @@ class MfaAccountTable extends React.Component {
         },
       },
       {
-        title: i18next.t("mfaAccount:Issuer"),
+        title: "Issuer",
         dataIndex: "issuer",
         key: "issuer",
         width: "300px",
@@ -106,7 +106,7 @@ class MfaAccountTable extends React.Component {
         },
       },
       {
-        title: i18next.t("mfaAccount:Origin"),
+        title: "Origin",
         dataIndex: "origin",
         key: "origin",
         render: (text, record, index) => {
@@ -118,7 +118,7 @@ class MfaAccountTable extends React.Component {
         },
       },
       {
-        title: i18next.t("mfaAccount:Secret Key"),
+        title: i18next.t("provider:Secret key"),
         dataIndex: "secretKey",
         key: "secretKey",
         render: (text, record, index) => {
@@ -137,10 +137,10 @@ class MfaAccountTable extends React.Component {
         render: (text, record, index) => (
           <Tooltip>
             {text ? (
-              <Image width={36} height={36} preview={false} src={`https://cdn.casbin.org/img/social_${text.toLowerCase()}.png`}
-                fallback="https://cdn.casbin.org/img/social_default.png" alt={text} />
+              <Image width={36} height={36} preview={false} src={`${Setting.StaticBaseUrl}/img/social_${text.toLowerCase()}.png`}
+                fallback={`${Setting.StaticBaseUrl}/img/social_default.png`} alt={text} />
             ) : (
-              <Image width={36} height={36} preview={false} src={"https://cdn.casbin.org/img/social_default.png"} alt="default" />
+              <Image width={36} height={36} preview={false} src={`${Setting.StaticBaseUrl}/img/social_default.png`} alt="default" />
             )}
           </Tooltip>
         ),

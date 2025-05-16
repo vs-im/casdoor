@@ -14,11 +14,13 @@
 
 import * as faceapi from "face-api.js";
 import React, {useState} from "react";
-import {Button, Modal, Progress, Spin, message} from "antd";
+import {Button, Modal, Progress, Space, Spin, message} from "antd";
 import i18next from "i18next";
+import Dragger from "antd/es/upload/Dragger";
+import * as Setting from "../../Setting";
 
 const FaceRecognitionModal = (props) => {
-  const {visible, onOk, onCancel} = props;
+  const {visible, onOk, onCancel, withImage} = props;
   const [modelsLoaded, setModelsLoaded] = React.useState(false);
   const [isCameraCaptured, setIsCameraCaptured] = useState(false);
 
@@ -28,12 +30,14 @@ const FaceRecognitionModal = (props) => {
   const mediaStreamRef = React.useRef(null);
   const [percent, setPercent] = useState(0);
 
+  const [files, setFiles] = useState([]);
+  const [currentFaceId, setCurrentFaceId] = React.useState();
+  const [currentFaceIndex, setCurrentFaceIndex] = React.useState();
+
   React.useEffect(() => {
     const loadModels = async() => {
-      // const MODEL_URL = process.env.PUBLIC_URL + "/models";
       // const MODEL_URL = "https://justadudewhohacks.github.io/face-api.js/models";
-      // const MODEL_URL = "https://cdn.casbin.org/site/casdoor/models";
-      const MODEL_URL = "https://cdn.casdoor.com/casdoor/models";
+      const MODEL_URL = `${Setting.StaticBaseUrl}/casdoor/models`;
 
       Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -50,6 +54,9 @@ const FaceRecognitionModal = (props) => {
   }, []);
 
   React.useEffect(() => {
+    if (withImage) {
+      return;
+    }
     if (visible) {
       setPercent(0);
       if (modelsLoaded) {
@@ -75,6 +82,9 @@ const FaceRecognitionModal = (props) => {
   }, [visible, modelsLoaded]);
 
   React.useEffect(() => {
+    if (withImage) {
+      return;
+    }
     if (isCameraCaptured) {
       let count = 0;
       const interval = setInterval(() => {
@@ -98,6 +108,9 @@ const FaceRecognitionModal = (props) => {
   }, [isCameraCaptured]);
 
   const handleStreamVideo = () => {
+    if (withImage) {
+      return;
+    }
     let count = 0;
     let goodCount = 0;
     if (!detection.current) {
@@ -148,73 +161,163 @@ const FaceRecognitionModal = (props) => {
     }
   };
 
-  return (
-    <div>
-      <Modal
-        closable={false}
+  const getBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  if (!withImage) {
+    return (
+      <div>
+        <Modal
+          closable={false}
+          maskClosable={false}
+          destroyOnClose={true}
+          open={visible && isCameraCaptured}
+          title={i18next.t("login:Face Recognition")}
+          width={350}
+          footer={[
+            <Button key="back" onClick={onCancel}>
+                  Cancel
+            </Button>,
+          ]}
+        >
+          <Progress percent={percent} />
+          <div style={{
+            marginTop: "20px",
+            marginBottom: "50px",
+            justifyContent: "center",
+            alignContent: "center",
+            position: "relative",
+            flexDirection: "column",
+          }}>
+            {
+              modelsLoaded ?
+                <div style={{display: "flex", justifyContent: "center", alignContent: "center"}}>
+                  <video
+                    ref={videoRef}
+                    onPlay={handleStreamVideo}
+                    style={{
+                      borderRadius: "50%",
+                      height: "220px",
+                      verticalAlign: "middle",
+                      width: "220px",
+                      objectFit: "cover",
+                    }}
+                  ></video>
+                  <div style={{
+                    position: "absolute",
+                    width: "240px",
+                    height: "240px",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                  }}>
+                    <svg width="240" height="240" fill="none">
+                      <circle
+                        strokeDasharray="700"
+                        strokeDashoffset={700 - 6.9115 * percent}
+                        strokeWidth="4"
+                        cx="120"
+                        cy="120"
+                        r="110"
+                        stroke="#5734d3"
+                        transform="rotate(-90, 120, 120)"
+                        strokeLinecap="round"
+                        style={{transition: "all .2s linear"}}
+                      ></circle>
+                    </svg>
+                  </div>
+                  <canvas ref={canvasRef} style={{position: "absolute"}} />
+                </div>
+                :
+                <div>
+                  <Spin tip={i18next.t("login:Loading")} size="large"
+                    style={{display: "flex", justifyContent: "center", alignContent: "center"}}>
+                    <div className="content" />
+                  </Spin>
+                </div>
+            }
+          </div>
+        </Modal>
+      </div>
+    );
+  } else {
+    return <div>
+      <Modal closable={false}
         maskClosable={false}
         destroyOnClose={true}
-        open={visible && isCameraCaptured}
+        open={visible}
         title={i18next.t("login:Face Recognition")}
         width={350}
         footer={[
-          <Button key="back" onClick={onCancel}>
-            Cancel
+          <Button key="ok" type={"primary"} disabled={!currentFaceId || currentFaceId?.length === 0} onClick={() => {
+            onOk(Array.from(currentFaceId.descriptor));
+          }}>
+            Ok
           </Button>,
-        ]}
-      >
-        <Progress percent={percent} />
-        <div style={{marginTop: "20px", marginBottom: "50px", justifyContent: "center", alignContent: "center", position: "relative", flexDirection: "column"}}>
+          <Button key="back" onClick={onCancel}>
+                  Cancel
+          </Button>,
+        ]}>
+        <Space direction={"vertical"} style={{width: "100%"}}>
+          <Dragger
+            multiple={true}
+            defaultFileList={files}
+            style={{width: "100%"}}
+            beforeUpload={(file) => {
+              getBase64(file).then(res => {
+                file.base64 = res;
+                files.push(file);
+              });
+              setCurrentFaceId([]);
+              return false;
+            }}
+            onRemove={(file) => {
+              const index = files.indexOf(file);
+              const newFileList = files.slice();
+              newFileList.splice(index, 1);
+              setFiles(newFileList);
+              setCurrentFaceId([]);
+            }}
+          >
+            <p>{i18next.t("general:Click to Upload")}</p>
+          </Dragger >
           {
-            modelsLoaded ?
-              <div style={{display: "flex", justifyContent: "center", alignContent: "center"}}>
-                <video
-                  ref={videoRef}
-                  onPlay={handleStreamVideo}
-                  style={{
-                    borderRadius: "50%",
-                    height: "220px",
-                    verticalAlign: "middle",
-                    width: "220px",
-                    objectFit: "cover",
-                  }}
-                ></video>
-                <div style={{
-                  position: "absolute",
-                  width: "240px",
-                  height: "240px",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                }}>
-                  <svg width="240" height="240" fill="none">
-                    <circle
-                      strokeDasharray="700"
-                      strokeDashoffset={700 - 6.9115 * percent}
-                      strokeWidth="4"
-                      cx="120"
-                      cy="120"
-                      r="110"
-                      stroke="#5734d3"
-                      transform="rotate(-90, 120, 120)"
-                      strokeLinecap="round"
-                      style={{transition: "all .2s linear"}}
-                    ></circle>
-                  </svg>
-                </div>
-                <canvas ref={canvasRef} style={{position: "absolute"}} />
-              </div>
-              :
-              <div>
-                <Spin tip={i18next.t("login:Loading")} size="large" style={{display: "flex", justifyContent: "center", alignContent: "center"}}>
-                  <div className="content" />
-                </Spin>
-              </div>
+            modelsLoaded ? <Button style={{width: "100%"}} onClick={async() => {
+              let maxScore = 0;
+              for (const file of files) {
+                const fileIndex = files.indexOf(file);
+                const img = new Image();
+                img.src = file.base64;
+                const faceIds = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
+                if (faceIds[0]?.detection.score > 0.9 && faceIds[0]?.detection.score > maxScore) {
+                  maxScore = faceIds[0]?.detection.score;
+                  setCurrentFaceId(faceIds[0]);
+                  setCurrentFaceIndex(fileIndex);
+                }
+              }
+              if (maxScore < 0.9) {
+                message.error(i18next.t("login:Face recognition failed"));
+              }
+            }}> {i18next.t("application:Generate Face ID")}</Button> : null
           }
-        </div>
+        </Space>
+        {
+          currentFaceId && currentFaceId.length !== 0 ? (
+            <React.Fragment>
+              <div>{i18next.t("application:Select")}:{files[currentFaceIndex]?.name}</div>
+              <div><img src={files[currentFaceIndex]?.base64} alt="selected" style={{width: "100%"}} /></div>
+            </React.Fragment>
+          ) : null
+        }
       </Modal>
-    </div>
-  );
+    </div>;
+  }
 };
 
 export default FaceRecognitionModal;

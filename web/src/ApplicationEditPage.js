@@ -13,8 +13,8 @@
 // limitations under the License.
 
 import React from "react";
-import {Button, Card, Col, ConfigProvider, Input, InputNumber, Popover, Radio, Result, Row, Select, Switch, Upload} from "antd";
-import {CopyOutlined, LinkOutlined, UploadOutlined} from "@ant-design/icons";
+import {Button, Card, Col, ConfigProvider, Input, InputNumber, Popover, Radio, Result, Row, Select, Space, Switch, Upload} from "antd";
+import {CopyOutlined, HolderOutlined, LinkOutlined, UploadOutlined, UsergroupAddOutlined} from "@ant-design/icons";
 import * as ApplicationBackend from "./backend/ApplicationBackend";
 import * as CertBackend from "./backend/CertBackend";
 import * as Setting from "./Setting";
@@ -34,14 +34,9 @@ import PromptPage from "./auth/PromptPage";
 import copy from "copy-to-clipboard";
 import ThemeEditor from "./common/theme/ThemeEditor";
 
-import {Controlled as CodeMirror} from "react-codemirror2";
-import "codemirror/lib/codemirror.css";
 import SigninTable from "./table/SigninTable";
-
-require("codemirror/theme/material-darker.css");
-require("codemirror/mode/htmlmixed/htmlmixed");
-require("codemirror/mode/xml/xml");
-require("codemirror/mode/css/css");
+import Editor from "./common/Editor";
+import * as GroupBackend from "./backend/GroupBackend";
 
 const {Option} = Select;
 
@@ -57,6 +52,14 @@ const template = `<style>
     border-radius: 10px;
     background-color: #333333;
     box-shadow: 0 0 30px 20px rgba(255, 255, 255, 0.20);
+  }
+  .forget-content {
+    padding: 10px 100px 20px;
+    margin: 30px auto;
+    border: 2px solid #fff;
+    border-radius: 7px;
+    background-color: rgb(255 255 255);
+    box-shadow: 0 0 20px rgb(0 0 0 / 20%);
   }
 </style>`;
 
@@ -91,11 +94,11 @@ const sideTemplate = `<style>
   }
 </style>
 <div class="left-model">
-  <span class="side-logo"> <img src="https://cdn.casbin.org/img/casdoor-logo_1185x256.png" alt="Casdoor" style="width: 120px"> 
+  <span class="side-logo"> <img src="${Setting.StaticBaseUrl}/img/casdoor-logo_1185x256.png" alt="Casdoor" style="width: 120px"> 
     <span>SSO</span> 
   </span>
   <div class="img">
-    <img src="https://cdn.casbin.org/img/casbin.svg" alt="Casdoor"/>
+    <img src="${Setting.StaticBaseUrl}/img/casbin.svg" alt="Casdoor"/>
   </div>
 </div>
 `;
@@ -122,6 +125,7 @@ class ApplicationEditPage extends React.Component {
   UNSAFE_componentWillMount() {
     this.getApplication();
     this.getOrganizations();
+    this.getGroups();
   }
 
   getApplication() {
@@ -168,6 +172,17 @@ class ApplicationEditPage extends React.Component {
         } else {
           this.setState({
             organizations: res.data || [],
+          });
+        }
+      });
+  }
+
+  getGroups() {
+    GroupBackend.getGroups(this.state.organizationName)
+      .then((res) => {
+        if (res.status === "ok") {
+          this.setState({
+            groups: res.data,
           });
         }
       });
@@ -405,6 +420,16 @@ class ApplicationEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("application:Forced redirect origin"), i18next.t("general:Forced redirect origin - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input prefix={<LinkOutlined />} value={this.state.application.forcedRedirectOrigin} onChange={e => {
+              this.updateApplicationField("forcedRedirectOrigin", e.target.value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("application:Token format"), i18next.t("application:Token format - Tooltip"))} :
           </Col>
           <Col span={22} >
@@ -429,6 +454,7 @@ class ApplicationEditPage extends React.Component {
           </Col>
           <Col span={22} >
             <Select virtual={false} disabled={this.state.application.tokenFormat !== "JWT-Custom"} mode="tags" showSearch style={{width: "100%"}} value={this.state.application.tokenFields} onChange={(value => {this.updateApplicationField("tokenFields", value);})}>
+              <Option key={"provider"} value={"provider"}>{"Provider"}</Option>)
               {
                 Setting.getUserCommonFields().map((item, index) => <Option key={index} value={item}>{item}</Option>)
               }
@@ -473,6 +499,31 @@ class ApplicationEditPage extends React.Component {
             <InputNumber style={{width: "150px"}} value={this.state.application.failedSigninFrozenTime} min={1} step={1} precision={0} addonAfter="Minutes" onChange={value => {
               this.updateApplicationField("failedSigninFrozenTime", value);
             }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("ldap:Default group"), i18next.t("ldap:Default group - Tooltip"))} :
+          </Col>
+          <Col span={22}>
+            <Select virtual={false} style={{width: "100%"}} value={this.state.application.defaultGroup ?? []} onChange={(value => {
+              this.updateApplicationField("defaultGroup", value);
+            })}
+            >
+              <Option key={""} value={""}>
+                <Space>
+                  {i18next.t("general:Default")}
+                </Space>
+              </Option>
+              {
+                this.state.groups?.map((group) => <Option key={group.name} value={`${group.owner}/${group.name}`}>
+                  <Space>
+                    {group.type === "Physical" ? <UsergroupAddOutlined /> : <HolderOutlined />}
+                    {group.displayName}
+                  </Space>
+                </Option>)
+              }
+            </Select>
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >
@@ -629,13 +680,9 @@ class ApplicationEditPage extends React.Component {
           <Col span={22} >
             <Popover placement="right" content={
               <div style={{width: "900px", height: "300px"}} >
-                <CodeMirror
-                  value={this.state.application.signupHtml}
-                  options={{mode: "htmlmixed", theme: "material-darker"}}
-                  onBeforeChange={(editor, data, value) => {
-                    this.updateApplicationField("signupHtml", value);
-                  }}
-                />
+                <Editor value={this.state.application.signupHtml} lang="html" fillHeight dark onChange={value => {
+                  this.updateApplicationField("signupHtml", value);
+                }} />
               </div>
             } title={i18next.t("provider:Signup HTML - Edit")} trigger="click">
               <Input value={this.state.application.signupHtml} style={{marginBottom: "10px"}} onChange={e => {
@@ -651,13 +698,9 @@ class ApplicationEditPage extends React.Component {
           <Col span={22} >
             <Popover placement="right" content={
               <div style={{width: "900px", height: "300px"}} >
-                <CodeMirror
-                  value={this.state.application.signinHtml}
-                  options={{mode: "htmlmixed", theme: "material-darker"}}
-                  onBeforeChange={(editor, data, value) => {
-                    this.updateApplicationField("signinHtml", value);
-                  }}
-                />
+                <Editor value={this.state.application.signinHtml} lang="html" fillHeight dark onChange={value => {
+                  this.updateApplicationField("signinHtml", value);
+                }} />
               </div>
             } title={i18next.t("provider:Signin HTML - Edit")} trigger="click">
               <Input value={this.state.application.signinHtml} style={{marginBottom: "10px"}} onChange={e => {
@@ -684,6 +727,7 @@ class ApplicationEditPage extends React.Component {
                   {id: "token", name: "Token"},
                   {id: "id_token", name: "ID Token"},
                   {id: "refresh_token", name: "Refresh Token"},
+                  {id: "urn:ietf:params:oauth:grant-type:device_code", name: "Device Code"},
                 ].map((item, index) => <Option key={index} value={item.id}>{item.name}</Option>)
               }
             </Select>
@@ -758,11 +802,7 @@ class ApplicationEditPage extends React.Component {
             {Setting.getLabel(i18next.t("application:SAML metadata"), i18next.t("application:SAML metadata - Tooltip"))} :
           </Col>
           <Col span={22}>
-            <CodeMirror
-              value={this.state.samlMetadata}
-              options={{mode: "xml", theme: "default"}}
-              onBeforeChange={(editor, data, value) => {}}
-            />
+            <Editor value={this.state.samlMetadata?.toString() ?? ""} lang="xml" readOnly />
             <br />
             <Button style={{marginBottom: "10px"}} type="primary" shape="round" icon={<CopyOutlined />} onClick={() => {
               copy(`${window.location.origin}/api/saml/metadata?application=admin/${encodeURIComponent(this.state.applicationName)}&enablePostBinding=${this.state.application.enableSamlPostBinding}`);
@@ -822,6 +862,33 @@ class ApplicationEditPage extends React.Component {
             </Row>
           </Col>
         </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("application:Background URL Mobile"), i18next.t("application:Background URL Mobile - Tooltip"))} :
+          </Col>
+          <Col span={22} style={(Setting.isMobile()) ? {maxWidth: "100%"} : {}}>
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(i18next.t("general:URL"), i18next.t("general:URL - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <Input prefix={<LinkOutlined />} value={this.state.application.formBackgroundUrlMobile} onChange={e => {
+                  this.updateApplicationField("formBackgroundUrlMobile", e.target.value);
+                }} />
+              </Col>
+            </Row>
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {i18next.t("general:Preview")}:
+              </Col>
+              <Col span={22} >
+                <a target="_blank" rel="noreferrer" href={this.state.application.formBackgroundUrlMobile}>
+                  <img src={this.state.application.formBackgroundUrlMobile} alt={this.state.application.formBackgroundUrlMobile} height={90} style={{marginBottom: "20px"}} />
+                </a>
+              </Col>
+            </Row>
+          </Col>
+        </Row>
         <Row>
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("application:Custom CSS"), i18next.t("application:Custom CSS - Tooltip"))} :
@@ -829,9 +896,12 @@ class ApplicationEditPage extends React.Component {
           <Col span={22}>
             <Popover placement="right" content={
               <div style={{width: "900px", height: "300px"}} >
-                <CodeMirror value={this.state.application.formCss === "" ? template : this.state.application.formCss}
-                  options={{mode: "css", theme: "material-darker"}}
-                  onBeforeChange={(editor, data, value) => {
+                <Editor
+                  value={this.state.application.formCss === "" ? template : this.state.application.formCss}
+                  lang="css"
+                  fillHeight
+                  dark
+                  onChange={value => {
                     this.updateApplicationField("formCss", value);
                   }}
                 />
@@ -850,9 +920,12 @@ class ApplicationEditPage extends React.Component {
           <Col span={22}>
             <Popover placement="right" content={
               <div style={{width: "900px", height: "300px"}} >
-                <CodeMirror value={this.state.application.formCssMobile === "" ? template : this.state.application.formCssMobile}
-                  options={{mode: "css", theme: "material-darker"}}
-                  onBeforeChange={(editor, data, value) => {
+                <Editor
+                  value={this.state.application.formCssMobile === "" ? template : this.state.application.formCssMobile}
+                  lang="css"
+                  fillHeight
+                  dark
+                  onChange={value => {
                     this.updateApplicationField("formCssMobile", value);
                   }}
                 />
@@ -887,9 +960,12 @@ class ApplicationEditPage extends React.Component {
                 <Col span={21} >
                   <Popover placement="right" content={
                     <div style={{width: "900px", height: "300px"}} >
-                      <CodeMirror value={this.state.application.formSideHtml === "" ? sideTemplate : this.state.application.formSideHtml}
-                        options={{mode: "htmlmixed", theme: "material-darker"}}
-                        onBeforeChange={(editor, data, value) => {
+                      <Editor
+                        value={this.state.application.formSideHtml === "" ? sideTemplate : this.state.application.formSideHtml}
+                        lang="html"
+                        fillHeight
+                        dark
+                        onChange={value => {
                           this.updateApplicationField("formSideHtml", value);
                         }}
                       />
@@ -936,10 +1012,12 @@ class ApplicationEditPage extends React.Component {
           <Col span={22} >
             <Popover placement="right" content={
               <div style={{width: "900px", height: "300px"}} >
-                <CodeMirror
+                <Editor
                   value={this.state.application.headerHtml}
-                  options={{mode: "htmlmixed", theme: "material-darker"}}
-                  onBeforeChange={(editor, data, value) => {
+                  lang="html"
+                  fillHeight
+                  dark
+                  onChange={value => {
                     this.updateApplicationField("headerHtml", value);
                   }}
                 />
@@ -958,10 +1036,12 @@ class ApplicationEditPage extends React.Component {
           <Col span={22} >
             <Popover placement="right" content={
               <div style={{width: "900px", height: "300px"}} >
-                <CodeMirror
+                <Editor
                   value={this.state.application.footerHtml}
-                  options={{mode: "htmlmixed", theme: "material-darker"}}
-                  onBeforeChange={(editor, data, value) => {
+                  lang="html"
+                  fillHeight
+                  dark
+                  onChange={value => {
                     this.updateApplicationField("footerHtml", value);
                   }}
                 />

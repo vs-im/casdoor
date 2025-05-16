@@ -30,6 +30,7 @@ type OidcDiscovery struct {
 	AuthorizationEndpoint                  string   `json:"authorization_endpoint"`
 	TokenEndpoint                          string   `json:"token_endpoint"`
 	UserinfoEndpoint                       string   `json:"userinfo_endpoint"`
+	DeviceAuthorizationEndpoint            string   `json:"device_authorization_endpoint"`
 	JwksUri                                string   `json:"jwks_uri"`
 	IntrospectionEndpoint                  string   `json:"introspection_endpoint"`
 	ResponseTypesSupported                 []string `json:"response_types_supported"`
@@ -77,6 +78,7 @@ func getOriginFromHostInternal(host string) (string, string) {
 		return origin, origin
 	}
 
+	isDev := conf.GetConfigString("runmode") == "dev"
 	// "door.casdoor.com"
 	protocol := "https://"
 	if !strings.Contains(host, ".") {
@@ -87,7 +89,7 @@ func getOriginFromHostInternal(host string) (string, string) {
 		protocol = "http://"
 	}
 
-	if host == "localhost:7777" {
+	if host == "localhost:7777" && isDev {
 		return fmt.Sprintf("%s%s", protocol, "localhost:7001"), fmt.Sprintf("%s%s", protocol, "localhost:7777")
 	} else {
 		return fmt.Sprintf("%s%s", protocol, host), fmt.Sprintf("%s%s", protocol, host)
@@ -118,6 +120,7 @@ func GetOidcDiscovery(host string) OidcDiscovery {
 		AuthorizationEndpoint:                  fmt.Sprintf("%s/login/oauth/authorize", originFrontend),
 		TokenEndpoint:                          fmt.Sprintf("%s/api/login/oauth/access_token", originBackend),
 		UserinfoEndpoint:                       fmt.Sprintf("%s/api/userinfo", originBackend),
+		DeviceAuthorizationEndpoint:            fmt.Sprintf("%s/api/device-auth", originBackend),
 		JwksUri:                                fmt.Sprintf("%s/.well-known/jwks", originBackend),
 		IntrospectionEndpoint:                  fmt.Sprintf("%s/api/login/oauth/introspect", originBackend),
 		ResponseTypesSupported:                 []string{"code", "token", "id_token", "code token", "code id_token", "token id_token", "code token id_token", "none"},
@@ -137,7 +140,7 @@ func GetOidcDiscovery(host string) OidcDiscovery {
 
 func GetJsonWebKeySet() (jose.JSONWebKeySet, error) {
 	jwks := jose.JSONWebKeySet{}
-	certs, err := GetCerts("admin")
+	certs, err := GetCerts("")
 	if err != nil {
 		return jwks, err
 	}
@@ -211,4 +214,15 @@ func GetWebFinger(resource string, rels []string, host string) (WebFinger, error
 	}
 
 	return wf, nil
+}
+
+func GetDeviceAuthResponse(deviceCode string, userCode string, host string) DeviceAuthResponse {
+	originFrontend, _ := getOriginFromHost(host)
+
+	return DeviceAuthResponse{
+		DeviceCode:      deviceCode,
+		UserCode:        userCode,
+		VerificationUri: fmt.Sprintf("%s/login/oauth/device/%s", originFrontend, userCode),
+		ExpiresIn:       120,
+	}
 }

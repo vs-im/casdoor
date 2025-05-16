@@ -15,6 +15,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/beego/beego"
@@ -22,6 +23,7 @@ import (
 	_ "github.com/beego/beego/session/redis"
 	"github.com/casdoor/casdoor/authz"
 	"github.com/casdoor/casdoor/conf"
+	"github.com/casdoor/casdoor/controllers"
 	"github.com/casdoor/casdoor/ldap"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/proxy"
@@ -45,6 +47,7 @@ func main() {
 	object.InitCasvisorConfig()
 
 	util.SafeGoroutine(func() { object.RunSyncUsersJob() })
+	util.SafeGoroutine(func() { controllers.InitCLIDownloader() })
 
 	// beego.DelStaticPath("/static")
 	// beego.SetStaticPath("/static", "web/build/static")
@@ -75,7 +78,22 @@ func main() {
 	beego.BConfig.WebConfig.Session.SessionGCMaxLifetime = 3600 * 24 * 30
 	// beego.BConfig.WebConfig.Session.SessionCookieSameSite = http.SameSiteNoneMode
 
-	err := logs.SetLogger(logs.AdapterFile, conf.GetConfigString("logConfig"))
+	var logAdapter string
+	logConfigMap := make(map[string]interface{})
+	err := json.Unmarshal([]byte(conf.GetConfigString("logConfig")), &logConfigMap)
+	if err != nil {
+		panic(err)
+	}
+	_, ok := logConfigMap["adapter"]
+	if !ok {
+		logAdapter = "file"
+	} else {
+		logAdapter = logConfigMap["adapter"].(string)
+	}
+	if logAdapter == "console" {
+		logs.Reset()
+	}
+	err = logs.SetLogger(logAdapter, conf.GetConfigString("logConfig"))
 	if err != nil {
 		panic(err)
 	}

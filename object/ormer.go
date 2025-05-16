@@ -157,7 +157,7 @@ func NewAdapter(driverName string, dataSourceName string, dbName string) (*Ormer
 	return a, nil
 }
 
-// NewAdapterFromdb is the constructor for Ormer.
+// NewAdapterFromDb is the constructor for Ormer.
 func NewAdapterFromDb(driverName string, dataSourceName string, dbName string, db *sql.DB) (*Ormer, error) {
 	a := &Ormer{}
 	a.driverName = driverName
@@ -179,7 +179,7 @@ func NewAdapterFromDb(driverName string, dataSourceName string, dbName string, d
 
 func refineDataSourceNameForPostgres(dataSourceName string) string {
 	reg := regexp.MustCompile(`dbname=[^ ]+\s*`)
-	return reg.ReplaceAllString(dataSourceName, "")
+	return reg.ReplaceAllString(dataSourceName, "dbname=postgres")
 }
 
 func createDatabaseForPostgres(driverName string, dataSourceName string, dbName string) error {
@@ -190,7 +190,7 @@ func createDatabaseForPostgres(driverName string, dataSourceName string, dbName 
 		}
 		defer db.Close()
 
-		_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s;", dbName))
+		_, err = db.Exec(fmt.Sprintf("CREATE DATABASE \"%s\";", dbName))
 		if err != nil {
 			if !strings.Contains(err.Error(), "already exists") {
 				return err
