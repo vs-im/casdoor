@@ -24,7 +24,7 @@ class SelfLoginButton extends React.Component {
   }
 
   getAccountShowName() {
-    const name = this.props.account.name || this.props.account.displayName;
+    const name = this.props.account.email || this.props.account.displayName || this.props.account.name;
     return name.length > 20 ? name.substring(0, 20) + "..." : name;
   }
 
