@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React from "react";
-import {Button, Form, Input, Radio, Result, Row, Select, message} from "antd";
+import {Button, Form, Input, Popover, Radio, Result, Row, Select, message} from "antd";
 import * as Setting from "../Setting";
 import * as AuthBackend from "./AuthBackend";
 import * as ProviderButton from "./ProviderButton";
@@ -32,7 +32,7 @@ import * as PasswordChecker from "../common/PasswordChecker";
 import * as InvitationBackend from "../backend/InvitationBackend";
 import "./AuthButtons.css";
 import {EmailInputGroup} from "../common/EmailInputGroup";
-import {CheckOutlined} from "@ant-design/icons";
+// import {CheckOutlined} from "@ant-design/icons";
 
 const formItemLayout = {
   // labelCol: {
@@ -222,8 +222,9 @@ class SignupPage extends React.Component {
     if (authConfig.appName === application.name) {
       return "/result";
     } else {
+      const oAuthParams = Util.getOAuthGetParameters();
       if (Setting.hasPromptPage(application)) {
-        return `/prompt/${application.name}`;
+        return `/prompt/${application.name}?oauth=${oAuthParams !== null}`;
       } else {
         return `/result/${application.name}`;
       }
@@ -834,16 +835,11 @@ class SignupPage extends React.Component {
 
       const render = this.state.isPasswordDirty && map.length !== 0 && this.state.isPasswordFocus;
       return (
-        <div style={{position: "relative"}}>
+        <Popover placement={window.innerWidth >= 960 ? "right" : "top"} content={this.state.passwordPopover} open={this.state.passwordPopoverOpen}>
           <Form.Item
             key="password"
             name="password"
             className="signup-password"
-            onChange={(e) => {
-              this.setState({password: e.target.value, isPasswordDirty: true});
-            }}
-            onFocus={() => this.setState({isPasswordFocus: true})}
-            onBlur={() => this.setState({isPasswordFocus: false})}
             label={
               signupItem.label ? signupItem.label : i18next.t("general:Password")
             }
@@ -859,7 +855,7 @@ class SignupPage extends React.Component {
                   if (errorMsg === "") {
                     return Promise.resolve();
                   } else {
-                    return Promise.reject("");
+                    return Promise.reject(errorMsg);
                   }
                 },
               },
@@ -868,39 +864,31 @@ class SignupPage extends React.Component {
           >
             <Input.Password
               className="signup-password-input"
-              autoComplete="new-password"
               placeholder={signupItem.placeholder}
+              autoComplete="new-password"
+              onChange={(e) => {
+                this.setState({
+                  passwordPopover: PasswordChecker.renderPasswordPopover(application.organizationObj.passwordOptions, e.target.value),
+                  password: e.target.value,
+                  isPasswordDirty: true,
+                });
+              }}
+              onFocus={() => {
+                this.setState({
+                  isPasswordFocus: true,
+                  passwordPopoverOpen: application.organizationObj.passwordOptions?.length > 0,
+                  passwordPopover: PasswordChecker.renderPasswordPopover(application.organizationObj.passwordOptions, this.form.current?.getFieldValue("password") ?? ""),
+                });
+              }}
+              onBlur={() => {
+                this.setState({
+                  passwordPopoverOpen: false,
+                  isPasswordFocus: false,
+                });
+              }}
             />
           </Form.Item>
-          {render && (
-            <div className="password-validation">
-              <div style={{marginBottom: "4px"}}>{i18next.t("user:Password requirements") + ":"}</div>
-              <div style={{marginInlineStart: "6px"}}>
-                {map.map(({value, failed, short}) => {
-                  return <p style={{textAlign: "start", margin: 0, color: failed ? "grey" : undefined}} key={value}>
-                    {!failed && <CheckOutlined style={{color: "#52c41a", marginRight: "5px"}}/>}
-                    {short}
-                  </p>;
-                })}
-              </div>
-              <svg
-                className="password-validation-triangle"
-                width="30"
-                height="15"
-                viewBox="0 0 30 15"
-                xmlns="http://www.w3.org/2000/svg"
-                >
-                <defs>
-                  <filter id="triangle-shadow" x="0" y="0" width="200%" height="200%">
-                    <feDropShadow dx="-2" dy="2" stdDeviation="2" flood-color="rgba(0, 0, 0, 0.2)" />
-                    <feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="rgba(0, 0, 0, 0.2)" />
-                  </filter>
-                </defs>
-                <polygon points="15,0 30,15 0,15" fill="white" filter="url(#triangle-shadow)" />
-              </svg>
-            </div>
-          )}
-        </div>
+        </Popover>
       );
     } else if (signupItem.name === "Confirm password") {
       return (

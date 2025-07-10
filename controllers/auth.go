@@ -132,7 +132,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 	if form.Type == ResponseTypeLogin {
 		c.SetSessionUsername(userId)
 		util.LogInfo(c.Ctx, "API: [%s] signed in", userId)
-		resp = &Response{Status: "ok", Msg: "", Data: userId, Data2: user.NeedUpdatePassword}
+		resp = &Response{Status: "ok", Msg: "", Data: userId, Data3: user.NeedUpdatePassword}
 	} else if form.Type == ResponseTypeCode {
 		clientId := c.Input().Get("clientId")
 		responseType := c.Input().Get("responseType")
@@ -154,7 +154,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		}
 
 		resp = codeToResponse(code)
-		resp.Data2 = user.NeedUpdatePassword
+		resp.Data3 = user.NeedUpdatePassword
 		if application.EnableSigninSession || application.HasPromptPage() {
 			// The prompt page needs the user to be signed in
 			c.SetSessionUsername(userId)
@@ -168,7 +168,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			token, _ := object.GetTokenByUser(application, user, scope, nonce, c.Ctx.Request.Host)
 			resp = tokenToResponse(token)
 
-			resp.Data2 = user.NeedUpdatePassword
+			resp.Data3 = user.NeedUpdatePassword
 		}
 	} else if form.Type == ResponseTypeDevice {
 		authCache, ok := object.DeviceAuthMap.LoadAndDelete(form.UserCode)
@@ -195,14 +195,14 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 
 		object.DeviceAuthMap.Store(authCacheCast.UserName, deviceAuthCacheDeviceCodeCast)
 
-		resp = &Response{Status: "ok", Msg: "", Data: userId, Data2: user.NeedUpdatePassword}
+		resp = &Response{Status: "ok", Msg: "", Data: userId, Data3: user.NeedUpdatePassword}
 	} else if form.Type == ResponseTypeSaml { // saml flow
 		res, redirectUrl, method, err := object.GetSamlResponse(application, user, form.SamlRequest, c.Ctx.Request.Host)
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
 			return
 		}
-		resp = &Response{Status: "ok", Msg: "", Data: res, Data2: map[string]interface{}{"redirectUrl": redirectUrl, "method": method, "needUpdatePassword": user.NeedUpdatePassword}}
+		resp = &Response{Status: "ok", Msg: "", Data: res, Data2: map[string]interface{}{"redirectUrl": redirectUrl, "method": method}, Data3: user.NeedUpdatePassword}
 
 		if application.EnableSigninSession || application.HasPromptPage() {
 			// The prompt page needs the user to be signed in
@@ -355,20 +355,27 @@ func isProxyProviderType(providerType string) bool {
 
 func checkMfaEnable(c *ApiController, user *object.User, organization *object.Organization, verificationType string) bool {
 	if object.IsNeedPromptMfa(organization, user) {
-		// The prompt page needs the user to be srigned in
+		// The prompt page needs the user to be signed in
 		c.SetSessionUsername(user.GetId())
 		c.ResponseOk(object.RequiredMfa)
 		return true
 	}
 
 	if user.IsMfaEnabled() {
+		currentTime := util.String2Time(util.GetCurrentTime())
+		mfaRememberDeadline := util.String2Time(user.MfaRememberDeadline)
+		if user.MfaRememberDeadline != "" && mfaRememberDeadline.After(currentTime) {
+			return false
+		}
 		c.setMfaUserSession(user.GetId())
 		mfaList := object.GetAllMfaProps(user, true)
 		mfaAllowList := []*object.MfaProps{}
+		mfaRememberInHours := organization.MfaRememberInHours
 		for _, prop := range mfaList {
 			if prop.MfaType == verificationType || !prop.Enabled {
 				continue
 			}
+			prop.MfaRememberInHours = mfaRememberInHours
 			mfaAllowList = append(mfaAllowList, prop)
 		}
 		if len(mfaAllowList) >= 1 {
@@ -504,6 +511,8 @@ func (c *ApiController) Login() {
 					c.ResponseError(fmt.Sprintf(c.T("verification:Phone number is invalid in your region %s"), authForm.CountryCode))
 					return
 				}
+			} else if verificationCodeType == object.VerifyTypeEmail {
+				checkDest = authForm.Username
 			}
 
 			// check result through Email or Phone
@@ -553,8 +562,11 @@ func (c *ApiController) Login() {
 				c.ResponseError(c.T("auth:The login method: login with LDAP is not enabled for the application"))
 				return
 			}
+
+			clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
+
 			var enableCaptcha bool
-			if enableCaptcha, err = object.CheckToEnableCaptcha(application, authForm.Organization, authForm.Username); err != nil {
+			if enableCaptcha, err = object.CheckToEnableCaptcha(application, authForm.Organization, authForm.Username, clientIp); err != nil {
 				c.ResponseError(err.Error())
 				return
 			} else if enableCaptcha {
@@ -569,7 +581,7 @@ func (c *ApiController) Login() {
 				}
 
 				var isHuman bool
-				isHuman, err = captcha.VerifyCaptchaByCaptchaType(authForm.CaptchaType, authForm.CaptchaToken, authForm.ClientSecret)
+				isHuman, err = captcha.VerifyCaptchaByCaptchaType(authForm.CaptchaType, authForm.CaptchaToken, captchaProvider.ClientId, authForm.ClientSecret, captchaProvider.ClientId2)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
@@ -867,7 +879,7 @@ func (c *ApiController) Login() {
 					}
 
 					var affected bool
-					affected, err = object.AddUser(user)
+					affected, err = object.AddUser(user, c.GetAcceptLanguage())
 					if err != nil {
 						c.ResponseError(err.Error())
 						return
@@ -968,6 +980,28 @@ func (c *ApiController) Login() {
 			return
 		}
 
+		var application *object.Application
+		if authForm.ClientId == "" {
+			application, err = object.GetApplication(fmt.Sprintf("admin/%s", authForm.Application))
+		} else {
+			application, err = object.GetApplicationByClientId(authForm.ClientId)
+		}
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		if application == nil {
+			c.ResponseError(fmt.Sprintf(c.T("auth:The application: %s does not exist"), authForm.Application))
+			return
+		}
+
+		var organization *object.Organization
+		organization, err = object.GetOrganization(util.GetId("admin", application.Organization))
+		if err != nil {
+			c.ResponseError(c.T(err.Error()))
+		}
+
 		if authForm.Passcode != "" {
 			if authForm.MfaType == c.GetSession("verificationCodeType") {
 				c.ResponseError("Invalid multi-factor authentication type")
@@ -994,6 +1028,17 @@ func (c *ApiController) Login() {
 				}
 			}
 
+			if authForm.EnableMfaRemember {
+				mfaRememberInSeconds := organization.MfaRememberInHours * 3600
+				currentTime := util.String2Time(util.GetCurrentTime())
+				duration := time.Duration(mfaRememberInSeconds) * time.Second
+				user.MfaRememberDeadline = util.Time2String(currentTime.Add(duration))
+				_, err = object.UpdateUser(user.GetId(), user, []string{"mfa_remember_deadline"}, user.IsAdmin)
+				if err != nil {
+					c.ResponseError(err.Error())
+					return
+				}
+			}
 			c.SetSession("verificationCodeType", "")
 		} else if authForm.RecoveryCode != "" {
 			err = object.MfaRecover(user, authForm.RecoveryCode)
@@ -1003,22 +1048,6 @@ func (c *ApiController) Login() {
 			}
 		} else {
 			c.ResponseError("missing passcode or recovery code")
-			return
-		}
-
-		var application *object.Application
-		if authForm.ClientId == "" {
-			application, err = object.GetApplication(fmt.Sprintf("admin/%s", authForm.Application))
-		} else {
-			application, err = object.GetApplicationByClientId(authForm.ClientId)
-		}
-		if err != nil {
-			c.ResponseError(err.Error())
-			return
-		}
-
-		if application == nil {
-			c.ResponseError(fmt.Sprintf(c.T("auth:The application: %s does not exist"), authForm.Application))
 			return
 		}
 
@@ -1220,27 +1249,26 @@ func (c *ApiController) GetQRCode() {
 func (c *ApiController) GetCaptchaStatus() {
 	organization := c.Input().Get("organization")
 	userId := c.Input().Get("userId")
-	user, err := object.GetUserByFields(organization, userId)
+	applicationName := c.Input().Get("application")
+
+	application, err := object.GetApplication(fmt.Sprintf("admin/%s", applicationName))
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
 	}
-
-	captchaEnabled := false
-	if user != nil {
-		var failedSigninLimit int
-		failedSigninLimit, _, err = object.GetFailedSigninConfigByUser(user)
-		if err != nil {
-			c.ResponseError(err.Error())
-			return
-		}
-
-		if user.SigninWrongTimes >= failedSigninLimit {
-			captchaEnabled = true
-		}
+	if application == nil {
+		c.ResponseError("application not found")
+		return
 	}
 
+	clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
+	captchaEnabled, err := object.CheckToEnableCaptcha(application, organization, userId, clientIp)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
 	c.ResponseOk(captchaEnabled)
+	return
 }
 
 // Callback

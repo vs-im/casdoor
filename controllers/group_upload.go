@@ -1,4 +1,4 @@
-// Copyright 2023 The Casdoor Authors. All Rights Reserved.
+// Copyright 2025 The Casdoor Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"github.com/casdoor/casdoor/util"
 )
 
-func (c *ApiController) UploadRoles() {
+func (c *ApiController) UploadGroups() {
 	userId := c.GetSessionUsername()
 	owner, user := util.GetOwnerAndNameFromId(userId)
 
@@ -35,20 +35,22 @@ func (c *ApiController) UploadRoles() {
 	fileId := fmt.Sprintf("%s_%s_%s", owner, user, util.RemoveExt(header.Filename))
 	path := util.GetUploadXlsxPath(fileId)
 	defer os.Remove(path)
+
 	err = saveFile(path, &file)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
 	}
 
-	affected, err := object.UploadRoles(owner, path)
+	affected, err := object.UploadGroups(owner, path)
 	if err != nil {
 		c.ResponseError(err.Error())
+		return
 	}
 
 	if affected {
 		c.ResponseOk()
 	} else {
-		c.ResponseError(c.T("general:Failed to import users"))
+		c.ResponseError(c.T("general:Failed to import groups"))
 	}
 }

@@ -187,6 +187,8 @@ class LoginPage extends React.Component {
         return CaptchaRule.Always;
       } else if (captchaProviderItems.some(providerItem => providerItem.rule === "Dynamic")) {
         return CaptchaRule.Dynamic;
+      } else if (captchaProviderItems.some(providerItem => providerItem.rule === "Internet-Only")) {
+        return CaptchaRule.InternetOnly;
       } else {
         return CaptchaRule.Never;
       }
@@ -519,6 +521,9 @@ class LoginPage extends React.Component {
       } else if (captchaRule === CaptchaRule.Dynamic) {
         this.checkCaptchaStatus(values);
         return;
+      } else if (captchaRule === CaptchaRule.InternetOnly) {
+        this.checkCaptchaStatus(values);
+        return;
       }
     }
     this.login(values);
@@ -576,9 +581,9 @@ class LoginPage extends React.Component {
             const responseType = values["type"];
 
             if (responseType === "login") {
-              if (res.data2) {
+              if (res.data3) {
                 sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
-                Setting.goToLink(this, `/forget/${this.state.applicationName}`);
+                Setting.goToLinkSoft(this, `/forget/${this.state.applicationName}`);
               }
               Setting.showMessage("success", i18next.t("application:Logged in successfully"));
               this.props.onLoginSuccess();
@@ -590,9 +595,9 @@ class LoginPage extends React.Component {
                 userCodeStatus: "success",
               });
             } else if (responseType === "token" || responseType === "id_token") {
-              if (res.data2) {
+              if (res.data3) {
                 sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
-                Setting.goToLink(this, `/forget/${this.state.applicationName}`);
+                Setting.goToLinkSoft(this, `/forget/${this.state.applicationName}`);
               }
               const amendatoryResponseType = responseType === "token" ? "access_token" : responseType;
               const accessToken = res.data;
@@ -602,9 +607,9 @@ class LoginPage extends React.Component {
                 this.props.onLoginSuccess(window.location.href);
                 return;
               }
-              if (res.data2.needUpdatePassword) {
+              if (res.data3) {
                 sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
-                Setting.goToLink(this, `/forget/${this.state.applicationName}`);
+                Setting.goToLinkSoft(this, `/forget/${this.state.applicationName}`);
               }
               if (res.data2.method === "POST") {
                 this.setState({
@@ -1052,9 +1057,23 @@ class LoginPage extends React.Component {
     const captchaProviderItems = this.getCaptchaProviderItems(application);
     const alwaysProviderItems = captchaProviderItems.filter(providerItem => providerItem.rule === "Always");
     const dynamicProviderItems = captchaProviderItems.filter(providerItem => providerItem.rule === "Dynamic");
-    const provider = alwaysProviderItems.length > 0
-      ? alwaysProviderItems[0].provider
-      : dynamicProviderItems[0].provider;
+    const internetOnlyProviderItems = captchaProviderItems.filter(providerItem => providerItem.rule === "Internet-Only");
+
+    // Select provider based on the active captcha rule, not fixed priority
+    const captchaRule = this.getCaptchaRule(this.getApplicationObj());
+    let provider = null;
+
+    if (captchaRule === CaptchaRule.Always && alwaysProviderItems.length > 0) {
+      provider = alwaysProviderItems[0].provider;
+    } else if (captchaRule === CaptchaRule.Dynamic && dynamicProviderItems.length > 0) {
+      provider = dynamicProviderItems[0].provider;
+    } else if (captchaRule === CaptchaRule.InternetOnly && internetOnlyProviderItems.length > 0) {
+      provider = internetOnlyProviderItems[0].provider;
+    }
+
+    if (!provider) {
+      return null;
+    }
 
     return <CaptchaModal
       owner={provider.owner}

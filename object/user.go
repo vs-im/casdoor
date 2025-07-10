@@ -25,6 +25,7 @@ import (
 
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/faceId"
+	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/proxy"
 	"github.com/casdoor/casdoor/util"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -209,10 +210,12 @@ type User struct {
 	LastSigninWrongTime    string `xorm:"varchar(100)" json:"lastSigninWrongTime"`
 	SigninWrongTimes       int    `json:"signinWrongTimes"`
 
-	ManagedAccounts    []ManagedAccount `xorm:"managedAccounts blob" json:"managedAccounts"`
-	MfaAccounts        []MfaAccount     `xorm:"mfaAccounts blob" json:"mfaAccounts"`
-	NeedUpdatePassword bool             `json:"needUpdatePassword"`
-	IpWhitelist        string           `xorm:"varchar(200)" json:"ipWhitelist"`
+	ManagedAccounts     []ManagedAccount `xorm:"managedAccounts blob" json:"managedAccounts"`
+	MfaAccounts         []MfaAccount     `xorm:"mfaAccounts blob" json:"mfaAccounts"`
+	MfaItems            []*MfaItem       `xorm:"varchar(300)" json:"mfaItems"`
+	MfaRememberDeadline string           `xorm:"varchar(100)" json:"mfaRememberDeadline"`
+	NeedUpdatePassword  bool             `json:"needUpdatePassword"`
+	IpWhitelist         string           `xorm:"varchar(200)" json:"ipWhitelist"`
 }
 
 type Userinfo struct {
@@ -660,6 +663,62 @@ func GetMaskedUser(user *User, isAdminOrSelf bool, errs ...error) (*User, error)
 	return user, nil
 }
 
+func GetFilteredUser(user *User, isAdmin bool, isAdminOrSelf bool, accountItems []*AccountItem) (*User, error) {
+	if accountItems == nil || len(accountItems) == 0 {
+		return user, nil
+	}
+
+	userFieldMap := map[string]int{}
+
+	reflectedUserField := reflect.TypeOf(User{})
+	for i := 0; i < reflectedUserField.NumField(); i++ {
+		userFieldMap[strings.ToLower(reflectedUserField.Field(i).Name)] = i
+	}
+
+	reflectedUser := reflect.ValueOf(user).Elem()
+
+	for _, accountItem := range accountItems {
+		if accountItem.ViewRule == "Public" {
+			continue
+		} else if accountItem.ViewRule == "Self" && isAdminOrSelf {
+			continue
+		} else if accountItem.ViewRule == "Admin" && isAdmin {
+			continue
+		}
+
+		lowerCaseAccountItemName := strings.ToLower(accountItem.Name)
+		lowerCaseAccountItemName = strings.ReplaceAll(lowerCaseAccountItemName, " ", "")
+
+		switch accountItem.Name {
+		case "Multi-factor authentication":
+			lowerCaseAccountItemName = strings.ToLower("PreferredMfaType")
+		case "User type":
+			lowerCaseAccountItemName = "type"
+		case "Country/Region":
+			lowerCaseAccountItemName = "region"
+		case "ID card info":
+			{
+				infoKeys := []string{"idCardWithPerson", "idCardFront", "idCardWithPerson"}
+				for _, infoKey := range infoKeys {
+					if _, ok := user.Properties[infoKey]; ok {
+						user.Properties[infoKey] = ""
+					}
+				}
+				continue
+			}
+		}
+
+		fieldIdx, ok := userFieldMap[lowerCaseAccountItemName]
+		if !ok {
+			continue
+		}
+
+		reflectedUser.Field(fieldIdx).SetZero()
+	}
+
+	return user, nil
+}
+
 func GetMaskedUsers(users []*User, errs ...error) ([]*User, error) {
 	if len(errs) > 0 && errs[0] != nil {
 		return nil, errs[0]
@@ -734,11 +793,11 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 			"eveonline", "fitbit", "gitea", "heroku", "influxcloud", "instagram", "intercom", "kakao", "lastfm", "mailru", "meetup",
 			"microsoftonline", "naver", "nextcloud", "onedrive", "oura", "patreon", "paypal", "salesforce", "shopify", "soundcloud",
 			"spotify", "strava", "stripe", "type", "tiktok", "tumblr", "twitch", "twitter", "typetalk", "uber", "vk", "wepay", "xero", "yahoo",
-			"yammer", "yandex", "zoom", "custom", "need_update_password", "ip_whitelist",
+			"yammer", "yandex", "zoom", "custom", "need_update_password", "ip_whitelist", "mfa_items", "mfa_remember_deadline",
 		}
 	}
 	if isAdmin {
-		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance")
+		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "mfa_items")
 	}
 
 	columns = append(columns, "updated_time")
@@ -818,7 +877,7 @@ func UpdateUserForAllFields(id string, user *User) (bool, error) {
 	return affected != 0, nil
 }
 
-func AddUser(user *User) (bool, error) {
+func AddUser(user *User, lang string) (bool, error) {
 	if user.Id == "" {
 		application, err := GetApplicationByUser(user)
 		if err != nil {
@@ -834,7 +893,7 @@ func AddUser(user *User) (bool, error) {
 	}
 
 	if user.Owner == "" || user.Name == "" {
-		return false, fmt.Errorf("the user's owner and name should not be empty")
+		return false, fmt.Errorf(i18n.Translate(lang, "user:the user's owner and name should not be empty"))
 	}
 
 	if CheckUsernameWithEmail(user.Name, "en") != "" {
@@ -846,7 +905,7 @@ func AddUser(user *User) (bool, error) {
 		return false, err
 	}
 	if organization == nil {
-		return false, fmt.Errorf("the organization: %s is not found", user.Owner)
+		return false, fmt.Errorf(i18n.Translate(lang, "auth:the organization: %s is not found"), user.Owner)
 	}
 
 	if user.Owner != "built-in" {
@@ -855,8 +914,12 @@ func AddUser(user *User) (bool, error) {
 			return false, err
 		}
 		if applicationCount == 0 {
-			return false, fmt.Errorf("The organization: %s should have one application at least", organization.Owner)
+			return false, fmt.Errorf(i18n.Translate(lang, "general:The organization: %s should have one application at least"), organization.Owner)
 		}
+	}
+
+	if organization.Name == "built-in" && !organization.HasPrivilegeConsent && user.Name != "admin" {
+		return false, fmt.Errorf(i18n.Translate(lang, "organization:adding a new user to the 'built-in' organization is currently disabled. Please note: all users in the 'built-in' organization are global administrators in Casdoor. Refer to the docs: https://casdoor.org/docs/basic/core-concepts#how-does-casdoor-manage-itself. If you still wish to create a user for the 'built-in' organization, go to the organization's settings page and enable the 'Has privilege consent' option."))
 	}
 
 	if organization.DefaultPassword != "" && user.Password == "123" {
@@ -1117,6 +1180,17 @@ func ExtendUserWithRolesAndPermissions(user *User) (err error) {
 }
 
 func DeleteGroupForUser(user string, group string) (bool, error) {
+	userObj, err := GetUser(user)
+	if err != nil {
+		return false, err
+	}
+
+	userObj.Groups = util.DeleteVal(userObj.Groups, group)
+	_, err = updateUser(user, userObj, []string{"groups"})
+	if err != nil {
+		return false, err
+	}
+
 	return userEnforcer.DeleteGroupForUser(user, group)
 }
 

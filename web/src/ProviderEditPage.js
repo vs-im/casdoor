@@ -371,11 +371,6 @@ class ProviderEditPage extends React.Component {
           {id: "Third-party", name: i18next.t("provider:Third-party")},
         ]
       );
-    } else if (type === "Aliyun Captcha") {
-      return [
-        {id: "nc", name: i18next.t("provider:Sliding Validation")},
-        {id: "ic", name: i18next.t("provider:Intelligent Validation")},
-      ];
     } else {
       return [];
     }
@@ -674,7 +669,7 @@ class ProviderEditPage extends React.Component {
           </Col>
         </Row>
         {
-          this.state.provider.type !== "WeCom" && this.state.provider.type !== "Infoflow" && this.state.provider.type !== "Aliyun Captcha" ? null : (
+          this.state.provider.type !== "WeCom" && this.state.provider.type !== "Infoflow" ? null : (
             <React.Fragment>
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={2}>
@@ -692,23 +687,35 @@ class ProviderEditPage extends React.Component {
               </Row>
               {
                 this.state.provider.type !== "WeCom" ? null : (
-                  <Row style={{marginTop: "20px"}} >
-                    <Col style={{marginTop: "5px"}} span={2}>
-                      {Setting.getLabel(i18next.t("general:Method"), i18next.t("provider:Method - Tooltip"))} :
-                    </Col>
-                    <Col span={22} >
-                      <Select virtual={false} style={{width: "100%"}} value={this.state.provider.method} onChange={value => {
-                        this.updateProviderField("method", value);
-                      }}>
-                        {
-                          [
-                            {id: "Normal", name: i18next.t("provider:Normal")},
-                            {id: "Silent", name: i18next.t("provider:Silent")},
-                          ].map((method, index) => <Option key={index} value={method.id}>{method.name}</Option>)
-                        }
-                      </Select>
-                    </Col>
-                  </Row>)
+                  <React.Fragment>
+                    <Row style={{marginTop: "20px"}} >
+                      <Col style={{marginTop: "5px"}} span={2}>
+                        {Setting.getLabel(i18next.t("general:Method"), i18next.t("provider:Method - Tooltip"))} :
+                      </Col>
+                      <Col span={22} >
+                        <Select virtual={false} style={{width: "100%"}} value={this.state.provider.method} onChange={value => {
+                          this.updateProviderField("method", value);
+                        }}>
+                          {
+                            [
+                              {id: "Normal", name: i18next.t("provider:Normal")},
+                              {id: "Silent", name: i18next.t("provider:Silent")},
+                            ].map((method, index) => <Option key={index} value={method.id}>{method.name}</Option>)
+                          }
+                        </Select>
+                      </Col>
+                    </Row>
+                    <Row style={{marginTop: "20px"}} >
+                      <Col style={{marginTop: "5px"}} span={2}>
+                        {Setting.getLabel(i18next.t("provider:Use id as name"), i18next.t("provider:Use id as name - Tooltip"))} :
+                      </Col>
+                      <Col span={22} >
+                        <Switch checked={this.state.provider.disableSsl} onChange={checked => {
+                          this.updateProviderField("disableSsl", checked);
+                        }} />
+                      </Col>
+                    </Row>
+                  </React.Fragment>)
               }
             </React.Fragment>
           )
@@ -938,7 +945,7 @@ class ProviderEditPage extends React.Component {
           )
         }
         {
-          this.state.provider.type !== "ADFS" && this.state.provider.type !== "AzureAD" && this.state.provider.type !== "AzureADB2C" && (this.state.provider.type !== "Casdoor" && this.state.category !== "Storage") && this.state.provider.type !== "Okta" ? null : (
+          this.state.provider.type !== "ADFS" && this.state.provider.type !== "AzureAD" && this.state.provider.type !== "AzureADB2C" && (this.state.provider.type !== "Casdoor" && this.state.category !== "Storage") && this.state.provider.type !== "Okta" && this.state.provider.type !== "Nextcloud" ? null : (
             <Row style={{marginTop: "20px"}} >
               <Col style={{marginTop: "5px"}} span={2}>
                 {Setting.getLabel(i18next.t("provider:Domain"), i18next.t("provider:Domain - Tooltip"))} :

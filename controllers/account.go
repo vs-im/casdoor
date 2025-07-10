@@ -42,6 +42,7 @@ type Response struct {
 	Name   string      `json:"name"`
 	Data   interface{} `json:"data"`
 	Data2  interface{} `json:"data2"`
+	Data3  interface{} `json:"data3"`
 }
 
 type Captcha struct {
@@ -259,7 +260,7 @@ func (c *ApiController) Signup() {
 		user.Groups = []string{application.DefaultGroup}
 	}
 
-	affected, err := object.AddUser(user)
+	affected, err := object.AddUser(user, c.GetAcceptLanguage())
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
