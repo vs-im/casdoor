@@ -37,6 +37,7 @@ import ThemeEditor from "./common/theme/ThemeEditor";
 import SigninTable from "./table/SigninTable";
 import Editor from "./common/Editor";
 import * as GroupBackend from "./backend/GroupBackend";
+import TokenAttributeTable from "./table/TokenAttributeTable";
 
 const {Option} = Select;
 
@@ -116,6 +117,7 @@ class ApplicationEditPage extends React.Component {
       providers: [],
       uploading: false,
       mode: props.location.mode !== undefined ? props.location.mode : "edit",
+      tokenAttributes: [],
       samlAttributes: [],
       samlMetadata: null,
       isAuthorized: true,
@@ -339,6 +341,43 @@ class ApplicationEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Title"), i18next.t("general:Title - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input value={this.state.application.title} onChange={e => {
+              this.updateApplicationField("title", e.target.value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Favicon"), i18next.t("general:Favicon - Tooltip"))} :
+          </Col>
+          <Col span={22} style={(Setting.isMobile()) ? {maxWidth: "100%"} : {}}>
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 1}>
+                {Setting.getLabel(i18next.t("general:URL"), i18next.t("general:URL - Tooltip"))} :
+              </Col>
+              <Col span={23} >
+                <Input prefix={<LinkOutlined />} value={this.state.application.favicon} onChange={e => {
+                  this.updateApplicationField("favicon", e.target.value);
+                }} />
+              </Col>
+            </Row>
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 1}>
+                {i18next.t("general:Preview")}:
+              </Col>
+              <Col span={23} >
+                <a target="_blank" rel="noreferrer" href={this.state.application.favicon}>
+                  <img src={this.state.application.favicon} alt={this.state.application.favicon} height={90} style={{marginBottom: "20px"}} />
+                </a>
+              </Col>
+            </Row>
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("general:Home"), i18next.t("general:Home - Tooltip"))} :
           </Col>
           <Col span={22} >
@@ -463,9 +502,34 @@ class ApplicationEditPage extends React.Component {
             <Select virtual={false} disabled={this.state.application.tokenFormat !== "JWT-Custom"} mode="tags" showSearch style={{width: "100%"}} value={this.state.application.tokenFields} onChange={(value => {this.updateApplicationField("tokenFields", value);})}>
               <Option key={"provider"} value={"provider"}>{"Provider"}</Option>)
               {
-                Setting.getUserCommonFields().map((item, index) => <Option key={index} value={item}>{item}</Option>)
+                [...Setting.getUserCommonFields(), "permissionNames"].map((item, index) => <Option key={index} value={item}>{item}</Option>)
               }
             </Select>
+          </Col>
+        </Row>
+        {
+          this.state.application.tokenFormat === "JWT-Custom" ? (<Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+              {Setting.getLabel(i18next.t("general:Token attributes"), i18next.t("general:Token attributes - Tooltip"))} :
+            </Col>
+            <Col span={22} >
+              <TokenAttributeTable
+                title={i18next.t("general:Token attributes")}
+                table={this.state.application.tokenAttributes}
+                application={this.state.application}
+                onUpdateTable={(value) => {this.updateApplicationField("tokenAttributes", value);}}
+              />
+            </Col>
+          </Row>) : null
+        }
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("application:Order"), i18next.t("application:Order - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <InputNumber style={{width: "150px"}} value={this.state.application.order} min={0} step={1} precision={0} addonAfter="" onChange={value => {
+              this.updateApplicationField("order", value);
+            }} />
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >
@@ -540,6 +604,16 @@ class ApplicationEditPage extends React.Component {
           <Col span={1} >
             <Switch checked={this.state.application.enableSignUp} onChange={checked => {
               this.updateApplicationField("enableSignUp", checked);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+            {Setting.getLabel(i18next.t("application:Disable signin"), i18next.t("application:Disable signin - Tooltip"))} :
+          </Col>
+          <Col span={1} >
+            <Switch checked={this.state.application.disableSignin} onChange={checked => {
+              this.updateApplicationField("disableSignin", checked);
             }} />
           </Col>
         </Row>
@@ -789,6 +863,26 @@ class ApplicationEditPage extends React.Component {
               this.updateApplicationField("enableSamlPostBinding", checked);
               this.getSamlMetadata(checked);
             }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("application:SAML hash algorithm"), i18next.t("application:SAML hash algorithm - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} style={{width: "100%"}}
+              value={this.state.application.samlHashAlgorithm}
+              onChange={(value => {
+                this.updateApplicationField("samlHashAlgorithm", value);
+              })} >
+              {
+                [
+                  {id: "SHA1", name: "SHA1"},
+                  {id: "SHA256", name: "SHA256"},
+                  {id: "SHA512", name: "SHA512"},
+                ].map((item, index) => <Option key={index} value={item.id}>{item.name}</Option>)
+              }
+            </Select>
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >
@@ -1064,7 +1158,7 @@ class ApplicationEditPage extends React.Component {
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
           </Col>
           {/* <Button style={{marginLeft: "10px", marginBottom: "5px"}} onClick={() => this.updateApplicationField("footerHtml", Setting.getDefaultFooterContent())} >
-            {i18next.t("provider:Reset to Default HTML")}
+            {i18next.t("general:Reset to Default")}
           </Button> */}
           {/* <Button style={{marginLeft: "10px", marginBottom: "5px"}} onClick={() => this.updateApplicationField("footerHtml", Setting.getEmptyFooterContent())} >
             {i18next.t("application:Reset to Empty")}
@@ -1240,7 +1334,7 @@ class ApplicationEditPage extends React.Component {
   submitApplicationEdit(exitAfterSave) {
     const application = Setting.deepCopy(this.state.application);
     application.providers = application.providers?.filter(provider => this.state.providers.map(provider => provider.name).includes(provider.name));
-    application.signinMethods = application.signinMethods?.filter(signinMethod => ["Password", "Verification code", "WebAuthn", "LDAP", "Face ID"].includes(signinMethod.name));
+    application.signinMethods = application.signinMethods?.filter(signinMethod => ["Password", "Verification code", "WebAuthn", "LDAP", "Face ID", "WeChat"].includes(signinMethod.name));
 
     ApplicationBackend.updateApplication("admin", this.state.applicationName, application)
       .then((res) => {

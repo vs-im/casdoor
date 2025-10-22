@@ -149,26 +149,27 @@ class SignupPage extends React.Component {
     if (this.getApplicationObj() === undefined) {
       if (this.state.applicationName !== null) {
         this.getApplication(this.state.applicationName);
-
-        const sp = new URLSearchParams(window.location.search);
-        if (sp.has("invitationCode")) {
-          const invitationCode = sp.get("invitationCode");
-          this.setState({invitationCode: invitationCode});
-          if (invitationCode !== "") {
-            this.getInvitationCodeInfo(
-              invitationCode,
-              "admin/" + this.state.applicationName
-            );
-          }
-        }
+        this.setInvitationCode();
       } else if (oAuthParams !== null) {
         this.getApplicationLogin(oAuthParams);
       } else {
-        Setting.showMessage(
-          "error",
-          `Unknown application name: ${this.state.applicationName}`
-        );
+        Setting.showMessage("error", `Unknown application name: ${this.state.applicationName}`);
         this.onUpdateApplication(null);
+      }
+    }
+  }
+
+  setInvitationCode(application = null) {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.has("invitationCode")) {
+      const invitationCode = sp.get("invitationCode");
+      this.setState({invitationCode: invitationCode});
+      if (invitationCode !== "") {
+        let appName = this.state.applicationName;
+        if (application) {
+          appName = application.name;
+        }
+        this.getInvitationCodeInfo(invitationCode, "admin/" + appName);
       }
     }
   }
@@ -189,17 +190,19 @@ class SignupPage extends React.Component {
   }
 
   getApplicationLogin(oAuthParams) {
-    AuthBackend.getApplicationLogin(oAuthParams).then((res) => {
-      if (res.status === "ok") {
-        const application = res.data;
-        this.onUpdateApplication(application);
-      } else {
-        this.onUpdateApplication(null);
-        this.setState({
-          msg: res.msg,
-        });
-      }
-    });
+    AuthBackend.getApplicationLogin(oAuthParams)
+      .then((res) => {
+        if (res.status === "ok") {
+          const application = res.data;
+          this.onUpdateApplication(application);
+          this.setInvitationCode(application);
+        } else {
+          this.onUpdateApplication(null);
+          this.setState({
+            msg: res.msg,
+          });
+        }
+      });
   }
 
   getInvitationCodeInfo(invitationCode, application) {
@@ -458,10 +461,41 @@ class SignupPage extends React.Component {
             },
           ]}
         >
-          <Input
-            className="signup-name-input"
-            placeholder={signupItem.placeholder}
-          />
+          <Input className="signup-name-input" placeholder={signupItem.placeholder} />
+        </Form.Item>
+      );
+    } else if (signupItem.name === "First name" && this.state?.displayNameRule !== "First, last") {
+      return (
+        <Form.Item
+          name="firstName"
+          className="signup-first-name"
+          label={signupItem.label ? signupItem.label : i18next.t("general:First name")}
+          rules={[
+            {
+              required: required,
+              message: i18next.t("signup:Please input your first name!"),
+              whitespace: true,
+            },
+          ]}
+        >
+          <Input className="signup-first-name-input" placeholder={signupItem.placeholder} />
+        </Form.Item>
+      );
+    } else if (signupItem.name === "Last name" && this.state?.displayNameRule !== "First, last") {
+      return (
+        <Form.Item
+          name="lastName"
+          className="signup-last-name"
+          label={signupItem.label ? signupItem.label : i18next.t("general:Last name")}
+          rules={[
+            {
+              required: required,
+              message: i18next.t("signup:Please input your last name!"),
+              whitespace: true,
+            },
+          ]}
+        >
+          <Input className="signup-last-name-input" placeholder={signupItem.placeholder} />
         </Form.Item>
       );
     } else if (signupItem.name === "Affiliation") {
@@ -1068,6 +1102,12 @@ class SignupPage extends React.Component {
         );
       }
     }
+
+    const displayNameItem = application.signupItems?.find(item => item.name === "Display name");
+    if (displayNameItem && !this.state.displayNameRule) {
+      this.setState({displayNameRule: displayNameItem.rule});
+    }
+
     const avaliableProviders = application.providers.filter((providerItem) =>
       this.isProviderVisible(providerItem)
     );

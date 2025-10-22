@@ -26,6 +26,7 @@ import (
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/idp"
 	"github.com/casdoor/casdoor/util"
+	"github.com/casvisor/casvisor-go-sdk/casvisorsdk"
 	"github.com/go-webauthn/webauthn/webauthn"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/xorm-io/core"
@@ -80,7 +81,8 @@ func GetUserByFields(organization string, field string) (*User, error) {
 	}
 
 	// check phone
-	user, err = GetUserByField(organization, "phone", field)
+	phone := util.GetSeperatedPhone(field)
+	user, err = GetUserByField(organization, "phone", phone)
 	if user != nil || err != nil {
 		return user, err
 	}
@@ -180,7 +182,7 @@ func getUserExtraProperty(user *User, providerType, key string) (string, error) 
 	return extra[key], nil
 }
 
-func SetUserOAuthProperties(organization *Organization, user *User, providerType string, userInfo *idp.UserInfo) (bool, error) {
+func SetUserOAuthProperties(organization *Organization, user *User, providerType string, userInfo *idp.UserInfo, userMapping ...map[string]string) (bool, error) {
 	if userInfo.Id != "" {
 		propertyName := fmt.Sprintf("oauth_%s_id", providerType)
 		setUserProperty(user, propertyName, userInfo.Id)
@@ -223,6 +225,11 @@ func SetUserOAuthProperties(organization *Organization, user *User, providerType
 		}
 	}
 
+	// Apply custom user mapping from provider configuration
+	if len(userMapping) > 0 && userMapping[0] != nil && len(userMapping[0]) > 0 && userInfo.Extra != nil {
+		applyUserMapping(user, userInfo.Extra, userMapping[0])
+	}
+
 	if userInfo.Extra != nil {
 		// Save extra info as json string
 		propertyName := fmt.Sprintf("oauth_%s_extra", providerType)
@@ -245,6 +252,108 @@ func SetUserOAuthProperties(organization *Organization, user *User, providerType
 	}
 
 	return UpdateUserForAllFields(user.GetId(), user)
+}
+
+func applyUserMapping(user *User, extraClaims map[string]string, userMapping map[string]string) {
+	// Map of user fields that can be set from IDP claims
+	for userField, claimName := range userMapping {
+		// Skip standard fields that are already handled
+		if userField == "id" || userField == "username" || userField == "displayName" || userField == "email" || userField == "avatarUrl" {
+			continue
+		}
+
+		// Get value from extra claims
+		claimValue, exists := extraClaims[claimName]
+		if !exists || claimValue == "" {
+			continue
+		}
+
+		// Map to user fields based on field name
+		switch strings.ToLower(userField) {
+		case "phone":
+			if user.Phone == "" {
+				user.Phone = claimValue
+			}
+		case "countrycode":
+			if user.CountryCode == "" {
+				user.CountryCode = claimValue
+			}
+		case "firstname":
+			if user.FirstName == "" {
+				user.FirstName = claimValue
+			}
+		case "lastname":
+			if user.LastName == "" {
+				user.LastName = claimValue
+			}
+		case "region":
+			if user.Region == "" {
+				user.Region = claimValue
+			}
+		case "location":
+			if user.Location == "" {
+				user.Location = claimValue
+			}
+		case "affiliation":
+			if user.Affiliation == "" {
+				user.Affiliation = claimValue
+			}
+		case "title":
+			if user.Title == "" {
+				user.Title = claimValue
+			}
+		case "homepage":
+			if user.Homepage == "" {
+				user.Homepage = claimValue
+			}
+		case "bio":
+			if user.Bio == "" {
+				user.Bio = claimValue
+			}
+		case "tag":
+			if user.Tag == "" {
+				user.Tag = claimValue
+			}
+		case "language":
+			if user.Language == "" {
+				user.Language = claimValue
+			}
+		case "gender":
+			if user.Gender == "" {
+				user.Gender = claimValue
+			}
+		case "birthday":
+			if user.Birthday == "" {
+				user.Birthday = claimValue
+			}
+		case "education":
+			if user.Education == "" {
+				user.Education = claimValue
+			}
+		case "idcard":
+			if user.IdCard == "" {
+				user.IdCard = claimValue
+			}
+		case "idcardtype":
+			if user.IdCardType == "" {
+				user.IdCardType = claimValue
+			}
+		}
+	}
+}
+
+func getUserRoleNames(user *User) (res []string) {
+	for _, role := range user.Roles {
+		res = append(res, role.Name)
+	}
+	return res
+}
+
+func getUserPermissionNames(user *User) (res []string) {
+	for _, permission := range user.Permissions {
+		res = append(res, permission.Name)
+	}
+	return res
 }
 
 func ClearUserOAuthProperties(user *User, providerType string) (bool, error) {
@@ -811,4 +920,76 @@ func StringArrayToStruct[T any](stringArray [][]string) ([]*T, error) {
 	}
 
 	return instances, nil
+}
+
+func replaceAttributeValue(user *User, value string) []string {
+	if user == nil {
+		return nil
+	}
+	valueList := []string{value}
+	if strings.Contains(value, "$user.roles") {
+		valueList = replaceAttributeValuesWithList("$user.roles", getUserRoleNames(user), valueList)
+	}
+
+	if strings.Contains(value, "$user.permissions") {
+		valueList = replaceAttributeValuesWithList("$user.permissions", getUserPermissionNames(user), valueList)
+	}
+
+	if strings.Contains(value, "$user.groups") {
+		valueList = replaceAttributeValuesWithList("$user.groups", user.Groups, valueList)
+	}
+
+	valueList = replaceAttributeValues("$user.owner", user.Owner, valueList)
+	valueList = replaceAttributeValues("$user.name", user.Name, valueList)
+	valueList = replaceAttributeValues("$user.email", user.Email, valueList)
+	valueList = replaceAttributeValues("$user.id", user.Id, valueList)
+	valueList = replaceAttributeValues("$user.phone", user.Phone, valueList)
+
+	return valueList
+}
+
+func replaceAttributeValues(val string, replaceVal string, values []string) []string {
+	var newValues []string
+	for _, value := range values {
+		newValues = append(newValues, strings.ReplaceAll(value, val, replaceVal))
+	}
+
+	return newValues
+}
+
+func replaceAttributeValuesWithList(val string, replaceVals []string, values []string) []string {
+	var newValues []string
+	for _, value := range values {
+		for _, rVal := range replaceVals {
+			newValues = append(newValues, strings.ReplaceAll(value, val, rVal))
+		}
+	}
+
+	return newValues
+}
+
+// TriggerWebhookForUser triggers a webhook for user operations (add, update, delete)
+// action: the action type, e.g., "new-user", "update-user", "delete-user"
+// user: the user object
+func TriggerWebhookForUser(action string, user *User) {
+	if user == nil {
+		return
+	}
+
+	record := &casvisorsdk.Record{
+		Name:         util.GenerateId(),
+		CreatedTime:  util.GetCurrentTime(),
+		Organization: user.Owner,
+		User:         user.Name,
+		Method:       "POST",
+		RequestUri:   "/api/" + action,
+		Action:       action,
+		Object:       util.StructToJson(user),
+		StatusCode:   200,
+		IsTriggered:  false,
+	}
+
+	util.SafeGoroutine(func() {
+		AddRecord(record)
+	})
 }

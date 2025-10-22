@@ -65,7 +65,7 @@ func (syncer *Syncer) syncUsers() error {
 		}
 	}
 
-	key := syncer.getKey()
+	key := syncer.getLocalPrimaryKey()
 
 	myUsers := map[string]*User{}
 	for _, m := range users {
@@ -146,6 +146,11 @@ func (syncer *Syncer) syncUsers() error {
 		_, err = AddUsersInBatch(newUsers)
 		if err != nil {
 			return err
+		}
+
+		// Trigger webhooks for syncer user additions
+		for _, newUser := range newUsers {
+			TriggerWebhookForUser("new-user-syncer", newUser)
 		}
 	}
 

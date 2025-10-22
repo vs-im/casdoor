@@ -67,7 +67,7 @@ type User struct {
 	DisplayName       string   `xorm:"varchar(100)" json:"displayName"`
 	FirstName         string   `xorm:"varchar(100)" json:"firstName"`
 	LastName          string   `xorm:"varchar(100)" json:"lastName"`
-	Avatar            string   `xorm:"varchar(500)" json:"avatar"`
+	Avatar            string   `xorm:"text" json:"avatar"`
 	AvatarType        string   `xorm:"varchar(100)" json:"avatarType"`
 	PermanentAvatar   string   `xorm:"varchar(500)" json:"permanentAvatar"`
 	Email             string   `xorm:"varchar(100) index" json:"email"`
@@ -101,6 +101,8 @@ type User struct {
 	SignupApplication string   `xorm:"varchar(100)" json:"signupApplication"`
 	Hash              string   `xorm:"varchar(100)" json:"hash"`
 	PreHash           string   `xorm:"varchar(100)" json:"preHash"`
+	RegisterType      string   `xorm:"varchar(100)" json:"registerType"`
+	RegisterSource    string   `xorm:"varchar(100)" json:"registerSource"`
 	AccessKey         string   `xorm:"varchar(100)" json:"accessKey"`
 	AccessSecret      string   `xorm:"varchar(100)" json:"accessSecret"`
 	AccessToken       string   `xorm:"mediumtext" json:"accessToken"`
@@ -187,10 +189,19 @@ type User struct {
 	MetaMask        string `xorm:"metamask varchar(100)" json:"metamask"`
 	Web3Onboard     string `xorm:"web3onboard varchar(100)" json:"web3onboard"`
 	Custom          string `xorm:"custom varchar(100)" json:"custom"`
+	Custom2         string `xorm:"custom2 text" json:"custom2"`
+	Custom3         string `xorm:"custom3 text" json:"custom3"`
+	Custom4         string `xorm:"custom4 text" json:"custom4"`
+	Custom5         string `xorm:"custom5 text" json:"custom5"`
+	Custom6         string `xorm:"custom6 text" json:"custom6"`
+	Custom7         string `xorm:"custom7 text" json:"custom7"`
+	Custom8         string `xorm:"custom8 text" json:"custom8"`
+	Custom9         string `xorm:"custom9 text" json:"custom9"`
+	Custom10        string `xorm:"custom10 text" json:"custom10"`
 
 	WebauthnCredentials []webauthn.Credential `xorm:"webauthnCredentials blob" json:"webauthnCredentials"`
 	PreferredMfaType    string                `xorm:"varchar(100)" json:"preferredMfaType"`
-	RecoveryCodes       []string              `xorm:"varchar(1000)" json:"recoveryCodes"`
+	RecoveryCodes       []string              `xorm:"mediumtext" json:"recoveryCodes"`
 	TotpSecret          string                `xorm:"varchar(100)" json:"totpSecret"`
 	MfaPhoneEnabled     bool                  `json:"mfaPhoneEnabled"`
 	MfaEmailEnabled     bool                  `json:"mfaEmailEnabled"`
@@ -204,7 +215,7 @@ type User struct {
 
 	Roles       []*Role       `json:"roles"`
 	Permissions []*Permission `json:"permissions"`
-	Groups      []string      `xorm:"groups varchar(1000)" json:"groups"`
+	Groups      []string      `xorm:"mediumtext" json:"groups"`
 
 	LastChangePasswordTime string `xorm:"varchar(100)" json:"lastChangePasswordTime"`
 	LastSigninWrongTime    string `xorm:"varchar(100)" json:"lastSigninWrongTime"`
@@ -510,6 +521,8 @@ func GetUserByPhone(owner string, phone string) (*User, error) {
 		return nil, nil
 	}
 
+	phone = util.GetSeperatedPhone(phone)
+
 	user := User{Owner: owner, Phone: phone}
 	existed, err := ormer.Engine.Get(&user)
 	if err != nil {
@@ -527,6 +540,8 @@ func GetUserByPhoneOnly(phone string) (*User, error) {
 	if phone == "" {
 		return nil, nil
 	}
+
+	phone = util.GetSeperatedPhone(phone)
 
 	user := User{Phone: phone}
 	existed, err := ormer.Engine.Get(&user)
@@ -797,7 +812,7 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 		}
 	}
 	if isAdmin {
-		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "mfa_items")
+		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "mfa_items", "register_type", "register_source")
 	}
 
 	columns = append(columns, "updated_time")
@@ -807,7 +822,7 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 		columns = append(columns, "deleted_time")
 	}
 
-	if util.ContainsString(columns, "groups") {
+	if util.InSlice(columns, "groups") {
 		_, err := userEnforcer.UpdateGroupsForUser(user.GetId(), user.Groups)
 		if err != nil {
 			return false, err
@@ -1329,6 +1344,56 @@ func (user *User) CheckUserFace(faceIdImage []string, provider *Provider) (bool,
 		return false, errList[0]
 	}
 	return false, nil
+}
+
+func (user *User) GetUserFullGroupPath() ([]string, error) {
+	if len(user.Groups) == 0 {
+		return []string{}, nil
+	}
+
+	var orgGroups []*Group
+	orgGroups, err := GetGroups(user.Owner)
+	if err != nil {
+		return nil, err
+	}
+
+	groupMap := make(map[string]Group)
+	for _, group := range orgGroups {
+		groupMap[group.Name] = *group
+	}
+
+	var groupFullPath []string
+
+	for _, groupId := range user.Groups {
+		_, groupName := util.GetOwnerAndNameFromIdNoCheck(groupId)
+		group, ok := groupMap[groupName]
+		if !ok {
+			continue
+		}
+
+		groupPath := groupName
+
+		curGroup, ok := groupMap[group.ParentId]
+		if !ok {
+			return []string{}, fmt.Errorf("group:Group %s not exist", group.ParentId)
+		}
+		for {
+			groupPath = util.GetId(curGroup.Name, groupPath)
+			if curGroup.IsTopGroup {
+				break
+			}
+
+			curGroup, ok = groupMap[curGroup.ParentId]
+			if !ok {
+				return []string{}, fmt.Errorf("group:Group %s not exist", curGroup.ParentId)
+			}
+		}
+
+		groupPath = util.GetId(curGroup.Owner, groupPath)
+		groupFullPath = append(groupFullPath, groupPath)
+	}
+
+	return groupFullPath, nil
 }
 
 func GenerateIdForNewUser(application *Application) (string, error) {

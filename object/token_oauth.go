@@ -136,7 +136,7 @@ func CheckOAuthLogin(clientId string, responseType string, redirectUri string, s
 	return "", application, nil
 }
 
-func GetOAuthCode(userId string, clientId string, provider string, responseType string, redirectUri string, scope string, state string, nonce string, challenge string, host string, lang string) (*Code, error) {
+func GetOAuthCode(userId string, clientId string, provider string, signinMethod string, responseType string, redirectUri string, scope string, state string, nonce string, challenge string, host string, lang string) (*Code, error) {
 	user, err := GetUser(userId)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func GetOAuthCode(userId string, clientId string, provider string, responseType 
 	if err != nil {
 		return nil, err
 	}
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, provider, nonce, scope, host)
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, provider, signinMethod, nonce, scope, host)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +379,7 @@ func RefreshToken(grantType string, refreshToken string, scope string, clientId 
 		return nil, err
 	}
 
-	newAccessToken, newRefreshToken, tokenName, err := generateJwtToken(application, user, "", "", scope, host)
+	newAccessToken, newRefreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", scope, host)
 	if err != nil {
 		return &TokenError{
 			Error:            EndpointError,
@@ -537,6 +537,13 @@ func GetPasswordToken(application *Application, username string, password string
 	if user.Ldap != "" {
 		err = CheckLdapUserPassword(user, password, "en")
 	} else {
+		// For OAuth users who don't have a password set, they cannot use password grant type
+		if user.Password == "" {
+			return nil, &TokenError{
+				Error:            InvalidGrant,
+				ErrorDescription: "OAuth users cannot use password grant type, please use authorization code flow",
+			}, nil
+		}
 		err = CheckPassword(user, password, "en")
 	}
 	if err != nil {
@@ -558,7 +565,7 @@ func GetPasswordToken(application *Application, username string, password string
 		return nil, nil, err
 	}
 
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", scope, host)
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", scope, host)
 	if err != nil {
 		return nil, &TokenError{
 			Error:            EndpointError,
@@ -604,7 +611,7 @@ func GetClientCredentialsToken(application *Application, clientSecret string, sc
 		Type:  "application",
 	}
 
-	accessToken, _, tokenName, err := generateJwtToken(application, nullUser, "", "", scope, host)
+	accessToken, _, tokenName, err := generateJwtToken(application, nullUser, "", "", "", scope, host)
 	if err != nil {
 		return nil, &TokenError{
 			Error:            EndpointError,
@@ -668,7 +675,7 @@ func GetTokenByUser(application *Application, user *User, scope string, nonce st
 		return nil, err
 	}
 
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", nonce, scope, host)
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", nonce, scope, host)
 	if err != nil {
 		return nil, err
 	}
@@ -775,7 +782,7 @@ func GetWechatMiniProgramToken(application *Application, code string, host strin
 		return nil, nil, err
 	}
 
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", host)
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", "", host)
 	if err != nil {
 		return nil, &TokenError{
 			Error:            EndpointError,

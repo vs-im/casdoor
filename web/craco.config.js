@@ -21,26 +21,34 @@ module.exports = {
         target: "http://localhost:7777",
         changeOrigin: true,
       },
-      "/cas/serviceValidate": {
+      "/cas/**/serviceValidate": {
         target: "http://localhost:7777",
         changeOrigin: true,
       },
-      "/cas/proxyValidate": {
+      "/cas/**/proxyValidate": {
         target: "http://localhost:7777",
         changeOrigin: true,
       },
-      "/cas/proxy": {
+      "/cas/**/proxy": {
         target: "http://localhost:7777",
         changeOrigin: true,
       },
-      "/cas/validate": {
+      "/cas/**/validate": {
+        target: "http://localhost:7777",
+        changeOrigin: true,
+      },
+      "/cas/**/p3/serviceValidate": {
+        target: "http://localhost:7777",
+        changeOrigin: true,
+      },
+      "/cas/**/p3/proxyValidate": {
         target: "http://localhost:7777",
         changeOrigin: true,
       },
       "/scim": {
         target: "http://localhost:7777",
         changeOrigin: true,
-      }
+      },
     },
   },
   plugins: [

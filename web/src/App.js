@@ -115,7 +115,7 @@ class App extends Component {
       this.setState({selectedMenuKey: "/logs"});
     } else if (uri.includes("/products") || uri.includes("/payments") || uri.includes("/plans") || uri.includes("/pricings") || uri.includes("/subscriptions")) {
       this.setState({selectedMenuKey: "/business"});
-    } else if (uri.includes("/sysinfo") || uri.includes("/syncers") || uri.includes("/webhooks")) {
+    } else if (uri.includes("/sysinfo") || uri.includes("/forms") || uri.includes("/syncers") || uri.includes("/webhooks")) {
       this.setState({selectedMenuKey: "/admin"});
     } else if (uri.includes("/signup")) {
       this.setState({selectedMenuKey: "/signup"});
@@ -252,7 +252,9 @@ class App extends Component {
           account.organization = res.data2;
           accessToken = res.data.accessToken;
 
-          this.setLanguage(account);
+          if (!localStorage.getItem("language")) {
+            this.setLanguage(account);
+          }
           this.setTheme(Setting.getThemeData(account.organization), Conf.InitThemeAlgorithm);
           setTourLogo(account.organization.logo);
           setOrgIsTourVisible(account.organization.enableTour);
@@ -416,6 +418,7 @@ class App extends Component {
                       account={this.state.account}
                       theme={this.state.themeData}
                       themeAlgorithm={this.state.themeAlgorithm}
+                      requiredEnableMfa={this.state.requiredEnableMfa}
                       updateApplication={(application) => {
                         this.setState({
                           application: application,

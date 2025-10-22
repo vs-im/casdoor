@@ -37,7 +37,8 @@
         "UA",
         "KZ",
         "CZ",
-        "SK"
+        "SK",
+        "AZ"
       ],
       "defaultAvatar": "",
       "defaultApplication": "",
@@ -66,13 +67,15 @@
         "kk",
         "fa",
         "cs",
-        "sk"
+        "sk",
+        "az"
       ],
       "masterPassword": "",
       "defaultPassword": "",
       "initScore": 2000,
       "enableSoftDeletion": false,
       "isProfilePublic": true,
+      "disableSignin": false,
       "accountItems": []
     }
   ],
@@ -87,6 +90,7 @@
       "cert": "",
       "enablePassword": true,
       "enableSignUp": true,
+      "disableSignin": false,
       "clientId": "",
       "clientSecret": "",
       "providers": [

@@ -334,7 +334,7 @@ class UserEditPage extends React.Component {
           </Col>
           <Col span={22} {...secondColumnProps} >
             <Select virtual={false} mode="multiple" style={{width: "100%"}} disabled={disabled} value={this.state.user.groups ?? []} onChange={(value => {
-              if (this.state.groups?.filter(group => value.includes(group.name))
+              if (this.state.groups?.filter(group => value.includes(`${group.owner}/${group.name}`))
                 .filter(group => group.type === "Physical").length > 1) {
                 Setting.showMessage("error", i18next.t("general:You can only select one physical group"));
                 return;
@@ -795,6 +795,30 @@ class UserEditPage extends React.Component {
           </Col>
         </Row>
       );
+    } else if (accountItem.name === "Register type") {
+      return (
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("user:Register type"), i18next.t("user:Register type - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input value={this.state.user.registerType} disabled={!this.props.account.isAdmin}
+              onChange={e => {this.updateUserField("registerType", e.target.value);}} />
+          </Col>
+        </Row>
+      );
+    } else if (accountItem.name === "Register source") {
+      return (
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("user:Register source"), i18next.t("user:Register source - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input value={this.state.user.registerSource} disabled={!this.props.account.isAdmin}
+              onChange={e => {this.updateUserField("registerSource", e.target.value);}} />
+          </Col>
+        </Row>
+      );
     } else if (accountItem.name === "API key") {
       return (
         <Row id={accountItemNameId} style={{marginTop}} >
@@ -1127,6 +1151,32 @@ class UserEditPage extends React.Component {
           <Col span={22}>
             <Input value={this.state.user.ipWhitelist} onChange={e => {
               this.updateUserField("ipWhitelist", e.target.value);
+            }} />
+          </Col>
+        </Row>
+      );
+    } else if (accountItem.name === "First name") {
+      return (
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:First name"), i18next.t("general:First name - Tooltip"))} :
+          </Col>
+          <Col span={22}>
+            <Input value={this.state.user.firstName} onChange={e => {
+              this.updateUserField("firstName", e.target.value);
+            }} />
+          </Col>
+        </Row>
+      );
+    } else if (accountItem.name === "Last name") {
+      return (
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Last name"), i18next.t("general:Last name - Tooltip"))} :
+          </Col>
+          <Col span={22}>
+            <Input value={this.state.user.lastName} onChange={e => {
+              this.updateUserField("lastName", e.target.value);
             }} />
           </Col>
         </Row>

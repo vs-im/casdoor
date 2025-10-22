@@ -88,7 +88,10 @@ class ProviderTable extends React.Component {
                 }
               }} >
               {
-                Setting.getDeduplicatedArray(this.props.providers, table, "name").map((provider, index) => <Option key={index} value={provider.name}>{provider.name}</Option>)
+                Setting.getDeduplicatedArray(this.props.providers, table, "name").filter(provider => provider.category !== "Captcha" || !table.some(tableItem => {
+                  const existingProvider = Setting.getArrayItem(this.props.providers, "name", tableItem.name);
+                  return existingProvider && existingProvider.category === "Captcha";
+                })).map((provider, index) => <Option key={index} value={provider.name}>{provider.name}</Option>)
               }
             </Select>
           );
@@ -144,7 +147,7 @@ class ProviderTable extends React.Component {
         key: "canSignUp",
         width: "120px",
         render: (text, record, index) => {
-          if (!["OAuth", "Web3"].includes(record.provider?.category)) {
+          if (!["OAuth", "Web3", "SAML"].includes(record.provider?.category)) {
             return null;
           }
 
@@ -161,7 +164,7 @@ class ProviderTable extends React.Component {
         key: "canSignIn",
         width: "120px",
         render: (text, record, index) => {
-          if (!["OAuth", "Web3"].includes(record.provider?.category)) {
+          if (!["OAuth", "Web3", "SAML"].includes(record.provider?.category)) {
             return null;
           }
 
@@ -178,7 +181,7 @@ class ProviderTable extends React.Component {
         key: "canUnlink",
         width: "120px",
         render: (text, record, index) => {
-          if (!["OAuth", "Web3"].includes(record.provider?.category)) {
+          if (!["OAuth", "Web3", "SAML"].includes(record.provider?.category)) {
             return null;
           }
 
@@ -195,7 +198,7 @@ class ProviderTable extends React.Component {
         key: "prompted",
         width: "120px",
         render: (text, record, index) => {
-          if (!["OAuth", "Web3"].includes(record.provider?.category)) {
+          if (!["OAuth", "Web3", "SAML"].includes(record.provider?.category)) {
             return null;
           }
 

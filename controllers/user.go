@@ -252,12 +252,16 @@ func (c *ApiController) GetUser() {
 // @Title UpdateUser
 // @Tag User API
 // @Description update user
-// @Param   id     query    string  true        "The id ( owner/name ) of the user"
+// @Param   id     query    string  false        "The id ( owner/name ) of the user"
+// @Param   userId query    string  false        "The userId (UUID) of the user"
+// @Param   owner  query    string  false        "The owner of the user (required when using userId)"
 // @Param   body    body   object.User  true        "The details of the user"
 // @Success 200 {object} controllers.Response The Response object
 // @router /update-user [post]
 func (c *ApiController) UpdateUser() {
 	id := c.Input().Get("id")
+	userId := c.Input().Get("userId")
+	owner := c.Input().Get("owner")
 	columnsStr := c.Input().Get("columns")
 
 	var user object.User
@@ -267,17 +271,38 @@ func (c *ApiController) UpdateUser() {
 		return
 	}
 
-	if id == "" {
+	if id == "" && userId == "" {
 		id = c.GetSessionUsername()
 		if id == "" {
 			c.ResponseError(c.T("general:Missing parameter"))
 			return
 		}
 	}
-	oldUser, err := object.GetUser(id)
-	if err != nil {
-		c.ResponseError(err.Error())
-		return
+
+	var userFromUserId *object.User
+	if userId != "" && owner != "" {
+		userFromUserId, err = object.GetUserByUserId(owner, userId)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		if userFromUserId == nil {
+			c.ResponseError(fmt.Sprintf(c.T("general:The user with userId: %s doesn't exist"), userId))
+			return
+		}
+
+		id = util.GetId(userFromUserId.Owner, userFromUserId.Name)
+	}
+
+	var oldUser *object.User
+	if userId != "" {
+		oldUser = userFromUserId
+	} else {
+		oldUser, err = object.GetUser(id)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
 	}
 
 	if oldUser == nil {
@@ -365,6 +390,17 @@ func (c *ApiController) AddUser() {
 	if msg != "" {
 		c.ResponseError(msg)
 		return
+	}
+
+	// Set RegisterSource based on the current user if not already set
+	if user.RegisterType == "" {
+		user.RegisterType = "Add User"
+	}
+	if user.RegisterSource == "" {
+		currentUser := c.getCurrentUser()
+		if currentUser != nil {
+			user.RegisterSource = currentUser.GetId()
+		}
 	}
 
 	c.Data["json"] = wrapActionResponse(object.AddUser(&user, c.GetAcceptLanguage()))
@@ -524,14 +560,16 @@ func (c *ApiController) SetPassword() {
 			}
 		}
 	} else if code == "" {
-		if user.Ldap == "" {
-			err = object.CheckPassword(targetUser, oldPassword, c.GetAcceptLanguage())
-		} else {
-			err = object.CheckLdapUserPassword(targetUser, oldPassword, c.GetAcceptLanguage())
-		}
-		if err != nil {
-			c.ResponseError(err.Error())
-			return
+		if targetUser.Password != "" || user.Ldap != "" {
+			if user.Ldap == "" {
+				err = object.CheckPassword(targetUser, oldPassword, c.GetAcceptLanguage())
+			} else {
+				err = object.CheckLdapUserPassword(targetUser, oldPassword, c.GetAcceptLanguage())
+			}
+			if err != nil {
+				c.ResponseError(err.Error())
+				return
+			}
 		}
 	}
 
@@ -548,6 +586,12 @@ func (c *ApiController) SetPassword() {
 	}
 	if organization == nil {
 		c.ResponseError(fmt.Sprintf(c.T("auth:the organization: %s is not found"), targetUser.Owner))
+		return
+	}
+
+	// Check if the new password is the same as the current password
+	if !object.CheckPasswordNotSameAsCurrent(targetUser, newPassword, organization) {
+		c.ResponseError(c.T("user:The new password must be different from your current password"))
 		return
 	}
 

@@ -28,6 +28,7 @@ export const SigninTableDefaultCssMap = {
   "Signin methods": ".signin-methods {}",
   "Username": ".login-username {}\n.login-username-input{}",
   "Password": ".login-password {}\n.login-password-input{}",
+  "Verification code": ".verification-code {}\n.verification-code-input{}",
   "Agreement": ".login-agreement {}",
   "Forgot password?": ".login-forget-password {\n    display: inline-flex;\n    justify-content: space-between;\n    width: 320px;\n    margin-bottom: 25px;\n}",
   "Login button": ".login-button-box {\n    margin-bottom: 5px;\n}\n.login-button {\n    width: 100%;\n}",
@@ -49,6 +50,9 @@ class SigninTable extends React.Component {
 
   updateField(table, index, key, value) {
     table[index][key] = value;
+    if (key === "name" && value === "Captcha") {
+      table[index]["rule"] = "pop up";
+    }
     this.updateTable(table);
   }
 
@@ -109,11 +113,15 @@ class SigninTable extends React.Component {
             {name: "Languages", displayName: i18next.t("general:Languages")},
             {name: "Username", displayName: i18next.t("signup:Username")},
             {name: "Password", displayName: i18next.t("general:Password")},
+            {name: "Verification code", displayName: i18next.t("login:Verification code")},
             {name: "Providers", displayName: i18next.t("general:Providers")},
             {name: "Agreement", displayName: i18next.t("signup:Agreement")},
             {name: "Forgot password?", displayName: i18next.t("login:Forgot password?")},
             {name: "Login button", displayName: i18next.t("login:Signin button")},
             {name: "Signup link", displayName: i18next.t("general:Signup link")},
+            {name: "Captcha", displayName: i18next.t("general:Captcha")},
+            {name: "Auto sign in", displayName: i18next.t("login:Auto sign in")},
+            {name: "Select organization", displayName: i18next.t("login:Select organization")},
           ];
 
           const getItemDisplayName = (text) => {
@@ -170,17 +178,17 @@ class SigninTable extends React.Component {
             return (
               <Popover placement="right" content={
                 <div style={{width: "900px", height: "300px"}} >
-                  <Editor value={text} lang="html" fillHeight dark onChange={value => {
-                    this.updateField(table, index, "label", value);
+                  <Editor value={record.customCss} lang="html" fillHeight dark onChange={value => {
+                    this.updateField(table, index, "customCss", value);
                   }} />
                 </div>
               } title={i18next.t("signup:Label HTML")} trigger="click">
-                <Input value={text} style={{marginBottom: "10px"}} onChange={e => {
-                  this.updateField(table, index, "label", e.target.value);
+                <Input value={record.customCss} style={{marginBottom: "10px"}} onChange={e => {
+                  this.updateField(table, index, "customCss", e.target.value);
                 }} />
               </Popover>
             );
-          } else if (["Username", "Password", "Signup link", "Forgot password?", "Login button"].includes(record.name)) {
+          } else if (["Username", "Password", "Verification code", "Signup link", "Forgot password?", "Login button"].includes(record.name)) {
             return <Input value={text} style={{marginBottom: "10px"}} onChange={e => {
               this.updateField(table, index, "label", e.target.value);
             }} />;
@@ -249,6 +257,19 @@ class SigninTable extends React.Component {
               {id: "small", name: i18next.t("application:Small icon")},
             ];
           }
+          if (record.name === "Captcha") {
+            options = [
+              {id: "pop up", name: i18next.t("application:Pop up")},
+              {id: "inline", name: i18next.t("application:Inline")},
+            ];
+          }
+          if (record.name === "Forgot password?") {
+            options = [
+              {id: "None", name: `${i18next.t("login:Auto sign in")} - ${i18next.t("general:True")}`},
+              {id: "Auto sign in - False", name: `${i18next.t("login:Auto sign in")} - ${i18next.t("general:False")}`},
+            ];
+          }
+
           if (options.length === 0) {
             return null;
           }

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/util"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -33,6 +34,8 @@ type Claims struct {
 	// the `azp` (Authorized Party) claim. Optional. See https://openid.net/specs/openid-connect-core-1_0.html#IDToken
 	Azp      string `json:"azp,omitempty"`
 	Provider string `json:"provider,omitempty"`
+
+	SigninMethod string `json:"signinMethod,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -105,6 +108,8 @@ type UserWithoutThirdIdp struct {
 	SignupApplication string   `xorm:"varchar(100)" json:"signupApplication"`
 	Hash              string   `xorm:"varchar(100)" json:"hash"`
 	PreHash           string   `xorm:"varchar(100)" json:"preHash"`
+	RegisterType      string   `xorm:"varchar(100)" json:"registerType"`
+	RegisterSource    string   `xorm:"varchar(100)" json:"registerSource"`
 	AccessKey         string   `xorm:"varchar(100)" json:"accessKey"`
 	AccessSecret      string   `xorm:"varchar(100)" json:"accessSecret"`
 
@@ -153,6 +158,8 @@ type ClaimsShort struct {
 	Scope     string `json:"scope,omitempty"`
 	Azp       string `json:"azp,omitempty"`
 	Provider  string `json:"provider,omitempty"`
+
+	SigninMethod string `json:"signinMethod,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -173,6 +180,8 @@ type ClaimsWithoutThirdIdp struct {
 	Scope     string `json:"scope,omitempty"`
 	Azp       string `json:"azp,omitempty"`
 	Provider  string `json:"provider,omitempty"`
+
+	SigninMethod string `json:"signinMethod,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -252,6 +261,8 @@ func getUserWithoutThirdIdp(user *User) *UserWithoutThirdIdp {
 		SignupApplication: user.SignupApplication,
 		Hash:              user.Hash,
 		PreHash:           user.PreHash,
+		RegisterType:      user.RegisterType,
+		RegisterSource:    user.RegisterSource,
 		AccessKey:         user.AccessKey,
 		AccessSecret:      user.AccessSecret,
 
@@ -302,6 +313,7 @@ func getShortClaims(claims Claims) ClaimsShort {
 		Scope:            claims.Scope,
 		RegisteredClaims: claims.RegisteredClaims,
 		Azp:              claims.Azp,
+		SigninMethod:     claims.SigninMethod,
 		Provider:         claims.Provider,
 	}
 	return res
@@ -316,12 +328,13 @@ func getClaimsWithoutThirdIdp(claims Claims) ClaimsWithoutThirdIdp {
 		Scope:               claims.Scope,
 		RegisteredClaims:    claims.RegisteredClaims,
 		Azp:                 claims.Azp,
+		SigninMethod:        claims.SigninMethod,
 		Provider:            claims.Provider,
 	}
 	return res
 }
 
-func getClaimsCustom(claims Claims, tokenField []string) jwt.MapClaims {
+func getClaimsCustom(claims Claims, tokenField []string, tokenAttributes []*JwtItem) jwt.MapClaims {
 	res := make(jwt.MapClaims)
 
 	userValue := reflect.ValueOf(claims.User).Elem()
@@ -338,13 +351,51 @@ func getClaimsCustom(claims Claims, tokenField []string) jwt.MapClaims {
 	res["tag"] = claims.Tag
 	res["scope"] = claims.Scope
 	res["azp"] = claims.Azp
+	res["signinMethod"] = claims.SigninMethod
 	res["provider"] = claims.Provider
 
 	for _, field := range tokenField {
-		userField := userValue.FieldByName(field)
-		if userField.IsValid() {
-			newfield := util.SnakeToCamel(util.CamelToSnakeCase(field))
-			res[newfield] = userField.Interface()
+		if strings.HasPrefix(field, "Properties.") {
+			/*
+				Use selected properties fields as custom claims.
+				Converts `Properties.my_field` to custom claim with name `my_field`.
+			*/
+			parts := strings.Split(field, ".")
+			if len(parts) != 2 || parts[0] != "Properties" { // Either too many segments, or not properly scoped to `Properties`, so skip.
+				continue
+			}
+			base, fieldName := parts[0], parts[1]
+			mField := userValue.FieldByName(base)
+			if !mField.IsValid() { // Can't find `Properties` field, so skip.
+				continue
+			}
+			finalField := mField.MapIndex(reflect.ValueOf(fieldName))
+			if finalField.IsValid() { // // Provided field within `Properties` exists, add claim.
+				res[fieldName] = finalField.Interface()
+			}
+
+		} else if field == "permissionNames" {
+			permissionNames := []string{}
+			for _, val := range claims.User.Permissions {
+				permissionNames = append(permissionNames, val.Name)
+			}
+			res[util.SnakeToCamel(util.CamelToSnakeCase(field))] = permissionNames
+		} else { // Use selected user field as claims.
+			userField := userValue.FieldByName(field)
+			if userField.IsValid() {
+				newfield := util.SnakeToCamel(util.CamelToSnakeCase(field))
+				res[newfield] = userField.Interface()
+			}
+		}
+	}
+
+	for _, item := range tokenAttributes {
+		valueList := replaceAttributeValue(claims.User, item.Value)
+
+		if len(valueList) == 1 {
+			res[item.Name] = valueList[0]
+		} else {
+			res[item.Name] = valueList
 		}
 	}
 
@@ -373,7 +424,7 @@ func refineUser(user *User) *User {
 	return user
 }
 
-func generateJwtToken(application *Application, user *User, provider string, nonce string, scope string, host string) (string, string, string, error) {
+func generateJwtToken(application *Application, user *User, provider string, signinMethod string, nonce string, scope string, host string) (string, string, string, error) {
 	nowTime := time.Now()
 	expireTime := nowTime.Add(time.Duration(application.ExpireInHours) * time.Hour)
 	refreshExpireTime := nowTime.Add(time.Duration(application.RefreshExpireInHours) * time.Hour)
@@ -381,6 +432,14 @@ func generateJwtToken(application *Application, user *User, provider string, non
 		refreshExpireTime = expireTime
 	}
 
+	if conf.GetConfigBool("useGroupPathInToken") {
+		groupPath, err := user.GetUserFullGroupPath()
+		if err != nil {
+			return "", "", "", err
+		}
+
+		user.Groups = groupPath
+	}
 	user = refineUser(user)
 
 	_, originBackend := getOriginFromHost(host)
@@ -398,10 +457,11 @@ func generateJwtToken(application *Application, user *User, provider string, non
 		TokenType: "access-token",
 		Nonce:     nonce,
 		// FIXME: A workaround for custom claim by reusing `tag` in user info
-		Tag:      user.Tag,
-		Scope:    scope,
-		Azp:      application.ClientId,
-		Provider: provider,
+		Tag:          user.Tag,
+		Scope:        scope,
+		Azp:          application.ClientId,
+		Provider:     provider,
+		SigninMethod: signinMethod,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    originBackend,
 			Subject:   user.Id,
@@ -456,7 +516,7 @@ func generateJwtToken(application *Application, user *User, provider string, non
 		claimsShort.TokenType = "refresh-token"
 		refreshToken = jwt.NewWithClaims(jwtMethod, claimsShort)
 	} else if application.TokenFormat == "JWT-Custom" {
-		claimsCustom := getClaimsCustom(claims, application.TokenFields)
+		claimsCustom := getClaimsCustom(claims, application.TokenFields, application.TokenAttributes)
 
 		claimsCustom["vd"] = "🔥"
 
@@ -469,7 +529,7 @@ func generateJwtToken(application *Application, user *User, provider string, non
 		}
 
 		token = jwt.NewWithClaims(jwtMethod, claimsCustom)
-		refreshClaims := getClaimsCustom(claims, application.TokenFields)
+		refreshClaims := getClaimsCustom(claims, application.TokenFields, application.TokenAttributes)
 		refreshClaims["exp"] = jwt.NewNumericDate(refreshExpireTime)
 		refreshClaims["TokenType"] = "refresh-token"
 		refreshToken = jwt.NewWithClaims(jwtMethod, refreshClaims)

@@ -85,6 +85,8 @@ class UserListPage extends BaseListPage {
       isDeleted: false,
       properties: {},
       signupApplication: this.state.organization.defaultApplication,
+      registerType: "Add User",
+      registerSource: `${this.props.account.owner}/${this.props.account.name}`,
     };
   }
 
@@ -188,7 +190,7 @@ class UserListPage extends BaseListPage {
 
     return (
       <Upload {...props}>
-        <Button icon={<UploadOutlined />} id="upload-button" type="primary" size="small">
+        <Button icon={<UploadOutlined />} id="upload-button" size="small">
           {i18next.t("user:Upload (.xlsx)")}
         </Button>
       </Upload>
@@ -348,6 +350,22 @@ class UserListPage extends BaseListPage {
         },
       },
       {
+        title: i18next.t("user:Register type"),
+        dataIndex: "registerType",
+        key: "registerType",
+        width: "150px",
+        sorter: true,
+        ...this.getColumnSearchProps("registerType"),
+      },
+      {
+        title: i18next.t("user:Register source"),
+        dataIndex: "registerSource",
+        key: "registerSource",
+        width: "150px",
+        sorter: true,
+        ...this.getColumnSearchProps("registerSource"),
+      },
+      {
         title: i18next.t("user:Is admin"),
         dataIndex: "isAdmin",
         key: "isAdmin",
@@ -419,6 +437,7 @@ class UserListPage extends BaseListPage {
       },
     ];
 
+    const filteredColumns = Setting.filterTableColumns(columns, this.props.formItems ?? this.state.formItems);
     const paginationProps = {
       total: this.state.pagination.total,
       showQuickJumper: true,
@@ -428,11 +447,11 @@ class UserListPage extends BaseListPage {
 
     return (
       <div>
-        <Table scroll={{x: "max-content"}} columns={columns} dataSource={users} rowKey={(record) => `${record.owner}/${record.name}`} size="middle" bordered pagination={paginationProps}
+        <Table scroll={{x: "max-content"}} columns={filteredColumns} dataSource={users} rowKey={(record) => `${record.owner}/${record.name}`} size="middle" bordered pagination={paginationProps}
           title={() => (
             <div>
               {i18next.t("general:Users")}&nbsp;&nbsp;&nbsp;&nbsp;
-              <Button style={{marginRight: "5px"}} type="primary" size="small" onClick={this.addUser.bind(this)}>{i18next.t("general:Add")} </Button>
+              <Button style={{marginRight: "15px"}} type="primary" size="small" onClick={this.addUser.bind(this)}>{i18next.t("general:Add")} </Button>
               {
                 this.renderUpload()
               }

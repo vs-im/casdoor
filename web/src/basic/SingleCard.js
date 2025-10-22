@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React from "react";
-import {Card} from "antd";
+import {Card, Col, Tag} from "antd";
 import * as Setting from "../Setting";
 import {withRouter} from "react-router-dom";
 
@@ -34,79 +34,70 @@ class SingleCard extends React.Component {
     return link;
   }
 
-  renderCardMobile(logo, link, title, desc, time, isSingle) {
-    // TODO: add borderRadius from app settings
+  renderCardMobile(logo, link, title, desc, time, tags, isSingle) {
     const gridStyle = {
-      width: "100%",
+      width: "100vw",
       textAlign: "center",
       cursor: "pointer",
-      borderRadius: "13px",
-      border: "1px solid #e6e6e6",
     };
     const silentSigninLink = this.wrappedAsSilentSigninLink(link);
 
     return (
-      <div style={gridStyle} onClick={() => Setting.goToLinkSoft(this, silentSigninLink)}>
-        <img src={logo} alt="logo" width={"100%"} style={{padding: "10px"}} />
+      <Card.Grid style={gridStyle} onClick={() => Setting.goToLinkSoft(this, silentSigninLink)}>
+        <img src={logo} alt="logo" width={"100%"} style={{marginBottom: "20px"}} />
         <Meta
-          title={""}
+          title={title}
           description={desc}
           style={{justifyContent: "center"}}
         />
+        {this.renderTags(tags)}
+      </Card.Grid>
+    );
+  }
+
+  renderTags(tags) {
+    if (!tags || !Array.isArray(tags) || tags.length === 0) {
+      return null;
+    }
+
+    return (
+      <div style={{marginTop: "8px"}}>
+        {tags.map(tag => (
+          <Tag key={tag.name} color={tag.color} style={{marginRight: "4px"}}>
+            {tag.name}
+          </Tag>
+        ))}
       </div>
     );
   }
 
-  renderCard(logo, link, title, desc, time, isSingle) {
+  renderCard(logo, link, title, desc, time, tags, isSingle) {
     const silentSigninLink = this.wrappedAsSilentSigninLink(link);
-    const date = Setting.getFormattedDateShort(time);
+
     return (
-      // TODO: add borderRadius from app settings
-      <div style={{paddingLeft: "20px", paddingRight: "20px", paddingBottom: "20px"}}>
-        <div
+      <Col style={{paddingLeft: "20px", paddingRight: "20px", paddingBottom: "20px", marginBottom: "20px"}} span={6}>
+        <Card
+          hoverable
+          cover={
+            <img alt="logo" src={logo} style={{width: "100%", height: "200px", padding: "20px", objectFit: "scale-down"}} />
+          }
           onClick={() => Setting.goToLinkSoft(this, silentSigninLink)}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            width: isSingle ? "320px" : "100%",
-            height: "100%",
-            padding: "10px",
-            borderRadius: "13px",
-            border: "1px solid #e6e6e6",
-            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.0)",
-            transition: "box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out",
-            cursor: "pointer",
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.boxShadow = "0 6px 12px rgba(0, 0, 0, 0.2)";
-            e.currentTarget.style.transform = "scale(1.02)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.0)";
-            e.currentTarget.style.transform = "scale(1)";
-          }}
+          style={isSingle ? {width: "320px", height: "100%"} : {width: "100%", height: "100%"}}
         >
-          <img
-            alt="logo"
-            src={logo}
-            style={{width: "100%", height: "auto", padding: "10px", objectFit: "contain"}}
-          />
-          <div style={{width: "50%", padding: "10px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}}>
-            <h3 style={{margin: 0}}>{title}</h3>
-            {date && <p style={{margin: 0}}>{date}</p>}
-            <p style={{margin: 0}}>{desc}</p>
-          </div>
-        </div>
-      </div>
+          <Meta title={title} description={desc} />
+          {this.renderTags(tags)}
+          <br />
+          <Meta title={""} description={Setting.getFormattedDateShort(time)} />
+        </Card>
+      </Col>
     );
   }
 
   render() {
     if (Setting.isMobile()) {
-      return this.renderCardMobile(this.props.logo, this.props.link, this.props.title, this.props.desc, this.props.time, this.props.isSingle);
+      return this.renderCardMobile(this.props.logo, this.props.link, this.props.title, this.props.desc, this.props.time, this.props.tags, this.props.isSingle);
     } else {
-      return this.renderCard(this.props.logo, this.props.link, this.props.title, this.props.desc, this.props.time, this.props.isSingle);
+      return this.renderCard(this.props.logo, this.props.link, this.props.title, this.props.desc, this.props.time, this.props.tags, this.props.isSingle);
     }
   }
 }

@@ -34,6 +34,11 @@ type Object struct {
 	AccessSecret string `json:"accessSecret"`
 }
 
+type ObjectWithOrg struct {
+	Object
+	Organization string `json:"organization"`
+}
+
 func getUsername(ctx *context.Context) (username string) {
 	username, ok := ctx.Input.Session("username").(string)
 	if !ok || username == "" {
@@ -91,7 +96,7 @@ func getObject(ctx *context.Context) (string, string, error) {
 
 		return "", "", nil
 	} else {
-		if path == "/api/add-policy" || path == "/api/remove-policy" || path == "/api/update-policy" {
+		if path == "/api/add-policy" || path == "/api/remove-policy" || path == "/api/update-policy" || path == "/api/send-invitation" {
 			id := ctx.Input.Query("id")
 			if id != "" {
 				return util.GetOwnerAndNameFromIdWithError(id)
@@ -104,10 +109,25 @@ func getObject(ctx *context.Context) (string, string, error) {
 		}
 
 		var obj Object
+
+		if strings.HasSuffix(path, "-application") || strings.HasSuffix(path, "-token") ||
+			strings.HasSuffix(path, "-syncer") || strings.HasSuffix(path, "-webhook") {
+			var objWithOrg ObjectWithOrg
+			err := json.Unmarshal(body, &objWithOrg)
+			if err != nil {
+				return "", "", nil
+			}
+			return objWithOrg.Organization, objWithOrg.Name, nil
+		}
+
 		err := json.Unmarshal(body, &obj)
 		if err != nil {
 			// this is not error
 			return "", "", nil
+		}
+
+		if strings.HasSuffix(path, "-organization") {
+			return obj.Name, obj.Name, nil
 		}
 
 		if path == "/api/delete-resource" {

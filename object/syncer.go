@@ -153,13 +153,15 @@ func GetMaskedSyncers(syncers []*Syncer, errs ...error) ([]*Syncer, error) {
 	return syncers, nil
 }
 
-func UpdateSyncer(id string, syncer *Syncer) (bool, error) {
+func UpdateSyncer(id string, syncer *Syncer, isGlobalAdmin bool) (bool, error) {
 	owner, name := util.GetOwnerAndNameFromId(id)
 	s, err := getSyncer(owner, name)
 	if err != nil {
 		return false, err
 	} else if s == nil {
 		return false, nil
+	} else if !isGlobalAdmin && s.Organization != syncer.Organization {
+		return false, fmt.Errorf("auth:Unauthorized operation")
 	}
 
 	session := ormer.Engine.ID(core.PK{owner, name}).AllCols()
@@ -218,7 +220,7 @@ func AddSyncer(syncer *Syncer) (bool, error) {
 }
 
 func DeleteSyncer(syncer *Syncer) (bool, error) {
-	affected, err := ormer.Engine.ID(core.PK{syncer.Owner, syncer.Name}).Delete(&Syncer{})
+	affected, err := ormer.Engine.ID(core.PK{syncer.Owner, syncer.Name}).Where("organization = ?", syncer.Organization).Delete(&Syncer{})
 	if err != nil {
 		return false, err
 	}
@@ -273,9 +275,14 @@ func (syncer *Syncer) getKeyColumn() *TableColumn {
 	return column
 }
 
-func (syncer *Syncer) getKey() string {
+func (syncer *Syncer) getLocalPrimaryKey() string {
 	column := syncer.getKeyColumn()
 	return util.CamelToSnakeCase(column.CasdoorName)
+}
+
+func (syncer *Syncer) getTargetTablePrimaryKey() string {
+	column := syncer.getKeyColumn()
+	return column.Name
 }
 
 func RunSyncer(syncer *Syncer) error {

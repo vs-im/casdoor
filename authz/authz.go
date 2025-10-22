@@ -61,6 +61,7 @@ p, *, *, GET, /api/get-application, *, *
 p, *, *, GET, /api/get-organization-applications, *, *
 p, *, *, GET, /api/get-user, *, *
 p, *, *, GET, /api/get-user-application, *, *
+p, *, *, POST, /api/upload-users, *, *
 p, *, *, GET, /api/get-resources, *, *
 p, *, *, GET, /api/get-records, *, *
 p, *, *, GET, /api/get-product, *, *
@@ -80,6 +81,9 @@ p, *, *, POST, /api/upload-resource, *, *
 p, *, *, GET, /.well-known/openid-configuration, *, *
 p, *, *, GET, /.well-known/webfinger, *, *
 p, *, *, *, /.well-known/jwks, *, *
+p, *, *, GET, /.well-known/:application/openid-configuration, *, *
+p, *, *, GET, /.well-known/:application/webfinger, *, *
+p, *, *, *, /.well-known/:application/jwks, *, *
 p, *, *, GET, /api/get-saml-login, *, *
 p, *, *, POST, /api/acs, *, *
 p, *, *, GET, /api/saml/metadata, *, *
@@ -143,6 +147,10 @@ func IsAllowed(subOwner string, subName string, method string, urlPath string, o
 			return false
 		}
 
+		if user.IsGlobalAdmin() {
+			return true
+		}
+
 		if user.IsAdmin && (subOwner == objOwner || (objOwner == "admin")) {
 			return true
 		}
@@ -151,6 +159,13 @@ func IsAllowed(subOwner string, subName string, method string, urlPath string, o
 	res, err := Enforcer.Enforce(subOwner, subName, method, urlPath, objOwner, objName)
 	if err != nil {
 		panic(err)
+	}
+
+	if !res {
+		res, err = object.CheckApiPermission(util.GetId(subOwner, subName), objOwner, urlPath, method)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return res

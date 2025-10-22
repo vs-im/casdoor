@@ -235,6 +235,8 @@ func (c *ApiController) Signup() {
 		Invitation:        invitationName,
 		InvitationCode:    authForm.InvitationCode,
 		EmailVerified:     userEmailVerified,
+		RegisterType:      "Application Signup",
+		RegisterSource:    fmt.Sprintf("%s/%s", authForm.Organization, application.Name),
 	}
 
 	if len(organization.Tags) > 0 {
@@ -286,8 +288,7 @@ func (c *ApiController) Signup() {
 		}
 	}
 
-	if application.HasPromptPage() && user.Type == "normal-user" {
-		// The prompt page needs the user to be signed in
+	if user.Type == "normal-user" {
 		c.SetSessionUsername(user.GetId())
 	}
 
@@ -327,9 +328,9 @@ func (c *ApiController) Signup() {
 // @router /logout [post]
 func (c *ApiController) Logout() {
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0-final.html
-	accessToken := c.Input().Get("id_token_hint")
-	redirectUri := c.Input().Get("post_logout_redirect_uri")
-	state := c.Input().Get("state")
+	accessToken := c.GetString("id_token_hint")
+	redirectUri := c.GetString("post_logout_redirect_uri")
+	state := c.GetString("state")
 
 	user := c.GetSessionUsername()
 

@@ -27,16 +27,22 @@ import (
 )
 
 type LarkIdProvider struct {
-	Client *http.Client
-	Config *oauth2.Config
+	Client     *http.Client
+	Config     *oauth2.Config
+	LarkDomain string
 }
 
-func NewLarkIdProvider(clientId string, clientSecret string, redirectUrl string) *LarkIdProvider {
+func NewLarkIdProvider(clientId string, clientSecret string, redirectUrl string, useGlobalEndpoint bool) *LarkIdProvider {
 	idp := &LarkIdProvider{}
+
+	if useGlobalEndpoint {
+		idp.LarkDomain = "https://open.larksuite.com"
+	} else {
+		idp.LarkDomain = "https://open.feishu.cn"
+	}
 
 	config := idp.getConfig(clientId, clientSecret, redirectUrl)
 	idp.Config = config
-
 	return idp
 }
 
@@ -47,7 +53,7 @@ func (idp *LarkIdProvider) SetHttpClient(client *http.Client) {
 // getConfig return a point of Config, which describes a typical 3-legged OAuth2 flow
 func (idp *LarkIdProvider) getConfig(clientId string, clientSecret string, redirectUrl string) *oauth2.Config {
 	endpoint := oauth2.Endpoint{
-		TokenURL: "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+		TokenURL: idp.LarkDomain + "/open-apis/auth/v3/tenant_access_token/internal",
 	}
 
 	config := &oauth2.Config{
@@ -129,6 +135,7 @@ func (idp *LarkIdProvider) GetToken(code string) (*oauth2.Token, error) {
         "open_id": "ou-caecc734c2e3328a62489fe0648c4b98779515d3",
         "union_id": "on-d89jhsdhjsajkda7828enjdj328ydhhw3u43yjhdj",
         "email": "zhangsan@feishu.cn",
+        "enterprise_email": "zhangsan@company.com",
         "user_id": "5d9bdxxx",
         "mobile": "+86130002883xx",
         "tenant_key": "736588c92lxf175d",
@@ -154,6 +161,7 @@ type LarkUserInfo struct {
 		OpenId           string `json:"open_id"`
 		UnionId          string `json:"union_id"`
 		Email            string `json:"email"`
+		EnterpriseEmail  string `json:"enterprise_email"`
 		UserId           string `json:"user_id"`
 		Mobile           string `json:"mobile"`
 		TenantKey        string `json:"tenant_key"`
@@ -175,7 +183,7 @@ func (idp *LarkIdProvider) GetUserInfo(token *oauth2.Token) (*UserInfo, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", "https://open.feishu.cn/open-apis/authen/v1/access_token", strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", idp.LarkDomain+"/open-apis/authen/v1/access_token", strings.NewReader(string(data)))
 	if err != nil {
 		return nil, err
 	}
@@ -200,6 +208,12 @@ func (idp *LarkIdProvider) GetUserInfo(token *oauth2.Token) (*UserInfo, error) {
 		return nil, err
 	}
 
+	// Use enterprise_email as fallback when email is empty
+	email := larkUserInfo.Data.Email
+	if email == "" {
+		email = larkUserInfo.Data.EnterpriseEmail
+	}
+
 	var phoneNumber string
 	var countryCode string
 	if len(larkUserInfo.Data.Mobile) != 0 {
@@ -215,7 +229,7 @@ func (idp *LarkIdProvider) GetUserInfo(token *oauth2.Token) (*UserInfo, error) {
 		Id:          larkUserInfo.Data.OpenId,
 		DisplayName: larkUserInfo.Data.Name,
 		Username:    larkUserInfo.Data.UserId,
-		Email:       larkUserInfo.Data.Email,
+		Email:       email,
 		AvatarUrl:   larkUserInfo.Data.AvatarUrl,
 		Phone:       phoneNumber,
 		CountryCode: countryCode,

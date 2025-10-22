@@ -102,6 +102,7 @@ func initAPI() {
 	beego.Router("/api/add-invitation", &controllers.ApiController{}, "POST:AddInvitation")
 	beego.Router("/api/delete-invitation", &controllers.ApiController{}, "POST:DeleteInvitation")
 	beego.Router("/api/verify-invitation", &controllers.ApiController{}, "GET:VerifyInvitation")
+	beego.Router("/api/send-invitation", &controllers.ApiController{}, "POST:SendInvitation")
 
 	beego.Router("/api/get-applications", &controllers.ApiController{}, "GET:GetApplications")
 	beego.Router("/api/get-application", &controllers.ApiController{}, "GET:GetApplication")
@@ -160,6 +161,7 @@ func initAPI() {
 	beego.Router("/api/add-adapter", &controllers.ApiController{}, "POST:AddAdapter")
 	beego.Router("/api/delete-adapter", &controllers.ApiController{}, "POST:DeleteAdapter")
 	beego.Router("/api/get-policies", &controllers.ApiController{}, "GET:GetPolicies")
+	beego.Router("/api/get-filtered-policies", &controllers.ApiController{}, "POST:GetFilteredPolicies")
 	beego.Router("/api/update-policy", &controllers.ApiController{}, "POST:UpdatePolicy")
 	beego.Router("/api/add-policy", &controllers.ApiController{}, "POST:AddPolicy")
 	beego.Router("/api/remove-policy", &controllers.ApiController{}, "POST:RemovePolicy")
@@ -238,6 +240,13 @@ func initAPI() {
 	beego.Router("/api/get-prometheus-info", &controllers.ApiController{}, "GET:GetPrometheusInfo")
 	beego.Handler("/api/metrics", promhttp.Handler())
 
+	beego.Router("/api/get-global-forms", &controllers.ApiController{}, "GET:GetGlobalForms")
+	beego.Router("/api/get-forms", &controllers.ApiController{}, "GET:GetForms")
+	beego.Router("/api/get-form", &controllers.ApiController{}, "GET:GetForm")
+	beego.Router("/api/update-form", &controllers.ApiController{}, "POST:UpdateForm")
+	beego.Router("/api/add-form", &controllers.ApiController{}, "POST:AddForm")
+	beego.Router("/api/delete-form", &controllers.ApiController{}, "POST:DeleteForm")
+
 	beego.Router("/api/get-syncers", &controllers.ApiController{}, "GET:GetSyncers")
 	beego.Router("/api/get-syncer", &controllers.ApiController{}, "GET:GetSyncer")
 	beego.Router("/api/update-syncer", &controllers.ApiController{}, "POST:UpdateSyncer")
@@ -294,8 +303,11 @@ func initAPI() {
 	beego.Router("/api/set-preferred-mfa", &controllers.ApiController{}, "POST:SetPreferredMfa")
 
 	beego.Router("/.well-known/openid-configuration", &controllers.RootController{}, "GET:GetOidcDiscovery")
+	beego.Router("/.well-known/:application/openid-configuration", &controllers.RootController{}, "GET:GetOidcDiscoveryByApplication")
 	beego.Router("/.well-known/jwks", &controllers.RootController{}, "*:GetJwks")
+	beego.Router("/.well-known/:application/jwks", &controllers.RootController{}, "*:GetJwksByApplication")
 	beego.Router("/.well-known/webfinger", &controllers.RootController{}, "GET:GetWebFinger")
+	beego.Router("/.well-known/:application/webfinger", &controllers.RootController{}, "GET:GetWebFingerByApplication")
 
 	beego.Router("/cas/:organization/:application/serviceValidate", &controllers.RootController{}, "GET:CasServiceValidate")
 	beego.Router("/cas/:organization/:application/proxyValidate", &controllers.RootController{}, "GET:CasProxyValidate")

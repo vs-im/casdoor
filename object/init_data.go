@@ -46,6 +46,8 @@ type InitData struct {
 	Sessions      []*Session            `json:"sessions"`
 	Subscriptions []*Subscription       `json:"subscriptions"`
 	Transactions  []*Transaction        `json:"transactions"`
+
+	EnforcerPolicies map[string][][]string `json:"enforcerPolicies"`
 }
 
 var initDataNewOnly bool
@@ -85,9 +87,6 @@ func InitFromFile() {
 		for _, model := range initData.Models {
 			initDefinedModel(model)
 		}
-		for _, permission := range initData.Permissions {
-			initDefinedPermission(permission)
-		}
 		for _, payment := range initData.Payments {
 			initDefinedPayment(payment)
 		}
@@ -116,7 +115,11 @@ func InitFromFile() {
 			initDefinedAdapter(adapter)
 		}
 		for _, enforcer := range initData.Enforcers {
-			initDefinedEnforcer(enforcer)
+			policies := initData.EnforcerPolicies[enforcer.GetId()]
+			initDefinedEnforcer(enforcer, policies)
+		}
+		for _, permission := range initData.Permissions {
+			initDefinedPermission(permission)
 		}
 		for _, plan := range initData.Plans {
 			initDefinedPlan(plan)
@@ -175,6 +178,8 @@ func readInitDataFromFile(filePath string) (*InitData, error) {
 		Sessions:      []*Session{},
 		Subscriptions: []*Subscription{},
 		Transactions:  []*Transaction{},
+
+		EnforcerPolicies: map[string][][]string{},
 	}
 	err := util.JsonToStruct(s, data)
 	if err != nil {
@@ -694,7 +699,7 @@ func initDefinedAdapter(adapter *Adapter) {
 	}
 }
 
-func initDefinedEnforcer(enforcer *Enforcer) {
+func initDefinedEnforcer(enforcer *Enforcer, policies [][]string) {
 	existed, err := getEnforcer(enforcer.Owner, enforcer.Name)
 	if err != nil {
 		panic(err)
@@ -713,6 +718,27 @@ func initDefinedEnforcer(enforcer *Enforcer) {
 	}
 	enforcer.CreatedTime = util.GetCurrentTime()
 	_, err = AddEnforcer(enforcer)
+	if err != nil {
+		panic(err)
+	}
+
+	err = enforcer.InitEnforcer()
+	if err != nil {
+		panic(err)
+	}
+
+	for _, policy := range policies {
+		if enforcer.HasPolicy(policy) {
+			continue
+		}
+
+		_, err = enforcer.AddPolicy(policy)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	err = enforcer.SavePolicy()
 	if err != nil {
 		panic(err)
 	}

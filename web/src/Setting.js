@@ -62,6 +62,7 @@ export const Countries = [
   {label: "فارسی", key: "fa", country: "IR", alt: "فارسی"},
   {label: "Čeština", key: "cs", country: "CZ", alt: "Čeština"},
   {label: "Slovenčina", key: "sk", country: "SK", alt: "Slovenčina"},
+  {label: "Azərbaycan dili", key: "az", country: "AZ", alt: "Azərbaycan dili"},
 ];
 
 export function getThemeData(organization, application) {
@@ -161,7 +162,7 @@ export const OtherProviderInfo = {
       url: "https://control.msg91.com/app/",
     },
     "OSON SMS": {
-      logo: "https://osonsms.com/images/osonsms-logo.svg",
+      logo: `${StaticBaseUrl}/img/social_osonsms.svg`,
       url: "https://osonsms.com/",
     },
     "Custom HTTP SMS": {
@@ -209,7 +210,7 @@ export const OtherProviderInfo = {
       url: "https://aws.amazon.com/s3",
     },
     "MinIO": {
-      logo: "https://min.io/resources/img/logo.svg",
+      logo: `${StaticBaseUrl}/img/social_minio.png`,
       url: "https://min.io/",
     },
     "Aliyun OSS": {
@@ -964,11 +965,12 @@ export function getClickable(text) {
 }
 
 export function getProviderLogoURL(provider) {
-  if (provider.type === "Custom" && provider.customLogo) {
+  if (provider.type.startsWith("Custom") && provider.customLogo) {
     return provider.customLogo;
   }
   if (provider.category === "OAuth") {
-    return `${StaticBaseUrl}/img/social_${provider.type.toLowerCase()}.png`;
+    const type = provider.type.startsWith("Custom") ? "Custom" : provider.type;
+    return `${StaticBaseUrl}/img/social_${type.toLowerCase()}.png`;
   } else {
     if (!provider.category || !provider.type) {
       return "";
@@ -1071,6 +1073,15 @@ export function getProviderTypeOptions(category) {
         {id: "Yandex", name: "Yandex"},
         {id: "Zoom", name: "Zoom"},
         {id: "Custom", name: "Custom"},
+        {id: "Custom2", name: "Custom2"},
+        {id: "Custom3", name: "Custom3"},
+        {id: "Custom4", name: "Custom4"},
+        {id: "Custom5", name: "Custom5"},
+        {id: "Custom6", name: "Custom6"},
+        {id: "Custom7", name: "Custom7"},
+        {id: "Custom8", name: "Custom8"},
+        {id: "Custom9", name: "Custom9"},
+        {id: "Custom10", name: "Custom10"},
       ]
     );
   } else if (category === "Email") {
@@ -1311,6 +1322,9 @@ export function getSignupLink(application, text) {
   } else {
     if (application.signupUrl === "") {
       url = `/signup/${application.name}`;
+      if (application.isShared) {
+        url = `/signup/${application.name}-org-${application.organization}`;
+      }
     } else {
       url = application.signupUrl;
     }
@@ -1353,10 +1367,14 @@ export function renderHelmet(application) {
     return null;
   }
 
+  // Application's title and favicon have higher priority than organization's values
+  const title = application.title || application.organizationObj.displayName;
+  const favicon = application.favicon || application.organizationObj.favicon;
+
   return (
     <Helmet>
-      <title>{application.organizationObj.displayName}</title>
-      <link rel="icon" href={application.organizationObj.favicon} />
+      <title>{title}</title>
+      <link rel="icon" href={favicon} />
     </Helmet>
   );
 }
@@ -1535,6 +1553,54 @@ export function getCurrencySymbol(currency) {
     return "$";
   } else if (currency === "CNY" || currency === "cny") {
     return "¥";
+  } else if (currency === "EUR" || currency === "eur") {
+    return "€";
+  } else if (currency === "JPY" || currency === "jpy") {
+    return "¥";
+  } else if (currency === "GBP" || currency === "gbp") {
+    return "£";
+  } else if (currency === "AUD" || currency === "aud") {
+    return "A$";
+  } else if (currency === "CAD" || currency === "cad") {
+    return "C$";
+  } else if (currency === "CHF" || currency === "chf") {
+    return "CHF";
+  } else if (currency === "HKD" || currency === "hkd") {
+    return "HK$";
+  } else if (currency === "SGD" || currency === "sgd") {
+    return "S$";
+  } else if (currency === "BRL" || currency === "brl") {
+    return "R$";
+  } else if (currency === "PLN" || currency === "pln") {
+    return "zł";
+  } else if (currency === "KRW" || currency === "krw") {
+    return "₩";
+  } else if (currency === "INR" || currency === "inr") {
+    return "₹";
+  } else if (currency === "RUB" || currency === "rub") {
+    return "₽";
+  } else if (currency === "MXN" || currency === "mxn") {
+    return "$";
+  } else if (currency === "ZAR" || currency === "zar") {
+    return "R";
+  } else if (currency === "TRY" || currency === "try") {
+    return "₺";
+  } else if (currency === "SEK" || currency === "sek") {
+    return "kr";
+  } else if (currency === "NOK" || currency === "nok") {
+    return "kr";
+  } else if (currency === "DKK" || currency === "dkk") {
+    return "kr";
+  } else if (currency === "THB" || currency === "thb") {
+    return "฿";
+  } else if (currency === "MYR" || currency === "myr") {
+    return "RM";
+  } else if (currency === "TWD" || currency === "twd") {
+    return "NT$";
+  } else if (currency === "CZK" || currency === "czk") {
+    return "Kč";
+  } else if (currency === "HUF" || currency === "huf") {
+    return "Ft";
   } else {
     return currency;
   }
@@ -1599,6 +1665,53 @@ export function getDefaultHtmlEmailContent() {
     <div class="code">
         %s
     </div>
+    <reset-link>
+      <div class="link">
+         Or click this <a href="%link">link</a> to reset
+      </div>
+    </reset-link>
+    <p>Thanks</p>
+    <p>Casbin Team</p>
+    <hr>
+    <div class="footer">
+        <p>Casdoor is a brand operated by Casbin organization. For more info please refer to <a href="https://casdoor.org">https://casdoor.org</a></p>
+    </div>
+</div>
+</body>
+</html>`;
+}
+
+export function getDefaultInvitationHtmlEmailContent() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invitation Code Email</title>
+<style>
+    body { font-family: Arial, sans-serif; }
+    .email-container { width: 600px; margin: 0 auto; }
+    .header { text-align: center; }
+    .code { font-size: 24px; margin: 20px 0; text-align: center; }
+    .footer { font-size: 12px; text-align: center; margin-top: 50px; }
+    .footer a { color: #000; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="email-container">
+  <div class="header">
+        <h3>Casbin Organization</h3>
+        <img src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png" alt="Casdoor Logo" width="300">
+    </div>
+    <p>You have been invited into Casdoor</p>
+    <div class="code">
+        %code
+    </div>
+    <reset-link>
+      <div class="link">
+         Or click this <a href="%link">link</a> to signup
+      </div>
+    </reset-link>
     <p>Thanks</p>
     <p>Casbin Team</p>
     <hr>
@@ -1633,6 +1746,36 @@ export function getCurrencyText(product) {
     return i18next.t("currency:SGD");
   } else if (product?.currency === "BRL") {
     return i18next.t("currency:BRL");
+  } else if (product?.currency === "PLN") {
+    return i18next.t("currency:PLN");
+  } else if (product?.currency === "KRW") {
+    return i18next.t("currency:KRW");
+  } else if (product?.currency === "INR") {
+    return i18next.t("currency:INR");
+  } else if (product?.currency === "RUB") {
+    return i18next.t("currency:RUB");
+  } else if (product?.currency === "MXN") {
+    return i18next.t("currency:MXN");
+  } else if (product?.currency === "ZAR") {
+    return i18next.t("currency:ZAR");
+  } else if (product?.currency === "TRY") {
+    return i18next.t("currency:TRY");
+  } else if (product?.currency === "SEK") {
+    return i18next.t("currency:SEK");
+  } else if (product?.currency === "NOK") {
+    return i18next.t("currency:NOK");
+  } else if (product?.currency === "DKK") {
+    return i18next.t("currency:DKK");
+  } else if (product?.currency === "THB") {
+    return i18next.t("currency:THB");
+  } else if (product?.currency === "MYR") {
+    return i18next.t("currency:MYR");
+  } else if (product?.currency === "TWD") {
+    return i18next.t("currency:TWD");
+  } else if (product?.currency === "CZK") {
+    return i18next.t("currency:CZK");
+  } else if (product?.currency === "HUF") {
+    return i18next.t("currency:HUF");
   } else {
     return "(Unknown currency)";
   }
@@ -1751,4 +1894,135 @@ export function renderLoginPanel(application, getInnerComponent, componentThis) 
       </div>
     </div>
   );
+}
+
+export function createFormAndSubmit(url, params) {
+  const form = document.createElement("form");
+  form.method = "post";
+  form.action = url;
+
+  for (const k in params) {
+    if (!params[k]) {
+      continue;
+    }
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = k;
+    input.value = params[k];
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+  setTimeout(() => {form.remove();}, 500);
+}
+
+export function getFormTypeOptions() {
+  return [
+    {id: "users", name: "general:Users"},
+    {id: "providers", name: "general:Providers"},
+    {id: "applications", name: "general:Applications"},
+    {id: "organizations", name: "general:Organizations"},
+  ];
+}
+
+export function getFormTypeItems(formType) {
+  if (formType === "users") {
+    return [
+      {name: "owner", label: "general:Organization", visible: true, width: "150"},
+      {name: "signupApplication", label: "general:Application", visible: true, width: "120"},
+      {name: "name", label: "general:Name", visible: true, width: "110"},
+      {name: "createdTime", label: "general:Created time", visible: true, width: "160"},
+      {name: "displayName", label: "general:Display name", visible: true, width: "150"},
+      {name: "avatar", label: "general:Avatar", visible: true, width: "80"},
+      {name: "email", label: "general:Email", visible: true, width: "160"},
+      {name: "phone", label: "general:Phone", visible: true, width: "120"},
+      {name: "affiliation", label: "user:Affiliation", visible: true, width: "140"},
+      {name: "region", label: "user:Country/Region", visible: true, width: "140"},
+      {name: "type", label: "general:User type", visible: true, width: "120"},
+      {name: "tag", label: "user:Tag", visible: true, width: "110"},
+      {name: "isAdmin", label: "user:Is admin", visible: true, width: "120"},
+      {name: "isForbidden", label: "user:Is forbidden", visible: true, width: "110"},
+      {name: "isDeleted", label: "user:Is deleted", visible: true, width: "110"},
+    ];
+  } else if (formType === "providers") {
+    return [
+      {name: "name", label: "general:Name", visible: true, width: "120"},
+      {name: "owner", label: "general:Organization", visible: true, width: "150"},
+      {name: "createdTime", label: "general:Created time", visible: true, width: "180"},
+      {name: "displayName", label: "general:Display name", visible: true, width: "150"},
+      {name: "category", label: "provider:Category", visible: true, width: "110"},
+      {name: "type", label: "provider:Type", visible: true, width: "110"},
+      {name: "clientId", label: "provider:Client ID", visible: true, width: "100"},
+      {name: "providerUrl", label: "provider:Provider URL", visible: true, width: "150"},
+    ];
+  } else if (formType === "applications") {
+    return [
+      {name: "name", label: "general:Name", visible: true, width: "150"},
+      {name: "createdTime", label: "general:Created time", visible: true, width: "160"},
+      {name: "displayName", label: "general:Display name", visible: true, width: "150"},
+      {name: "logo", label: "Logo", visible: true, width: "200"},
+      {name: "organization", label: "general:Organization", visible: true, width: "150"},
+      {name: "providers", label: "general:Providers", visible: true, width: "500"},
+    ];
+  } else if (formType === "organizations") {
+    return [
+      {name: "name", label: "general:Name", visible: true, width: "120"},
+      {name: "createdTime", label: "general:Created time", visible: true, width: "160"},
+      {name: "displayName", label: "general:Display name", visible: true, width: "150"},
+      {name: "favicon", label: "general:Favicon", visible: true, width: "50"},
+      {name: "websiteUrl", label: "organization:Website URL", visible: true, width: "200"},
+      {name: "passwordType", label: "general:Password type", visible: true, width: "150"},
+      {name: "passwordSalt", label: "general:Password salt", visible: true, width: "150"},
+      {name: "defaultAvatar", label: "general:Default avatar", visible: true, width: "120"},
+      {name: "enableSoftDeletion", label: "organization:Soft deletion", visible: true, width: "140"},
+    ];
+  } else {
+    return [];
+  }
+}
+
+export function filterTableColumns(columns, formItems, actionKey = "op") {
+  if (!formItems || formItems.length === 0) {
+    return columns;
+  }
+  const visibleColumns = formItems
+    .filter(item => item.visible !== false)
+    .map(item => {
+      const matchedColumn = columns.find(col => col.key === item.name);
+
+      if (matchedColumn) {
+        return {
+          ...matchedColumn,
+          width: item.width !== undefined ? `${item.width}px` : matchedColumn.width,
+          title: item.width !== undefined ? `${i18next.t(item.label)}` : matchedColumn.title,
+        };
+      }
+      return null;
+    })
+    .filter(col => col !== null);
+
+  const actionColumn = columns.find(col => col.key === actionKey);
+
+  return [
+    ...visibleColumns,
+    actionColumn,
+  ].filter(col => col);
+}
+
+export function getApiPaths() {
+  const objects = ["organization", "group", "user", "application", "provider", "resource", "cert", "role", "permission", "model", "adapter", "enforcer", "session", "record", "token", "product", "payment", "plan", "pricing", "subscription", "syncer", "webhook"];
+  const res = [];
+  objects.forEach(obj => {
+    ["add", "update", "delete"].forEach(action => {
+      res.push(`${action}-${obj}`);
+    });
+    if (obj === "payment") {
+      res.push("invoice-payment", "notify-payment");
+    }
+    if (obj === "product") {
+      res.push("buy-product");
+    }
+  });
+  return res;
 }

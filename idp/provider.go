@@ -87,7 +87,7 @@ func GetIdProvider(idpInfo *ProviderInfo, redirectUrl string) (IdProvider, error
 			return nil, fmt.Errorf("WeCom provider subType: %s is not supported", idpInfo.SubType)
 		}
 	case "Lark":
-		return NewLarkIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
+		return NewLarkIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl, idpInfo.DisableSsl), nil
 	case "GitLab":
 		return NewGitlabIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
 	case "ADFS":
@@ -127,6 +127,9 @@ func GetIdProvider(idpInfo *ProviderInfo, redirectUrl string) (IdProvider, error
 	default:
 		if isGothSupport(idpInfo.Type) {
 			return NewGothIdProvider(idpInfo.Type, idpInfo.ClientId, idpInfo.ClientSecret, idpInfo.ClientId2, idpInfo.ClientSecret2, redirectUrl, idpInfo.HostUrl)
+		}
+		if strings.HasPrefix(idpInfo.Type, "Custom") {
+			return NewCustomIdProvider(idpInfo, redirectUrl), nil
 		}
 		return nil, fmt.Errorf("OAuth provider type: %s is not supported", idpInfo.Type)
 	}

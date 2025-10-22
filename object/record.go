@@ -43,6 +43,8 @@ type Record struct {
 type Response struct {
 	Status string `json:"status"`
 	Msg    string `json:"msg"`
+
+	Data interface{} `json:"data"`
 }
 
 func maskPassword(recordString string) string {
@@ -52,6 +54,10 @@ func maskPassword(recordString string) string {
 func NewRecord(ctx *context.Context) (*casvisorsdk.Record, error) {
 	clientIp := strings.Replace(util.GetClientIpFromRequest(ctx.Request), ": ", "", -1)
 	action := strings.Replace(ctx.Request.URL.Path, "/api/", "", -1)
+	if strings.HasPrefix(action, "notify-payment") {
+		action = "notify-payment"
+	}
+
 	requestUri := util.FilterQuery(ctx.Request.RequestURI, []string{"accessToken"})
 	if len(requestUri) > 1000 {
 		requestUri = requestUri[0:1000]
@@ -74,6 +80,19 @@ func NewRecord(ctx *context.Context) (*casvisorsdk.Record, error) {
 		return nil, err
 	}
 
+	if action != "buy-product" {
+		resp.Data = nil
+	}
+
+	dataResp := ""
+	if resp.Data != nil {
+		dataByte, err := json.Marshal(resp.Data)
+		if err != nil {
+			return nil, err
+		}
+		dataResp = fmt.Sprintf(", data:%s", string(dataByte))
+	}
+
 	language := ctx.Request.Header.Get("Accept-Language")
 	if len(language) > 2 {
 		language = language[0:2]
@@ -91,7 +110,7 @@ func NewRecord(ctx *context.Context) (*casvisorsdk.Record, error) {
 		Language:    languageCode,
 		Object:      object,
 		StatusCode:  200,
-		Response:    fmt.Sprintf("{status:\"%s\", msg:\"%s\"}", resp.Status, resp.Msg),
+		Response:    fmt.Sprintf("{status:\"%s\", msg:\"%s\"%s}", resp.Status, resp.Msg, dataResp),
 		IsTriggered: false,
 	}
 	return &record, nil

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -186,6 +187,11 @@ func (c *ApiController) DeleteResource() {
 		return
 	}
 	_, resource.Name = refineFullFilePath(resource.Name)
+
+	tag := c.Input().Get("tag")
+	if tag == "Direct" {
+		resource.Name = path.Join(provider.PathPrefix, resource.Name)
+	}
 
 	err = object.DeleteFile(provider, resource.Name, c.GetAcceptLanguage())
 	if err != nil {
@@ -358,7 +364,7 @@ func (c *ApiController) UploadResource() {
 		}
 
 		applicationObj.TermsOfUse = fileUrl
-		_, err = object.UpdateApplication(applicationId, applicationObj)
+		_, err = object.UpdateApplication(applicationId, applicationObj, true)
 		if err != nil {
 			c.ResponseError(err.Error())
 			return

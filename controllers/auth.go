@@ -70,6 +70,16 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		return
 	}
 
+	if application.DisableSignin {
+		c.ResponseError(fmt.Sprintf(c.T("auth:The application: %s has disabled users to signin"), application.Name))
+		return
+	}
+
+	if application.OrganizationObj != nil && application.OrganizationObj.DisableSignin {
+		c.ResponseError(fmt.Sprintf(c.T("auth:The organization: %s has disabled users to signin"), application.Organization))
+		return
+	}
+
 	allowed, err := object.CheckLoginPermission(userId, application)
 	if err != nil {
 		c.ResponseError(err.Error(), nil)
@@ -147,7 +157,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			c.ResponseError(c.T("auth:Challenge method should be S256"))
 			return
 		}
-		code, err := object.GetOAuthCode(userId, clientId, form.Provider, responseType, redirectUri, scope, state, nonce, codeChallenge, c.Ctx.Request.Host, c.GetAcceptLanguage())
+		code, err := object.GetOAuthCode(userId, clientId, form.Provider, form.SigninMethod, responseType, redirectUri, scope, state, nonce, codeChallenge, c.Ctx.Request.Host, c.GetAcceptLanguage())
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
 			return
@@ -678,6 +688,7 @@ func (c *ApiController) Login() {
 		}
 		if provider == nil {
 			c.ResponseError(fmt.Sprintf(c.T("auth:The provider: %s does not exist"), authForm.Provider))
+			return
 		}
 
 		providerItem := application.GetProviderItem(provider.Name)
@@ -709,7 +720,8 @@ func (c *ApiController) Login() {
 
 			setHttpClient(idProvider, provider.Type)
 
-			if authForm.State != conf.GetConfigString("authState") && authForm.State != application.Name {
+			stateApplicationName := strings.Split(authForm.State, "-org-")[0]
+			if authForm.State != conf.GetConfigString("authState") && stateApplicationName != application.Name {
 				c.ResponseError(fmt.Sprintf(c.T("auth:State expected: %s, but got: %s"), conf.GetConfigString("authState"), authForm.State))
 				return
 			}
@@ -765,7 +777,7 @@ func (c *ApiController) Login() {
 			if user != nil && !user.IsDeleted {
 				// Sign in via OAuth (want to sign up but already have account)
 				// sync info from 3rd-party if possible
-				_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo)
+				_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo, provider.UserMapping)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
@@ -778,7 +790,7 @@ func (c *ApiController) Login() {
 				resp = c.HandleLoggedIn(application, user, &authForm)
 
 				c.Ctx.Input.SetParam("recordUserId", user.GetId())
-			} else if provider.Category == "OAuth" || provider.Category == "Web3" {
+			} else if provider.Category == "OAuth" || provider.Category == "Web3" || provider.Category == "SAML" {
 				// Sign up via OAuth
 				if application.EnableLinkWithEmail {
 					if userInfo.Email != "" {
@@ -807,7 +819,7 @@ func (c *ApiController) Login() {
 					}
 
 					if !providerItem.CanSignUp {
-						c.ResponseError(fmt.Sprintf(c.T("auth:The account for provider: %s and username: %s (%s) does not exist and is not allowed to sign up as new account via %%s, please use another way to sign up"), provider.Type, userInfo.Username, userInfo.DisplayName, provider.Type))
+						c.ResponseError(fmt.Sprintf(c.T("auth:The account for provider: %s and username: %s (%s) does not exist and is not allowed to sign up as new account via %s, please use another way to sign up"), provider.Type, userInfo.Username, userInfo.DisplayName, provider.Type))
 						return
 					}
 
@@ -876,6 +888,8 @@ func (c *ApiController) Login() {
 						IsDeleted:         false,
 						SignupApplication: application.Name,
 						Properties:        properties,
+						RegisterType:      "Application Signup",
+						RegisterSource:    fmt.Sprintf("%s/%s", application.Organization, application.Name),
 					}
 
 					var affected bool
@@ -901,7 +915,7 @@ func (c *ApiController) Login() {
 				}
 
 				// sync info from 3rd-party if possible
-				_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo)
+				_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo, provider.UserMapping)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
@@ -949,7 +963,7 @@ func (c *ApiController) Login() {
 			}
 
 			// sync info from 3rd-party if possible
-			_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo)
+			_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo, provider.UserMapping)
 			if err != nil {
 				c.ResponseError(err.Error())
 				return

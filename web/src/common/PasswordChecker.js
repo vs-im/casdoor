@@ -20,7 +20,7 @@ function isValidOption_AtLeast6(password) {
   return {
     value: i18next.t("user:The password must have at least 6 characters"),
     short: i18next.t("user:At least 6 characters"),
-    failed: password.length < 6,
+    failed: password?.length < 6,
   };
 }
 
@@ -28,7 +28,7 @@ function isValidOption_AtLeast8(password) {
   return {
     value: i18next.t("user:The password must have at least 8 characters"),
     short: i18next.t("user:At least 8 characters"),
-    failed: password.length < 8,
+    failed: password?.length < 8,
   };
 }
 
@@ -87,9 +87,9 @@ export function renderPasswordPopover(options, password) {
 }
 
 export function checkPasswordComplexity(password, options) {
-  let firstError = password.length === 0 ? i18next.t("login:Please input your password!") : "";
+  let firstError = !password?.length ? i18next.t("login:Please input your password!") : "";
   const checkersResults = [];
-  if (password.length === 0) {
+  if (password?.length === 0) {
     checkersResults.push({
       failed: true,
       value: firstError,
