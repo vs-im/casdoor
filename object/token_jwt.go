@@ -334,6 +334,31 @@ func getClaimsWithoutThirdIdp(claims Claims) ClaimsWithoutThirdIdp {
 	return res
 }
 
+func updateClaimsWithRoles(baseClaims jwt.MapClaims, roleNames []string, tokenAttributes []string) jwt.MapClaims {
+
+	for _, tokenAttribute := range tokenAttributes {
+		if tokenAttribute == "X-Hasura-Allowed-Roles" {
+			if len(roleNames) > 0 {
+				baseClaims["x-hasura-allowed-roles"] = roleNames
+			} else {
+				baseClaims["x-hasura-allowed-roles"] = []string{"user"}
+			}
+		}
+		if tokenAttribute == "X-Hasura-Default-Role" {
+			if len(roleNames) > 0 {
+				baseClaims["x-hasura-default-role"] = roleNames[0]
+			} else {
+				baseClaims["x-hasura-default-role"] = "user"
+			}
+		}
+		if tokenAttribute == "Vd" {
+			baseClaims["vd"] = "🔥"
+		}
+	}
+
+	return baseClaims
+}
+
 func getClaimsCustom(claims Claims, tokenField []string, tokenAttributes []*JwtItem) jwt.MapClaims {
 	res := make(jwt.MapClaims)
 
@@ -517,19 +542,11 @@ func generateJwtToken(application *Application, user *User, provider string, sig
 		refreshToken = jwt.NewWithClaims(jwtMethod, claimsShort)
 	} else if application.TokenFormat == "JWT-Custom" {
 		claimsCustom := getClaimsCustom(claims, application.TokenFields, application.TokenAttributes)
-
-		claimsCustom["vd"] = "🔥"
-
-		if len(roleNames) > 0 {
-			claimsCustom["x-hasura-allowed-roles"] = roleNames
-			claimsCustom["x-hasura-default-role"] = roleNames[0]
-		} else {
-			claimsCustom["x-hasura-allowed-roles"] = []string{"user"}
-			claimsCustom["x-hasura-default-role"] = "user"
-		}
+		claimsCustom = updateClaimsWithRoles(claimsCustom, roleNames, application.TokenFields)
 
 		token = jwt.NewWithClaims(jwtMethod, claimsCustom)
 		refreshClaims := getClaimsCustom(claims, application.TokenFields, application.TokenAttributes)
+		refreshClaims = updateClaimsWithRoles(refreshClaims, roleNames, application.TokenFields)
 		refreshClaims["exp"] = jwt.NewNumericDate(refreshExpireTime)
 		refreshClaims["TokenType"] = "refresh-token"
 		refreshToken = jwt.NewWithClaims(jwtMethod, refreshClaims)

@@ -1620,9 +1620,7 @@ export function getFriendlyUserName(account) {
 
 export function getUserCommonFields() {
   return ["Owner", "Name", "CreatedTime", "UpdatedTime", "DeletedTime", "Id", "Type", "Password", "PasswordSalt", "DisplayName", "FirstName", "LastName", "Avatar", "PermanentAvatar",
-    "Email", "EmailVerified", "Phone", "Location", "Address", "Affiliation", "Title", "IdCardType", "IdCard", "Homepage", "Bio", "Tag", "Region",
-    "Language", "Gender", "Birthday", "Education", "Score", "Ranking", "IsDefaultAvatar", "IsOnline", "IsAdmin", "IsForbidden", "IsDeleted", "CreatedIp",
-    "PreferredMfaType", "TotpSecret", "SignupApplication", "RecoveryCodes", "MfaPhoneEnabled", "MfaEmailEnabled"];
+    "Email", "EmailVerified", "Phone", "Location", "Address", "Affiliation", "Title", "IdCardType", "IdCard", "Homepage", "Bio", "Tag", "Region", "Language", "Gender", "Birthday", "Education", "Score", "Ranking", "IsDefaultAvatar", "IsOnline", "IsAdmin", "IsForbidden", "IsDeleted", "CreatedIp", "AvatarType", "CountryCode", "Karma", "Hash", "PreHash", "RegisterType", "RegisterSource", "AccessKey", "AccessSecret", "Github", "Google", "Qq", "Wechat", "Facebook", "Dingtalk", "Weibo", "Gitee", "Linkedin", "Wecom", "Lark", "Gitlab", "LastSigninTime", "LastSigninIp", "Ldap", "Properties", "Roles", "Permissions", "Groups", "LastSigninWrongTime", "SigninWrongTimes", "ManagedAccounts", "X-Hasura-Allowed-Roles", "X-Hasura-Default-Role", "Vd"];
 }
 
 export function getDefaultFooterContent() {
