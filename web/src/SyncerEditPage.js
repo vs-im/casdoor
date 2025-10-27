@@ -188,6 +188,138 @@ class SyncerEditPage extends React.Component {
           ],
         },
       ];
+    case "WeCom":
+      return [
+        {
+          "name": "userid",
+          "type": "string",
+          "casdoorName": "Id",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "casdoorName": "DisplayName",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "casdoorName": "Email",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "mobile",
+          "type": "string",
+          "casdoorName": "Phone",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "avatar",
+          "type": "string",
+          "casdoorName": "Avatar",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "position",
+          "type": "string",
+          "casdoorName": "Title",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "gender",
+          "type": "string",
+          "casdoorName": "Gender",
+          "isHashed": true,
+          "values": [],
+        },
+      ];
+    case "Azure AD":
+      return [
+        {
+          "name": "id",
+          "type": "string",
+          "casdoorName": "Id",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "userPrincipalName",
+          "type": "string",
+          "casdoorName": "Name",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "displayName",
+          "type": "string",
+          "casdoorName": "DisplayName",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "givenName",
+          "type": "string",
+          "casdoorName": "FirstName",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "surname",
+          "type": "string",
+          "casdoorName": "LastName",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "mail",
+          "type": "string",
+          "casdoorName": "Email",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "mobilePhone",
+          "type": "string",
+          "casdoorName": "Phone",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "jobTitle",
+          "type": "string",
+          "casdoorName": "Title",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "officeLocation",
+          "type": "string",
+          "casdoorName": "Location",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "preferredLanguage",
+          "type": "string",
+          "casdoorName": "Language",
+          "isHashed": true,
+          "values": [],
+        },
+        {
+          "name": "accountEnabled",
+          "type": "boolean",
+          "casdoorName": "IsForbidden",
+          "isHashed": true,
+          "values": [],
+        },
+      ];
     default:
       return [];
     }
@@ -240,37 +372,41 @@ class SyncerEditPage extends React.Component {
               });
             })}>
               {
-                ["Database", "Keycloak"]
+                ["Database", "Keycloak", "WeCom", "Azure AD"]
                   .map((item, index) => <Option key={index} value={item}>{item}</Option>)
               }
             </Select>
           </Col>
         </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("syncer:Database type"), i18next.t("syncer:Database type - Tooltip"))} :
-          </Col>
-          <Col span={22} >
-            <Select virtual={false} style={{width: "100%"}} value={this.state.syncer.databaseType} onChange={(value => {
-              this.updateSyncerField("databaseType", value);
-              if (value === "postgres") {
-                this.updateSyncerField("sslMode", "disable");
-              } else {
-                this.updateSyncerField("sslMode", "");
-              }
-            })}>
-              {
-                [
-                  {id: "mysql", name: "MySQL"},
-                  {id: "postgres", name: "PostgreSQL"},
-                  {id: "mssql", name: "SQL Server"},
-                  {id: "oracle", name: "Oracle"},
-                  {id: "sqlite3", name: "Sqlite 3"},
-                ].map((item, index) => <Option key={index} value={item.id}>{item.name}</Option>)
-              }
-            </Select>
-          </Col>
-        </Row>
+        {
+          this.state.syncer.type === "WeCom" || this.state.syncer.type === "Azure AD" ? null : (
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(i18next.t("syncer:Database type"), i18next.t("syncer:Database type - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <Select virtual={false} style={{width: "100%"}} value={this.state.syncer.databaseType} onChange={(value => {
+                  this.updateSyncerField("databaseType", value);
+                  if (value === "postgres") {
+                    this.updateSyncerField("sslMode", "disable");
+                  } else {
+                    this.updateSyncerField("sslMode", "");
+                  }
+                })}>
+                  {
+                    [
+                      {id: "mysql", name: "MySQL"},
+                      {id: "postgres", name: "PostgreSQL"},
+                      {id: "mssql", name: "SQL Server"},
+                      {id: "oracle", name: "Oracle"},
+                      {id: "sqlite3", name: "Sqlite 3"},
+                    ].map((item, index) => <Option key={index} value={item.id}>{item.name}</Option>)
+                  }
+                </Select>
+              </Col>
+            </Row>
+          )
+        }
         {
           this.state.syncer.databaseType !== "postgres" ? null : (
             <Row style={{marginTop: "20px"}} >
@@ -294,29 +430,42 @@ class SyncerEditPage extends React.Component {
             </Row>
           )
         }
+        {
+          this.state.syncer.type === "WeCom" ? null : (
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(this.state.syncer.type === "Azure AD" ? i18next.t("provider:Tenant ID") : i18next.t("provider:Host"), i18next.t("provider:Host - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <Input prefix={<LinkOutlined />} value={this.state.syncer.host} onChange={e => {
+                  this.updateSyncerField("host", e.target.value);
+                }} />
+              </Col>
+            </Row>
+          )
+        }
+        {
+          this.state.syncer.type === "WeCom" || this.state.syncer.type === "Azure AD" ? null : (
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(i18next.t("provider:Port"), i18next.t("provider:Port - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <InputNumber value={this.state.syncer.port} onChange={value => {
+                  this.updateSyncerField("port", value);
+                }} />
+              </Col>
+            </Row>
+          )
+        }
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("provider:Host"), i18next.t("provider:Host - Tooltip"))} :
-          </Col>
-          <Col span={22} >
-            <Input prefix={<LinkOutlined />} value={this.state.syncer.host} onChange={e => {
-              this.updateSyncerField("host", e.target.value);
-            }} />
-          </Col>
-        </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("provider:Port"), i18next.t("provider:Port - Tooltip"))} :
-          </Col>
-          <Col span={22} >
-            <InputNumber value={this.state.syncer.port} onChange={value => {
-              this.updateSyncerField("port", value);
-            }} />
-          </Col>
-        </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("general:User"), i18next.t("general:User - Tooltip"))} :
+            {Setting.getLabel(
+              this.state.syncer.type === "WeCom" ? i18next.t("provider:Corp ID") :
+                this.state.syncer.type === "Azure AD" ? i18next.t("provider:Client ID") :
+                  i18next.t("general:User"),
+              i18next.t("general:User - Tooltip")
+            )} :
           </Col>
           <Col span={22} >
             <Input value={this.state.syncer.user} onChange={e => {
@@ -326,7 +475,12 @@ class SyncerEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("general:Password"), i18next.t("general:Password - Tooltip"))} :
+            {Setting.getLabel(
+              this.state.syncer.type === "WeCom" ? i18next.t("provider:Corp Secret") :
+                this.state.syncer.type === "Azure AD" ? i18next.t("provider:Client Secret") :
+                  i18next.t("general:Password"),
+              i18next.t("general:Password - Tooltip")
+            )} :
           </Col>
           <Col span={22} >
             <Input.Password value={this.state.syncer.password} onChange={e => {
@@ -334,16 +488,20 @@ class SyncerEditPage extends React.Component {
             }} />
           </Col>
         </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("syncer:Database"), i18next.t("syncer:Database - Tooltip"))} :
-          </Col>
-          <Col span={22} >
-            <Input value={this.state.syncer.database} onChange={e => {
-              this.updateSyncerField("database", e.target.value);
-            }} />
-          </Col>
-        </Row>
+        {
+          this.state.syncer.type === "WeCom" || this.state.syncer.type === "Azure AD" ? null : (
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(i18next.t("syncer:Database"), i18next.t("syncer:Database - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <Input value={this.state.syncer.database} onChange={e => {
+                  this.updateSyncerField("database", e.target.value);
+                }} />
+              </Col>
+            </Row>
+          )
+        }
         {
           this.state.syncer.databaseType === "mysql" || this.state.syncer.databaseType === "mssql" || this.state.syncer.databaseType === "postgres" ? (
             <Row style={{marginTop: "20px"}} >
@@ -426,19 +584,23 @@ class SyncerEditPage extends React.Component {
             </React.Fragment>
           ) : null
         }
+        {
+          this.state.syncer.type === "WeCom" || this.state.syncer.type === "Azure AD" ? null : (
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(i18next.t("syncer:Table"), i18next.t("syncer:Table - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <Input value={this.state.syncer.table} onChange={e => {
+                  this.updateSyncerField("table", e.target.value);
+                }} />
+              </Col>
+            </Row>
+          )
+        }
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("syncer:Table"), i18next.t("syncer:Table - Tooltip"))} :
-          </Col>
-          <Col span={22} >
-            <Input value={this.state.syncer.table} onChange={e => {
-              this.updateSyncerField("table", e.target.value);
-            }} />
-          </Col>
-        </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("provider:DB test"), i18next.t("provider:DB test - Tooltip"))} :
+            {Setting.getLabel(i18next.t("provider:Syncer test"), i18next.t("provider:Syncer test - Tooltip"))} :
           </Col>
           <Col span={2} >
             <Button type={"primary"} loading={this.state.testDbLoading} onClick={() => {
@@ -458,7 +620,7 @@ class SyncerEditPage extends React.Component {
                   Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
                 });
             }
-            }>{i18next.t("syncer:Test DB Connection")}</Button>
+            }>{i18next.t("syncer:Test Connection")}</Button>
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >

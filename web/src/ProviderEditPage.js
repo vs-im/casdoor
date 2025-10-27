@@ -236,15 +236,15 @@ class ProviderEditPage extends React.Component {
         <Input value={this.state.provider.userMapping.countryCode} onChange={e => {
           this.updateUserMappingField("countryCode", e.target.value);
         }} />
-        {Setting.getLabel(i18next.t("user:First name"), i18next.t("user:First name - Tooltip"))} :
+        {Setting.getLabel(i18next.t("general:First name"), i18next.t("general:First name - Tooltip"))} :
         <Input value={this.state.provider.userMapping.firstName} onChange={e => {
           this.updateUserMappingField("firstName", e.target.value);
         }} />
-        {Setting.getLabel(i18next.t("user:Last name"), i18next.t("user:Last name - Tooltip"))} :
+        {Setting.getLabel(i18next.t("general:Last name"), i18next.t("general:Last name - Tooltip"))} :
         <Input value={this.state.provider.userMapping.lastName} onChange={e => {
           this.updateUserMappingField("lastName", e.target.value);
         }} />
-        {Setting.getLabel(i18next.t("user:Region"), i18next.t("user:Region - Tooltip"))} :
+        {Setting.getLabel(i18next.t("provider:Region"), i18next.t("provider:Region - Tooltip"))} :
         <Input value={this.state.provider.userMapping.region} onChange={e => {
           this.updateUserMappingField("region", e.target.value);
         }} />
@@ -695,12 +695,17 @@ class ProviderEditPage extends React.Component {
                 this.updateProviderField("type", "Telegram");
               } else if (value === "Face ID") {
                 this.updateProviderField("type", "Alibaba Cloud Facebody");
+              } else if (value === "MFA") {
+                this.updateProviderField("type", "RADIUS");
+                this.updateProviderField("host", "");
+                this.updateProviderField("port", 1812);
               }
             })}>
               {
                 [
                   {id: "Captcha", name: "Captcha"},
                   {id: "Email", name: "Email"},
+                  {id: "MFA", name: "MFA"},
                   {id: "Notification", name: "Notification"},
                   {id: "OAuth", name: "OAuth"},
                   {id: "Payment", name: "Payment"},
@@ -909,6 +914,7 @@ class ProviderEditPage extends React.Component {
         {
           (this.state.provider.category === "Captcha" && this.state.provider.type === "Default") ||
           (this.state.provider.category === "Web3") ||
+          (this.state.provider.category === "MFA") ||
           (this.state.provider.category === "Storage" && this.state.provider.type === "Local File System") ||
           (this.state.provider.category === "SMS" && this.state.provider.type === "Custom HTTP SMS") ||
           (this.state.provider.category === "Email" && this.state.provider.type === "Custom HTTP Email") ||
@@ -1246,6 +1252,16 @@ class ProviderEditPage extends React.Component {
                   </Col>
                 </Row>
               )}
+              <Row style={{marginTop: "20px"}} >
+                <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                  {Setting.getLabel(i18next.t("provider:Enable proxy"), i18next.t("provider:Enable proxy - Tooltip"))} :
+                </Col>
+                <Col span={1} >
+                  <Switch checked={this.state.provider.enableProxy} onChange={checked => {
+                    this.updateProviderField("enableProxy", checked);
+                  }} />
+                </Col>
+              </Row>
               {
                 !["Custom HTTP Email"].includes(this.state.provider.type) ? null : (
                   <React.Fragment>
@@ -1545,6 +1561,16 @@ class ProviderEditPage extends React.Component {
               }
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                  {Setting.getLabel(i18next.t("provider:Enable proxy"), i18next.t("provider:Enable proxy - Tooltip"))} :
+                </Col>
+                <Col span={1} >
+                  <Switch checked={this.state.provider.enableProxy} onChange={checked => {
+                    this.updateProviderField("enableProxy", checked);
+                  }} />
+                </Col>
+              </Row>
+              <Row style={{marginTop: "20px"}} >
+                <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
                   {Setting.getLabel(i18next.t("provider:SMS Test"), i18next.t("provider:SMS Test - Tooltip"))} :
                 </Col>
                 <Col span={4} >
@@ -1571,6 +1597,39 @@ class ProviderEditPage extends React.Component {
                     onClick={() => ProviderEditTestSms.sendTestSms(this.state.provider, "+" + Setting.getCountryCode(this.state.provider.content) + this.state.provider.receiver)} >
                     {i18next.t("provider:Send Testing SMS")}
                   </Button>
+                </Col>
+              </Row>
+            </React.Fragment>
+          ) : this.state.provider.category === "MFA" ? (
+            <React.Fragment>
+              <Row style={{marginTop: "20px"}} >
+                <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                  {Setting.getLabel(i18next.t("provider:Host"), i18next.t("provider:Host - Tooltip"))} :
+                </Col>
+                <Col span={22} >
+                  <Input prefix={<LinkOutlined />} value={this.state.provider.host} placeholder="10.10.10.10" onChange={e => {
+                    this.updateProviderField("host", e.target.value);
+                  }} />
+                </Col>
+              </Row>
+              <Row style={{marginTop: "20px"}} >
+                <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                  {Setting.getLabel(i18next.t("provider:Port"), i18next.t("provider:Port - Tooltip"))} :
+                </Col>
+                <Col span={22} >
+                  <InputNumber value={this.state.provider.port} onChange={value => {
+                    this.updateProviderField("port", value);
+                  }} />
+                </Col>
+              </Row>
+              <Row style={{marginTop: "20px"}} >
+                <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                  {Setting.getLabel(i18next.t("provider:Client secret"), i18next.t("provider:RADIUS Shared Secret - Tooltip"))} :
+                </Col>
+                <Col span={22} >
+                  <Input value={this.state.provider.clientSecret} placeholder="Shared secret" onChange={e => {
+                    this.updateProviderField("clientSecret", e.target.value);
+                  }} />
                 </Col>
               </Row>
             </React.Fragment>

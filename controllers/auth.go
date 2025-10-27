@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/beego/beego"
 	"github.com/casdoor/casdoor/captcha"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/form"
@@ -58,6 +59,11 @@ func tokenToResponse(token *object.Token) *Response {
 func (c *ApiController) HandleLoggedIn(application *object.Application, user *object.User, form *form.AuthForm) (resp *Response) {
 	if user.IsForbidden {
 		c.ResponseError(c.T("check:The user is forbidden to sign in, please contact the administrator"))
+		return
+	}
+
+	if user.IsDeleted {
+		c.ResponseError(c.T("check:The user has been deleted and cannot be used to sign in, please contact the administrator"))
 		return
 	}
 
@@ -244,12 +250,32 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		c.setExpireForSession()
 	}
 
+	if application.EnableExclusiveSignin {
+		sessions, err := object.GetUserAppSessions(user.Owner, user.Name, application.Name)
+		if err != nil {
+			c.ResponseError(err.Error(), nil)
+			return
+		}
+
+		for _, session := range sessions {
+			for _, sid := range session.SessionId {
+				err := beego.GlobalSessions.GetProvider().SessionDestroy(sid)
+				if err != nil {
+					c.ResponseError(err.Error(), nil)
+					return
+				}
+			}
+		}
+	}
+
 	if resp.Status == "ok" {
 		_, err = object.AddSession(&object.Session{
 			Owner:       user.Owner,
 			Name:        user.Name,
 			Application: application.Name,
 			SessionId:   []string{c.Ctx.Input.CruSession.SessionID()},
+
+			ExclusiveSignin: true,
 		})
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
@@ -812,7 +838,19 @@ func (c *ApiController) Login() {
 					}
 				}
 
-				if user == nil || user.IsDeleted {
+				// Try to find existing user by username (case-insensitive)
+				// This allows OAuth providers (e.g., Wecom) to automatically associate with
+				// existing users when usernames match, particularly useful for enterprise
+				// scenarios where signup is disabled and users already exist in Casdoor
+				if user == nil && userInfo.Username != "" {
+					user, err = object.GetUserByFields(application.Organization, userInfo.Username)
+					if err != nil {
+						c.ResponseError(err.Error())
+						return
+					}
+				}
+
+				if user == nil {
 					if !application.EnableSignUp {
 						c.ResponseError(fmt.Sprintf(c.T("auth:The account for provider: %s and username: %s (%s) does not exist and is not allowed to sign up as new account, please contact your IT support"), provider.Type, userInfo.Username, userInfo.DisplayName))
 						return
@@ -892,6 +930,10 @@ func (c *ApiController) Login() {
 						RegisterSource:    fmt.Sprintf("%s/%s", application.Organization, application.Name),
 					}
 
+					if providerItem.SignupGroup != "" {
+						user.Groups = []string{providerItem.SignupGroup}
+					}
+
 					var affected bool
 					affected, err = object.AddUser(user, c.GetAcceptLanguage())
 					if err != nil {
@@ -902,15 +944,6 @@ func (c *ApiController) Login() {
 					if !affected {
 						c.ResponseError(fmt.Sprintf(c.T("auth:Failed to create user, user information is invalid: %s"), util.StructToJson(user)))
 						return
-					}
-
-					if providerItem.SignupGroup != "" {
-						user.Groups = []string{providerItem.SignupGroup}
-						_, err = object.UpdateUser(user.GetId(), user, []string{"groups"}, false)
-						if err != nil {
-							c.ResponseError(err.Error())
-							return
-						}
 					}
 				}
 

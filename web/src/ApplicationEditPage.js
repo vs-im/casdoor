@@ -574,6 +574,16 @@ class ApplicationEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("application:Code resend timeout"), i18next.t("application:Code resend timeout - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <InputNumber style={{width: "150px"}} value={this.state.application.codeResendTimeout} min={0} step={1} precision={0} addonAfter="Seconds" onChange={value => {
+              this.updateApplicationField("codeResendTimeout", value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("ldap:Default group"), i18next.t("ldap:Default group - Tooltip"))} :
           </Col>
           <Col span={22}>
@@ -614,6 +624,16 @@ class ApplicationEditPage extends React.Component {
           <Col span={1} >
             <Switch checked={this.state.application.disableSignin} onChange={checked => {
               this.updateApplicationField("disableSignin", checked);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+            {Setting.getLabel(i18next.t("application:Enable exclusive signin"), i18next.t("application:Enable exclusive signin - Tooltip"))} :
+          </Col>
+          <Col span={1} >
+            <Switch checked={this.state.application.enableExclusiveSignin} onChange={checked => {
+              this.updateApplicationField("enableExclusiveSignin", checked);
             }} />
           </Col>
         </Row>

@@ -36,6 +36,16 @@ type Credential struct {
 }
 
 func (syncer *Syncer) getOriginalUsers() ([]*OriginalUser, error) {
+	// Handle WeCom syncer separately
+	if syncer.Type == "WeCom" {
+		return syncer.getWecomOriginalUsers()
+	}
+
+	// Handle Azure AD syncer separately
+	if syncer.Type == "Azure AD" {
+		return syncer.getAzureAdOriginalUsers()
+	}
+
 	var results []map[string]sql.NullString
 	err := syncer.Ormer.Engine.Table(syncer.getTable()).Find(&results)
 	if err != nil {
@@ -144,6 +154,16 @@ func (t dsnConnector) Driver() driver.Driver {
 
 func (syncer *Syncer) initAdapter() error {
 	if syncer.Ormer != nil {
+		return nil
+	}
+
+	// WeCom syncer doesn't need database adapter
+	if syncer.Type == "WeCom" {
+		return nil
+	}
+
+	// Azure AD syncer doesn't need database adapter
+	if syncer.Type == "Azure AD" {
 		return nil
 	}
 
