@@ -113,6 +113,7 @@ class AuthCallback extends React.Component {
     const method = innerParams.get("method");
     const samlRequest = innerParams.get("SAMLRequest");
     const casService = innerParams.get("service");
+    const isPopup = innerParams.get("popup");
 
     const redirectUri = `${window.location.origin}/callback`;
 
@@ -190,6 +191,10 @@ class AuthCallback extends React.Component {
                   state: oAuthParams?.state,
                 };
                 createFormAndSubmit(oAuthParams?.redirectUri, params);
+              } else if (isPopup === "true") {
+                const code = res.data;
+                window.opener.postMessage({type: "loginSuccess", data: {code: code, state: oAuthParams.state}}, window.location.origin);
+                window.close();
               } else {
                 const code = res.data;
                 Setting.goToLink(`${oAuthParams.redirectUri}${concatChar}code=${code}&state=${oAuthParams.state}`);

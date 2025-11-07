@@ -123,10 +123,19 @@ img {
 }
 
 .forget-content-inner {
+  position: relative;
   background-color: rgb(255 255 255);
   padding: 10px;
   margin: 10px;
   border-radius: 12px;
+}
+
+.forget-content .back-inner-button {
+  position: absolute;
+  cursor: pointer;
+  left: 10px;
+  top: 10px;
+  z-index: 3;
 }
 
 @media (prefers-color-scheme: dark) {

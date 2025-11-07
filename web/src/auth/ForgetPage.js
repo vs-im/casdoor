@@ -505,6 +505,11 @@ class ForgetPage extends React.Component {
       return Util.renderMessageLarge(this, this.state.msg);
     }
 
+    const onBackButtonClick = (e) => {
+      e.preventDefault();
+      this.stepBack();
+    };
+
     return (
       <React.Fragment>
         <CustomGithubCorner />
@@ -512,17 +517,17 @@ class ForgetPage extends React.Component {
           <div className="forget-content-inner">
             {Setting.inIframe() || Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCss}} />}
             {Setting.inIframe() || !Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCssMobile}} />}
-            <Button type="text"
-              style={{position: "relative", left: Setting.isMobile() ? "10px" : "-90px", top: 0}}
+            <Button className="back-inner-button" type="text"
+              style={{left: "10px"}}
               icon={<ArrowLeftOutlined style={{fontSize: "24px"}} />}
               size={"large"}
-              onClick={() => {this.stepBack();}}
+              onClick={onBackButtonClick}
             />
             <Row>
               <Col span={24} style={{justifyContent: "center"}}>
                 <Row>
                   <Col span={24}>
-                    <div style={{marginTop: "80px", marginBottom: "10px", textAlign: "center"}}>
+                    <div style={{marginTop: "35px", marginBottom: "30px", textAlign: "center"}}>
                       {
                         Setting.renderHelmet(application)
                       }
@@ -532,9 +537,9 @@ class ForgetPage extends React.Component {
                     </div>
                   </Col>
                 </Row>
-                <Row>
+                <Row style={{marginBottom: "24px"}}>
                   <Col span={24}>
-                    <div style={{textAlign: "center", fontSize: "28px"}}>
+                    <div style={{textAlign: "center", fontSize: "20px"}}>
                       {i18next.t("forget:Reset password")}
                     </div>
                   </Col>
@@ -570,7 +575,7 @@ class ForgetPage extends React.Component {
                 </Row>
               </Col>
               <Col span={24} style={{display: "flex", justifyContent: "center"}}>
-                <div style={{marginTop: "40px", textAlign: "center"}}>
+                <div style={{marginTop: "12px", textAlign: "center"}}>
                   {this.renderForm(application)}
                 </div>
               </Col>

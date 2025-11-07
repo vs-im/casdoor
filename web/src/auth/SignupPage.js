@@ -96,6 +96,10 @@ export const tailFormItemLayout = {
   //     offset: 8, // 8
   //   },
   // },
+  style: {
+    paddingTop: "15px",
+    marginBottom: "0px",
+  },
 };
 
 class SignupPage extends React.Component {
@@ -1165,6 +1169,8 @@ class SignupPage extends React.Component {
           ]}
         ></Form.Item>
         {signupItems.map((signupItem, idx) => {
+          const renderedItem = this.renderFormItem(application, signupItem);
+          if (!renderedItem) return null;
           return (
             <div key={idx}>
               <div
@@ -1172,7 +1178,7 @@ class SignupPage extends React.Component {
                   __html: "<style>" + signupItem.customCss + "</style>",
                 }}
               />
-              {this.renderFormItem(application, signupItem)}
+              {renderedItem}
             </div>
           );
         })}
@@ -1180,7 +1186,7 @@ class SignupPage extends React.Component {
           <Button disabled={this.state.loading} type="primary" htmlType="submit" style={{width: "100%"}}>
             {i18next.t("account:Sign Up")}
           </Button>
-          <div style={{padding: "34px 0px 10px 0px"}}>
+          <div style={{padding: "30px 0px 0px 0px"}}>
             &nbsp;&nbsp;{i18next.t("signup:Have account?")}&nbsp;
             <a
               onClick={() => {

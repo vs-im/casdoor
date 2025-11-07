@@ -991,6 +991,10 @@ class LoginPage extends React.Component {
       }
       const availableProviders = application.providers?.filter(providerItem => this.isProviderVisible(providerItem));
       const showProviders = availableProviders.length > 0;
+      const otherProviderForm = this.renderOtherFormProvider(application)
+      
+      if (!otherProviderForm && !showProviders) return null;
+
       const searchParams = new URLSearchParams(window.location.search);
       const providerHint = searchParams.get("provider_hint");
 
@@ -998,9 +1002,7 @@ class LoginPage extends React.Component {
         <div key={resultItemKey}>
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <Form.Item>
-            {
-              this.renderOtherFormProvider(application)
-            }
+            {otherProviderForm}
             {showProviders && (
               <React.Fragment>
                 <div className="social-auth-label">
@@ -1036,10 +1038,12 @@ class LoginPage extends React.Component {
         <div key={resultItemKey} dangerouslySetInnerHTML={{__html: signinItem.customCss}} />
       );
     } else if (signinItem.name === "Signup link") {
+      const footer = this.renderFooter(application, signinItem);
+      if (!footer) return null;
       return (
         <div key={resultItemKey} style={{width: "100%", marginBottom: "10px"}} className="login-signup-link">
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
-          {this.renderFooter(application, signinItem)}
+          {footer}
         </div>
       );
     } else if (signinItem.name === "Select organization") {
@@ -1234,6 +1238,7 @@ class LoginPage extends React.Component {
   }
 
   renderFooter(application, signinItem) {
+    if (!application.enableSignUp) return null;
     return (
       <div>
         {
