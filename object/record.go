@@ -315,7 +315,8 @@ func SendWebhooks(record *casvisorsdk.Record) error {
 	record2 := *record
 	for _, webhook := range webhooks {
 
-		if len(webhook.ObjectFields) != 0 && webhook.ObjectFields[0] != "All" {
+		isEmptyObjectFields := len(webhook.ObjectFields) != 0 && webhook.ObjectFields[0] != "All"
+		if isEmptyObjectFields {
 			record2.Object = filterRecordObject(record.Object, webhook.ObjectFields)
 		}
 
@@ -325,6 +326,14 @@ func SendWebhooks(record *casvisorsdk.Record) error {
 			if err != nil {
 				errs = append(errs, err)
 				continue
+			}
+
+			if isEmptyObjectFields || util.InSlice(webhook.ObjectFields, "Permissions") || util.InSlice(webhook.ObjectFields, "permissions") {
+				err = ExtendUserWithRolesAndPermissions(user)
+				if err != nil {
+					errs = append(errs, err)
+					continue
+				}
 			}
 
 			user, err = GetMaskedUser(user, false, err)

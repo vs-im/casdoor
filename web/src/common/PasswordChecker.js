@@ -80,7 +80,8 @@ function getOptionDescription(option, password) {
 export function renderPasswordPopover(options, password) {
   return <div style={{width: 240}} >
     {options.map((option, idx) => {
-      return <div key={idx}>{checkers[option](password) === "" ? <CheckCircleTwoTone twoToneColor={"#52c41a"} /> :
+      const {failed} = checkers[option](password);
+      return <div key={idx}>{!failed ? <CheckCircleTwoTone twoToneColor={"#52c41a"} /> :
         <CloseCircleTwoTone twoToneColor={"#ff4d4f"} />} {getOptionDescription(option, password)}</div>;
     })}
   </div>;
@@ -97,7 +98,7 @@ export function checkPasswordComplexity(password, options) {
   }
 
   if (!options || options.length === 0) {
-    return "";
+    return [firstError, checkersResults];
   }
 
   const checkers = {
