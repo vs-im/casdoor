@@ -17,8 +17,10 @@ package object
 import (
 	"fmt"
 
+	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/util"
 	"github.com/xorm-io/core"
+	"golang.org/x/crypto/ssh"
 )
 
 type TableColumn struct {
@@ -60,7 +62,8 @@ type Syncer struct {
 	IsReadOnly       bool           `json:"isReadOnly"`
 	IsEnabled        bool           `json:"isEnabled"`
 
-	Ormer *Ormer `xorm:"-" json:"-"`
+	Ormer     *Ormer      `xorm:"-" json:"-"`
+	SshClient *ssh.Client `xorm:"-" json:"-"`
 }
 
 func GetSyncerCount(owner, organization, field, value string) (int64, error) {
@@ -118,7 +121,10 @@ func getSyncer(owner string, name string) (*Syncer, error) {
 }
 
 func GetSyncer(id string) (*Syncer, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return nil, err
+	}
 	return getSyncer(owner, name)
 }
 
@@ -153,16 +159,22 @@ func GetMaskedSyncers(syncers []*Syncer, errs ...error) ([]*Syncer, error) {
 	return syncers, nil
 }
 
-func UpdateSyncer(id string, syncer *Syncer, isGlobalAdmin bool) (bool, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+func UpdateSyncer(id string, syncer *Syncer, isGlobalAdmin bool, lang string) (bool, error) {
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return false, err
+	}
 	s, err := getSyncer(owner, name)
 	if err != nil {
 		return false, err
 	} else if s == nil {
 		return false, nil
 	} else if !isGlobalAdmin && s.Organization != syncer.Organization {
-		return false, fmt.Errorf("auth:Unauthorized operation")
+		return false, fmt.Errorf(i18n.Translate(lang, "auth:Unauthorized operation"))
 	}
+
+	// Close old syncer connections before updating
+	_ = s.Close()
 
 	session := ormer.Engine.ID(core.PK{owner, name}).AllCols()
 	if syncer.Password == "***" {
@@ -304,26 +316,30 @@ func TestSyncer(syncer Syncer) error {
 		syncer.Password = oldSyncer.Password
 	}
 
-	// For WeCom syncer, test by getting access token
-	if syncer.Type == "WeCom" {
-		_, err := syncer.getWecomAccessToken()
-		return err
-	}
+	provider := GetSyncerProvider(&syncer)
+	return provider.TestConnection()
+}
 
-	// For Azure AD syncer, test by getting access token
-	if syncer.Type == "Azure AD" {
-		_, err := syncer.getAzureAdAccessToken()
-		return err
+func (syncer *Syncer) Close() error {
+	var err error
+	if syncer.Ormer != nil {
+		if syncer.Ormer.Engine != nil {
+			err = syncer.Ormer.Engine.Close()
+			syncer.Ormer.Engine = nil
+		}
+		if syncer.Ormer.Db != nil {
+			if dbErr := syncer.Ormer.Db.Close(); dbErr != nil && err == nil {
+				err = dbErr
+			}
+			syncer.Ormer.Db = nil
+		}
+		syncer.Ormer = nil
 	}
-
-	err = syncer.initAdapter()
-	if err != nil {
-		return err
+	if syncer.SshClient != nil {
+		if sshErr := syncer.SshClient.Close(); sshErr != nil && err == nil {
+			err = sshErr
+		}
+		syncer.SshClient = nil
 	}
-
-	err = syncer.Ormer.Engine.Ping()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

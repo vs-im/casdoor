@@ -57,6 +57,10 @@ class OAuthWidget extends React.Component {
       return;
     }
 
+    if (!user.address || user.address.length === 0) {
+      return;
+    }
+
     const affiliationUrl = application.affiliationUrl.split("|")[1];
     const code = user.address[user.address.length - 1];
     UserBackend.getAffiliationOptions(affiliationUrl, code)
@@ -109,7 +113,7 @@ class OAuthWidget extends React.Component {
 
                 this.unlinked();
               } else {
-                Setting.showMessage("error", `Failed to unlink: ${res.msg}`);
+                Setting.showMessage("error", `${i18next.t("general:Failed to unlink")}: ${res.msg}`);
               }
             });
         });
@@ -122,7 +126,7 @@ class OAuthWidget extends React.Component {
 
           this.unlinked();
         } else {
-          Setting.showMessage("error", `Failed to unlink: ${res.msg}`);
+          Setting.showMessage("error", `${i18next.t("general:Failed to unlink")}: ${res.msg}`);
         }
       });
   }

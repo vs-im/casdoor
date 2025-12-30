@@ -73,7 +73,7 @@ class PermissionEditPage extends React.Component {
         this.getRoles(permission.owner);
         this.getModels(permission.owner);
         this.getResources(permission.owner);
-        this.getModel(permission.owner, permission.model);
+        this.getModel(permission.model);
       });
   }
 
@@ -142,10 +142,13 @@ class PermissionEditPage extends React.Component {
       });
   }
 
-  getModel(organizationName, modelName) {
-    if (modelName === "") {
+  getModel(modelId) {
+    if (modelId === "") {
       return;
     }
+
+    const organizationName = modelId.split("/")[0];
+    const modelName = modelId.split("/")[1];
     ModelBackend.getModel(organizationName, modelName)
       .then((res) => {
         this.setState({
@@ -172,7 +175,7 @@ class PermissionEditPage extends React.Component {
 
   updatePermissionField(key, value) {
     if (key === "model") {
-      this.getModel(this.state.permission.owner, value);
+      this.getModel(value);
     }
 
     value = this.parsePermissionField(key, value);
@@ -256,18 +259,8 @@ class PermissionEditPage extends React.Component {
             <Select virtual={false} style={{width: "100%"}} value={this.state.permission.model} onChange={(model => {
               this.updatePermissionField("model", model);
             })}
-            options={this.state.models.map((model) => Setting.getOption(model.name, model.name))
+            options={this.state.models.map((model) => Setting.getOption(`${model.owner}/${model.name}`, `${model.owner}/${model.name}`))
             } />
-          </Col>
-        </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("general:Adapter"), i18next.t("general:Adapter - Tooltip"))} :
-          </Col>
-          <Col span={22} >
-            <Input value={this.state.permission.adapter} onChange={e => {
-              this.updatePermissionField("adapter", e.target.value);
-            }} />
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >
@@ -467,7 +460,7 @@ class PermissionEditPage extends React.Component {
 
   submitPermissionEdit(exitAfterSave) {
     if (this.state.permission.users.length === 0 && this.state.permission.roles.length === 0) {
-      Setting.showMessage("error", "The users and roles cannot be empty at the same time");
+      Setting.showMessage("error", i18next.t("general:The users and roles cannot be empty at the same time"));
       return;
     }
     // if (this.state.permission.domains.length === 0) {
@@ -475,15 +468,15 @@ class PermissionEditPage extends React.Component {
     //   return;
     // }
     if (this.state.permission.resources.length === 0) {
-      Setting.showMessage("error", "The resources cannot be empty");
+      Setting.showMessage("error", i18next.t("general:The resources cannot be empty"));
       return;
     }
     if (this.state.permission.actions.length === 0) {
-      Setting.showMessage("error", "The actions cannot be empty");
+      Setting.showMessage("error", i18next.t("general:The actions cannot be empty"));
       return;
     }
     if (!Setting.isLocalAdminUser(this.props.account) && this.state.permission.submitter !== this.props.account.name) {
-      Setting.showMessage("error", "A normal user can only modify the permission submitted by itself");
+      Setting.showMessage("error", i18next.t("general:A normal user can only modify the permission submitted by itself"));
       return;
     }
 

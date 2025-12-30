@@ -290,6 +290,10 @@ const authInfo = {
     scope: "users.read%20tweet.read",
     endpoint: "https://twitter.com/i/oauth2/authorize",
   },
+  Telegram: {
+    scope: "",
+    endpoint: "https://core.telegram.org/widgets/login",
+  },
   Typetalk: {
     scope: "my",
     endpoint: "https://typetalk.com/oauth2/authorize",
@@ -507,6 +511,10 @@ export function getAuthUrl(application, provider, method, code) {
     return `${endpoint}?client_id=${provider.clientId}&redirect_uri=${redirectUri}&scope=${scope}&state=${state}&grant_options[]=per-user`;
   } else if (provider.type === "Twitter" || provider.type === "Fitbit") {
     return `${endpoint}?client_id=${provider.clientId}&redirect_uri=${redirectUri}&state=${state}&response_type=code&scope=${scope}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+  } else if (provider.type === "Telegram") {
+    // Telegram uses widget-based authentication
+    // The actual login is handled by Telegram widget on the frontend
+    return `${redirectUri}?state=${state}`;
   } else if (provider.type === "MetaMask") {
     return `${redirectUri}?state=${state}`;
   } else if (provider.type === "Web3Onboard") {

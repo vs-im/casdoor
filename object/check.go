@@ -59,8 +59,11 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 		if HasUserByField(organization.Name, "name", authForm.Username) {
 			return i18n.Translate(lang, "check:Username already exists")
 		}
-		if HasUserByField(organization.Name, "email", authForm.Email) {
-			return i18n.Translate(lang, "check:Email already exists")
+		if authForm.Email != "" {
+			normalizedEmail := strings.ToLower(authForm.Email)
+			if HasUserByField(organization.Name, "email", normalizedEmail) {
+				return i18n.Translate(lang, "check:Email already exists")
+			}
 		}
 		if HasUserByField(organization.Name, "phone", authForm.Phone) {
 			return i18n.Translate(lang, "check:Phone already exists")
@@ -68,7 +71,7 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 	}
 
 	if application.IsSignupItemVisible("Password") {
-		msg := CheckPasswordComplexityByOrg(organization, authForm.Password)
+		msg := CheckPasswordComplexityByOrg(organization, authForm.Password, lang)
 		if msg != "" {
 			return msg
 		}
@@ -80,7 +83,8 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 				return i18n.Translate(lang, "check:Email cannot be empty")
 			}
 		} else {
-			if HasUserByField(organization.Name, "email", authForm.Email) {
+			normalizedEmail := strings.ToLower(authForm.Email)
+			if HasUserByField(organization.Name, "email", normalizedEmail) {
 				return i18n.Translate(lang, "check:Email already exists")
 			} else if !util.IsEmailValid(authForm.Email) {
 				return i18n.Translate(lang, "check:Email is invalid")
@@ -115,9 +119,9 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 			if authForm.Name == "" {
 				return i18n.Translate(lang, "check:DisplayName cannot be blank")
 			} else if application.GetSignupItemRule("Display name") == "Real name" {
-				if !isValidRealName(authForm.Name) {
-					return i18n.Translate(lang, "check:DisplayName is not valid real name")
-				}
+				// if !isValidRealName(authForm.Name) {
+				//	return i18n.Translate(lang, "check:DisplayName is not valid real name")
+				// }
 			}
 		}
 	}
@@ -278,17 +282,30 @@ func CheckPassword(user *User, password string, lang string, options ...bool) er
 	return resetUserSigninErrorTimes(user)
 }
 
-func CheckPasswordComplexityByOrg(organization *Organization, password string) string {
-	errorMsg := checkPasswordComplexity(password, organization.PasswordOptions)
+func CheckPasswordComplexityByOrg(organization *Organization, password string, lang string) string {
+	errorMsg := checkPasswordComplexity(password, organization.PasswordOptions, lang)
 	return errorMsg
 }
 
-func CheckPasswordComplexity(user *User, password string) string {
+func CheckPasswordComplexity(user *User, password string, lang string) string {
 	organization, _ := GetOrganizationByUser(user)
-	return CheckPasswordComplexityByOrg(organization, password)
+	return CheckPasswordComplexityByOrg(organization, password, lang)
 }
 
-func CheckLdapUserPassword(user *User, password string, lang string) error {
+func CheckLdapUserPassword(user *User, password string, lang string, options ...bool) error {
+	enableCaptcha := false
+	if len(options) > 0 {
+		enableCaptcha = options[0]
+	}
+
+	// check the login error times
+	if !enableCaptcha {
+		err := checkSigninErrorTimes(user, lang)
+		if err != nil {
+			return err
+		}
+	}
+
 	ldaps, err := GetLdaps(user.Owner)
 	if err != nil {
 		return err
@@ -336,7 +353,7 @@ func CheckLdapUserPassword(user *User, password string, lang string) error {
 		if !hit {
 			return fmt.Errorf("user not exist")
 		}
-		return fmt.Errorf(i18n.Translate(lang, "check:LDAP user name or password incorrect"))
+		return recordSigninErrorInfo(user, lang, enableCaptcha)
 	}
 	return resetUserSigninErrorTimes(user)
 }
@@ -363,6 +380,11 @@ func CheckUserPassword(organization string, username string, password string, la
 		return nil, fmt.Errorf(i18n.Translate(lang, "check:The user is forbidden to sign in, please contact the administrator"))
 	}
 
+	// Prevent direct login for guest users without upgrading
+	if user.Tag == "guest-user" {
+		return nil, fmt.Errorf(i18n.Translate(lang, "check:Guest users must upgrade their account by setting a username and password before they can sign in directly"))
+	}
+
 	if isSigninViaLdap {
 		if user.Ldap == "" {
 			return nil, fmt.Errorf(i18n.Translate(lang, "check:The user: %s doesn't exist in LDAP server"), username)
@@ -374,22 +396,14 @@ func CheckUserPassword(organization string, username string, password string, la
 			return nil, fmt.Errorf(i18n.Translate(lang, "check:password or code is incorrect"))
 		}
 
-		// check the login error times
-		if !enableCaptcha {
-			err = checkSigninErrorTimes(user, lang)
-			if err != nil {
-				return nil, err
-			}
-		}
-
 		// only for LDAP users
-		err = CheckLdapUserPassword(user, password, lang)
+		err = CheckLdapUserPassword(user, password, lang, enableCaptcha)
 		if err != nil {
 			if err.Error() == "user not exist" {
 				return nil, fmt.Errorf(i18n.Translate(lang, "check:The user: %s doesn't exist in LDAP server"), username)
 			}
 
-			return nil, recordSigninErrorInfo(user, lang, enableCaptcha)
+			return nil, err
 		}
 	} else {
 		err = CheckPassword(user, password, lang, enableCaptcha)
@@ -564,7 +578,10 @@ func CheckApiPermission(userId string, organization string, path string, method 
 }
 
 func CheckLoginPermission(userId string, application *Application) (bool, error) {
-	owner, _ := util.GetOwnerAndNameFromId(userId)
+	owner, _, err := util.GetOwnerAndNameFromIdWithError(userId)
+	if err != nil {
+		return false, err
+	}
 	if owner == "built-in" {
 		return true, nil
 	}

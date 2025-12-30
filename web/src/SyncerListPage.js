@@ -99,7 +99,7 @@ class SyncerListPage extends BaseListPage {
       )
       .catch(error => {
         this.setState({loading: false});
-        Setting.showMessage("error", `Syncer failed to sync users: ${error}`);
+        Setting.showMessage("error", `${i18next.t("general:Failed to sync")}: ${error}`);
       });
   }
 
@@ -227,7 +227,7 @@ class SyncerListPage extends BaseListPage {
         sorter: true,
         render: (text, record, index) => {
           return (
-            <Switch disabled checkedChildren="ON" unCheckedChildren="OFF" checked={text} />
+            <Switch disabled checkedChildren={i18next.t("general:ON")} unCheckedChildren={i18next.t("general:OFF")} checked={text} />
           );
         },
       },

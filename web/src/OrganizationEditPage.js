@@ -28,6 +28,8 @@ import ThemeEditor from "./common/theme/ThemeEditor";
 import MfaTable from "./table/MfaTable";
 import {NavItemTree} from "./common/NavItemTree";
 import {WidgetItemTree} from "./common/WidgetItemTree";
+import TransactionTable from "./table/TransactionTable";
+import * as TransactionBackend from "./backend/TransactionBackend";
 
 const {Option} = Select;
 
@@ -41,6 +43,7 @@ class OrganizationEditPage extends React.Component {
       applications: [],
       ldaps: null,
       mode: props.location.mode !== undefined ? props.location.mode : "edit",
+      transactions: [],
     };
   }
 
@@ -48,6 +51,7 @@ class OrganizationEditPage extends React.Component {
     this.getOrganization();
     this.getApplications();
     this.getLdaps();
+    this.getOrganizationTransactions();
   }
 
   getOrganization() {
@@ -96,6 +100,22 @@ class OrganizationEditPage extends React.Component {
         this.setState({
           ldaps: resdata,
         });
+      });
+  }
+
+  getOrganizationTransactions() {
+    TransactionBackend.getTransactions(this.state.organizationName)
+      .then((res) => {
+        if (res.status === "ok") {
+          this.setState({
+            transactions: res.data ?? [],
+          });
+        } else {
+          Setting.showMessage("error", `${i18next.t("general:Failed to load")}: ${res.msg}`);
+        }
+      })
+      .catch(error => {
+        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
       });
   }
 
@@ -523,6 +543,48 @@ class OrganizationEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+            {Setting.getLabel(i18next.t("organization:Org balance"), i18next.t("organization:Org balance - Tooltip"))} :
+          </Col>
+          <Col span={4} >
+            <InputNumber value={this.state.organization.orgBalance ?? 0} onChange={value => {
+              this.updateOrganizationField("orgBalance", value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+            {Setting.getLabel(i18next.t("organization:User balance"), i18next.t("organization:User balance - Tooltip"))} :
+          </Col>
+          <Col span={4} >
+            <InputNumber value={this.state.organization.userBalance ?? 0} disabled />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+            {Setting.getLabel(i18next.t("organization:Balance credit"), i18next.t("organization:Balance credit - Tooltip"))} :
+          </Col>
+          <Col span={4} >
+            <InputNumber value={this.state.organization.balanceCredit ?? 0} onChange={value => {
+              this.updateOrganizationField("balanceCredit", value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+            {Setting.getLabel(i18next.t("organization:Balance currency"), i18next.t("organization:Balance currency - Tooltip"))} :
+          </Col>
+          <Col span={4} >
+            <Select virtual={false} style={{width: "100%"}} value={this.state.organization.balanceCurrency || "USD"} onChange={(value => {
+              this.updateOrganizationField("balanceCurrency", value);
+            })}>
+              {
+                Setting.CurrencyOptions.map((item, index) => <Option key={index} value={item.id}>{Setting.getCurrencyWithFlag(item.id)}</Option>)
+              }
+            </Select>
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
             {Setting.getLabel(i18next.t("organization:Soft deletion"), i18next.t("organization:Soft deletion - Tooltip"))} :
           </Col>
           <Col span={1} >
@@ -573,7 +635,7 @@ class OrganizationEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("organization:Navbar items"), i18next.t("organization:Navbar items - Tooltip"))} :
+            {Setting.getLabel(i18next.t("organization:Admin navbar items"), i18next.t("organization:Admin navbar items - Tooltip"))} :
           </Col>
           <Col span={22} >
             <NavItemTree
@@ -582,6 +644,21 @@ class OrganizationEditPage extends React.Component {
               defaultExpandedKeys={["all"]}
               onCheck={(checked, _) => {
                 this.updateOrganizationField("navItems", checked);
+              }}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("organization:User navbar items"), i18next.t("organization:User navbar items - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <NavItemTree
+              disabled={!Setting.isAdminUser(this.props.account)}
+              checkedKeys={this.state.organization.userNavItems ?? []}
+              defaultExpandedKeys={["all"]}
+              onCheck={(checked, _) => {
+                this.updateOrganizationField("userNavItems", checked);
               }}
             />
           </Col>
@@ -739,6 +816,11 @@ class OrganizationEditPage extends React.Component {
         {
           this.state.organization !== null ? this.renderOrganization() : null
         }
+        {this.state.mode !== "add" && this.state.transactions.length > 0 ? (
+          <Card size="small" title={i18next.t("transaction:Transactions")} style={{marginTop: "20px"}} type="inner">
+            <TransactionTable transactions={this.state.transactions} includeUser={true} />
+          </Card>
+        ) : null}
         <div style={{marginTop: "20px", marginLeft: "40px"}}>
           <Button size="large" onClick={() => this.submitOrganizationEdit(false)}>{i18next.t("general:Save")}</Button>
           <Button style={{marginLeft: "20px"}} type="primary" size="large" onClick={() => this.submitOrganizationEdit(true)}>{i18next.t("general:Save & Exit")}</Button>

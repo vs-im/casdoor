@@ -46,6 +46,8 @@ p, *, *, POST, /api/login, *, *
 p, *, *, GET, /api/get-app-login, *, *
 p, *, *, POST, /api/logout, *, *
 p, *, *, GET, /api/logout, *, *
+p, *, *, POST, /api/sso-logout, *, *
+p, *, *, GET, /api/sso-logout, *, *
 p, *, *, POST, /api/callback, *, *
 p, *, *, POST, /api/device-auth, *, *
 p, *, *, GET, /api/get-account, *, *
@@ -65,7 +67,6 @@ p, *, *, POST, /api/upload-users, *, *
 p, *, *, GET, /api/get-resources, *, *
 p, *, *, GET, /api/get-records, *, *
 p, *, *, GET, /api/get-product, *, *
-p, *, *, POST, /api/buy-product, *, *
 p, *, *, GET, /api/get-payment, *, *
 p, *, *, POST, /api/update-payment, *, *
 p, *, *, POST, /api/invoice-payment, *, *
@@ -98,6 +99,8 @@ p, *, *, *, /api/metrics, *, *
 p, *, *, GET, /api/get-pricing, *, *
 p, *, *, GET, /api/get-plan, *, *
 p, *, *, GET, /api/get-subscription, *, *
+p, *, *, GET, /api/get-transactions, *, *
+p, *, *, GET, /api/get-transaction, *, *
 p, *, *, GET, /api/get-provider, *, *
 p, *, *, GET, /api/get-organization-names, *, *
 p, *, *, GET, /api/get-all-objects, *, *
@@ -173,7 +176,7 @@ func IsAllowed(subOwner string, subName string, method string, urlPath string, o
 
 func isAllowedInDemoMode(subOwner string, subName string, method string, urlPath string, objOwner string, objName string) bool {
 	if method == "POST" {
-		if strings.HasPrefix(urlPath, "/api/login") || urlPath == "/api/logout" || urlPath == "/api/signup" || urlPath == "/api/callback" || urlPath == "/api/send-verification-code" || urlPath == "/api/send-email" || urlPath == "/api/verify-captcha" || urlPath == "/api/verify-code" || urlPath == "/api/check-user-password" || strings.HasPrefix(urlPath, "/api/mfa/") || urlPath == "/api/webhook" || urlPath == "/api/get-qrcode" || urlPath == "/api/refresh-engines" {
+		if strings.HasPrefix(urlPath, "/api/login") || urlPath == "/api/logout" || urlPath == "/api/sso-logout" || urlPath == "/api/signup" || urlPath == "/api/callback" || urlPath == "/api/send-verification-code" || urlPath == "/api/send-email" || urlPath == "/api/verify-captcha" || urlPath == "/api/verify-code" || urlPath == "/api/check-user-password" || strings.HasPrefix(urlPath, "/api/mfa/") || urlPath == "/api/webhook" || urlPath == "/api/get-qrcode" || urlPath == "/api/refresh-engines" {
 			return true
 		} else if urlPath == "/api/update-user" {
 			// Allow ordinary users to update their own information
@@ -181,7 +184,7 @@ func isAllowedInDemoMode(subOwner string, subName string, method string, urlPath
 				return true
 			}
 			return false
-		} else if urlPath == "/api/upload-resource" {
+		} else if urlPath == "/api/upload-resource" || urlPath == "/api/add-transaction" {
 			if subOwner == "app" && subName == "app-casibase" {
 				return true
 			}

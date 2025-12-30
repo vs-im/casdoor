@@ -72,7 +72,7 @@ class PricingPage extends React.Component {
       .then(results => {
         const hasError = results.some(result => result.status === "error");
         if (hasError) {
-          Setting.showMessage("error", i18next.t("pricing:Failed to get plans"));
+          Setting.showMessage("error", i18next.t("general:Failed to get"));
           return;
         }
         const plans = results.map(result => result.data);
@@ -85,7 +85,7 @@ class PricingPage extends React.Component {
         });
       })
       .catch(error => {
-        Setting.showMessage("error", i18next.t("pricing:Failed to get plans") + `: ${error}`);
+        Setting.showMessage("error", i18next.t("general:Failed to get") + `: ${error}`);
       });
   }
 
@@ -138,11 +138,15 @@ class PricingPage extends React.Component {
   renderCards() {
     const getUrlByPlan = (planName) => {
       const pricing = this.state.pricing;
-      let signUpUrl = `/signup/${pricing.application}?plan=${planName}&pricing=${pricing.name}`;
-      if (this.state.userName) {
-        signUpUrl = `/buy-plan/${pricing.owner}/${pricing.name}?plan=${planName}&user=${this.state.userName}`;
+      const account = this.props.account;
+      const isLoggedIn = (account !== null && account !== undefined);
+
+      if (isLoggedIn) {
+        const userName = this.state.userName || account.name;
+        return `/buy-plan/${pricing.owner}/${pricing.name}?plan=${planName}${userName ? `&user=${userName}` : ""}`;
+      } else {
+        return `/signup/${pricing.application}?plan=${planName}&pricing=${pricing.name}`;
       }
-      return `${window.location.origin}${signUpUrl}`;
     };
 
     if (Setting.isMobile()) {

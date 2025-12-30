@@ -15,14 +15,18 @@
 package routers
 
 import (
+	stdcontext "context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/beego/beego/v2/core/logs"
+	"github.com/casdoor/casdoor/controllers"
 	"github.com/casdoor/casdoor/object"
 
-	"github.com/beego/beego/context"
+	"github.com/beego/beego/v2/server/web/context"
 	"github.com/casdoor/casdoor/authz"
 	"github.com/casdoor/casdoor/util"
 )
@@ -48,6 +52,33 @@ func getUsername(ctx *context.Context) (username string) {
 	if username == "" {
 		username, _ = getUsernameByKeys(ctx)
 	}
+
+	session := ctx.Input.Session("SessionData")
+	if session == nil {
+		return
+	}
+
+	sessionData := &controllers.SessionData{}
+	err := util.JsonToStruct(session.(string), sessionData)
+	if err != nil {
+		logs.Error("GetSessionData failed, error: %s", err)
+		return ""
+	}
+
+	if sessionData.ExpireTime != 0 &&
+		sessionData.ExpireTime < time.Now().Unix() {
+		err = ctx.Input.CruSession.Set(stdcontext.Background(), "username", "")
+		if err != nil {
+			logs.Error("Failed to clear expired session, error: %s", err)
+			return ""
+		}
+		err = ctx.Input.CruSession.Delete(stdcontext.Background(), "SessionData")
+		if err != nil {
+			logs.Error("Failed to clear expired session, error: %s", err)
+		}
+		return ""
+	}
+
 	return
 }
 
@@ -58,7 +89,11 @@ func getSubject(ctx *context.Context) (string, string) {
 	}
 
 	// username == "built-in/admin"
-	return util.GetOwnerAndNameFromId(username)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(username)
+	if err != nil {
+		panic(err)
+	}
+	return owner, name
 }
 
 func getObject(ctx *context.Context) (string, string, error) {

@@ -64,7 +64,14 @@ func (c *ApiController) MfaSetupInitiate() {
 		return
 	}
 
-	mfaProps, err := MfaUtil.Initiate(user.GetId())
+	issuer := ""
+	if organization != nil && organization.DisplayName != "" {
+		issuer = organization.DisplayName
+	} else if organization != nil {
+		issuer = organization.Name
+	}
+
+	mfaProps, err := MfaUtil.Initiate(user.GetId(), issuer)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
@@ -132,6 +139,17 @@ func (c *ApiController) MfaSetupVerify() {
 		config.Secret = dest
 		if secret == "" {
 			c.ResponseError("RADIUS provider is missing")
+			return
+		}
+		config.URL = secret
+	} else if mfaType == object.PushType {
+		if dest == "" {
+			c.ResponseError("push notification receiver is missing")
+			return
+		}
+		config.Secret = dest
+		if secret == "" {
+			c.ResponseError("push notification provider is missing")
 			return
 		}
 		config.URL = secret
@@ -219,6 +237,17 @@ func (c *ApiController) MfaSetupEnable() {
 		config.Secret = dest
 		if secret == "" {
 			c.ResponseError("RADIUS provider is missing")
+			return
+		}
+		config.URL = secret
+	} else if mfaType == object.PushType {
+		if dest == "" {
+			c.ResponseError("push notification receiver is missing")
+			return
+		}
+		config.Secret = dest
+		if secret == "" {
+			c.ResponseError("push notification provider is missing")
 			return
 		}
 		config.URL = secret

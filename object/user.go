@@ -81,6 +81,8 @@ type User struct {
 	Title             string   `xorm:"varchar(100)" json:"title"`
 	IdCardType        string   `xorm:"varchar(100)" json:"idCardType"`
 	IdCard            string   `xorm:"varchar(100) index" json:"idCard"`
+	RealName          string   `xorm:"varchar(100)" json:"realName"`
+	IsVerified        bool     `json:"isVerified"`
 	Homepage          string   `xorm:"varchar(100)" json:"homepage"`
 	Bio               string   `xorm:"varchar(100)" json:"bio"`
 	Tag               string   `xorm:"varchar(100)" json:"tag"`
@@ -92,7 +94,9 @@ type User struct {
 	Karma             int      `json:"karma"`
 	Ranking           int      `json:"ranking"`
 	Balance           float64  `json:"balance"`
+	BalanceCredit     float64  `json:"balanceCredit"`
 	Currency          string   `xorm:"varchar(100)" json:"currency"`
+	BalanceCurrency   string   `xorm:"varchar(100)" json:"balanceCurrency"`
 	IsDefaultAvatar   bool     `json:"isDefaultAvatar"`
 	IsOnline          bool     `json:"isOnline"`
 	IsAdmin           bool     `json:"isAdmin"`
@@ -106,6 +110,7 @@ type User struct {
 	AccessKey         string   `xorm:"varchar(100)" json:"accessKey"`
 	AccessSecret      string   `xorm:"varchar(100)" json:"accessSecret"`
 	AccessToken       string   `xorm:"mediumtext" json:"accessToken"`
+	OriginalToken     string   `xorm:"mediumtext" json:"originalToken"`
 
 	CreatedIp      string `xorm:"varchar(100)" json:"createdIp"`
 	LastSigninTime string `xorm:"varchar(100)" json:"lastSigninTime"`
@@ -208,6 +213,9 @@ type User struct {
 	MfaRadiusEnabled    bool                  `json:"mfaRadiusEnabled"`
 	MfaRadiusUsername   string                `xorm:"varchar(100)" json:"mfaRadiusUsername"`
 	MfaRadiusProvider   string                `xorm:"varchar(100)" json:"mfaRadiusProvider"`
+	MfaPushEnabled      bool                  `json:"mfaPushEnabled"`
+	MfaPushReceiver     string                `xorm:"varchar(100)" json:"mfaPushReceiver"`
+	MfaPushProvider     string                `xorm:"varchar(100)" json:"mfaPushProvider"`
 	MultiFactorAuths    []*MfaProps           `xorm:"-" json:"multiFactorAuths,omitempty"`
 	Invitation          string                `xorm:"varchar(100) index" json:"invitation"`
 	InvitationCode      string                `xorm:"varchar(100) index" json:"invitationCode"`
@@ -243,6 +251,8 @@ type Userinfo struct {
 	Avatar        string   `json:"picture,omitempty"`
 	Address       string   `json:"address,omitempty"`
 	Phone         string   `json:"phone,omitempty"`
+	RealName      string   `json:"real_name,omitempty"`
+	IsVerified    bool     `json:"is_verified,omitempty"`
 	Groups        []string `json:"groups,omitempty"`
 	Roles         []string `json:"roles,omitempty"`
 	Permissions   []string `json:"permissions,omitempty"`
@@ -631,7 +641,10 @@ func GetUserByAccessKey(accessKey string) (*User, error) {
 }
 
 func GetUser(id string) (*User, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return nil, err
+	}
 	return getUser(owner, name)
 }
 
@@ -656,6 +669,9 @@ func GetMaskedUser(user *User, isAdminOrSelf bool, errs ...error) (*User, error)
 	if !isAdminOrSelf {
 		if user.AccessSecret != "" {
 			user.AccessSecret = "***"
+		}
+		if user.OriginalToken != "" {
+			user.OriginalToken = "***"
 		}
 	}
 
@@ -777,6 +793,23 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 		return false, fmt.Errorf("the user: %s is not found", id)
 	}
 
+	// Auto-upgrade guest users when they update their username or password
+	if oldUser.Tag == "guest-user" {
+		// Check if username is being changed from the generated guest username
+		usernameChanged := oldUser.Name != user.Name && !strings.HasPrefix(user.Name, "guest_")
+		// Check if password is being updated (not the placeholder ***)
+		passwordChanged := user.Password != "***" && user.Password != "" && user.Password != oldUser.Password
+
+		if usernameChanged || passwordChanged {
+			// Upgrade to normal user
+			user.Tag = "normal-user"
+			// Ensure tag is included in the update columns
+			if !util.InSlice(columns, "tag") && len(columns) > 0 {
+				columns = append(columns, "tag")
+			}
+		}
+	}
+
 	if name != user.Name {
 		err := userChangeTrigger(name, user.Name)
 		if err != nil {
@@ -804,7 +837,7 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 			"owner", "display_name", "avatar", "first_name", "last_name",
 			"location", "address", "country_code", "region", "language", "affiliation", "title", "id_card_type", "id_card", "homepage", "bio", "tag", "language", "gender", "birthday", "education", "score", "karma", "ranking", "signup_application",
 			"is_admin", "is_forbidden", "is_deleted", "hash", "is_default_avatar", "properties", "webauthnCredentials", "managedAccounts", "face_ids", "mfaAccounts",
-			"signin_wrong_times", "last_change_password_time", "last_signin_wrong_time", "groups", "access_key", "access_secret", "mfa_phone_enabled", "mfa_email_enabled",
+			"signin_wrong_times", "last_change_password_time", "last_signin_wrong_time", "groups", "access_key", "access_secret", "mfa_phone_enabled", "mfa_email_enabled", "email_verified",
 			"github", "google", "qq", "wechat", "facebook", "dingtalk", "weibo", "gitee", "linkedin", "wecom", "lark", "gitlab", "adfs",
 			"baidu", "alipay", "casdoor", "infoflow", "apple", "azuread", "azureadb2c", "slack", "steam", "bilibili", "okta", "douyin", "kwai", "line", "amazon",
 			"auth0", "battlenet", "bitbucket", "box", "cloudfoundry", "dailymotion", "deezer", "digitalocean", "discord", "dropbox",
@@ -815,7 +848,7 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 		}
 	}
 	if isAdmin {
-		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "mfa_items", "register_type", "register_source")
+		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "balance_credit", "balance_currency", "mfa_items", "register_type", "register_source")
 	}
 
 	columns = append(columns, "updated_time")
@@ -847,6 +880,11 @@ func updateUser(id string, user *User, columns []string) (int64, error) {
 		return 0, err
 	}
 
+	// Ensure hash column is included in updates when columns are specified
+	if len(columns) > 0 && !util.InSlice(columns, "hash") {
+		columns = append(columns, "hash")
+	}
+
 	affected, err := ormer.Engine.ID(core.PK{owner, name}).Cols(columns...).Update(user)
 	if err != nil {
 		return 0, err
@@ -856,7 +894,10 @@ func updateUser(id string, user *User, columns []string) (int64, error) {
 
 func UpdateUserForAllFields(id string, user *User) (bool, error) {
 	var err error
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return false, err
+	}
 	oldUser, err := getUser(owner, name)
 	if err != nil {
 		return false, err
@@ -940,6 +981,14 @@ func AddUser(user *User, lang string) (bool, error) {
 		return false, fmt.Errorf(i18n.Translate(lang, "organization:adding a new user to the 'built-in' organization is currently disabled. Please note: all users in the 'built-in' organization are global administrators in Casdoor. Refer to the docs: https://casdoor.org/docs/basic/core-concepts#how-does-casdoor-manage-itself. If you still wish to create a user for the 'built-in' organization, go to the organization's settings page and enable the 'Has privilege consent' option."))
 	}
 
+	if user.BalanceCurrency == "" {
+		if organization.BalanceCurrency != "" {
+			user.BalanceCurrency = organization.BalanceCurrency
+		} else {
+			user.BalanceCurrency = "USD"
+		}
+	}
+
 	if organization.DefaultPassword != "" && user.Password == "123" {
 		user.Password = organization.DefaultPassword
 	}
@@ -950,6 +999,10 @@ func AddUser(user *User, lang string) (bool, error) {
 
 	if user.CreatedTime == "" {
 		user.CreatedTime = util.GetCurrentTime()
+	}
+
+	if user.UpdatedTime == "" {
+		user.UpdatedTime = user.CreatedTime
 	}
 
 	err = user.UpdateUserHash()
@@ -1011,6 +1064,14 @@ func AddUsers(users []*User) (bool, error) {
 	for _, user := range users {
 		// this function is only used for syncer or batch upload, so no need to encrypt the password
 		// user.UpdateUserPassword(organization)
+
+		if user.CreatedTime == "" {
+			user.CreatedTime = util.GetCurrentTime()
+		}
+
+		if user.UpdatedTime == "" {
+			user.UpdatedTime = user.CreatedTime
+		}
 
 		err := user.UpdateUserHash()
 		if err != nil {
@@ -1085,7 +1146,7 @@ func deleteUser(user *User) (bool, error) {
 
 func DeleteUser(user *User) (bool, error) {
 	// Forced offline the user first
-	_, err := DeleteSession(util.GetSessionId(user.Owner, user.Name, CasdoorApplication))
+	_, err := DeleteSession(util.GetSessionId(user.Owner, user.Name, CasdoorApplication), "")
 	if err != nil {
 		return false, err
 	}
@@ -1151,6 +1212,11 @@ func GetUserInfo(user *User, scope string, aud string, host string) (*Userinfo, 
 
 	if strings.Contains(scope, "phone") {
 		resp.Phone = user.Phone
+	}
+
+	if strings.Contains(scope, "profile") {
+		resp.RealName = user.RealName
+		resp.IsVerified = user.IsVerified
 	}
 
 	return &resp, nil
@@ -1230,7 +1296,10 @@ func userChangeTrigger(oldName string, newName string) error {
 	for _, role := range roles {
 		for j, u := range role.Users {
 			// u = organization/username
-			owner, name := util.GetOwnerAndNameFromId(u)
+			owner, name, err := util.GetOwnerAndNameFromIdWithError(u)
+			if err != nil {
+				return err
+			}
 			if name == oldName {
 				role.Users[j] = util.GetId(owner, newName)
 			}
@@ -1253,7 +1322,10 @@ func userChangeTrigger(oldName string, newName string) error {
 			}
 
 			// u = organization/username
-			owner, name := util.GetOwnerAndNameFromId(u)
+			owner, name, err := util.GetOwnerAndNameFromIdWithError(u)
+			if err != nil {
+				return err
+			}
 			if name == oldName {
 				permission.Users[j] = util.GetId(owner, newName)
 			}
@@ -1378,7 +1450,7 @@ func (user *User) GetUserFullGroupPath() ([]string, error) {
 
 		curGroup, ok := groupMap[group.ParentId]
 		if !ok {
-			return []string{}, fmt.Errorf("group:Group %s not exist", group.ParentId)
+			return []string{}, fmt.Errorf(i18n.Translate("en", "auth:The group: %s does not exist"), group.ParentId)
 		}
 		for {
 			groupPath = util.GetId(curGroup.Name, groupPath)
@@ -1388,7 +1460,7 @@ func (user *User) GetUserFullGroupPath() ([]string, error) {
 
 			curGroup, ok = groupMap[curGroup.ParentId]
 			if !ok {
-				return []string{}, fmt.Errorf("group:Group %s not exist", curGroup.ParentId)
+				return []string{}, fmt.Errorf(i18n.Translate("en", "auth:The group: %s does not exist"), curGroup.ParentId)
 			}
 		}
 
@@ -1421,12 +1493,56 @@ func GenerateIdForNewUser(application *Application) (string, error) {
 	return res, nil
 }
 
-func UpdateUserBalance(owner string, name string, balance float64) error {
+func UpdateUserBalance(owner string, name string, balance float64, currency string, lang string) error {
 	user, err := getUser(owner, name)
 	if err != nil {
 		return err
 	}
-	user.Balance += balance
+	if user == nil {
+		return fmt.Errorf(i18n.Translate(lang, "general:The user: %s is not found"), fmt.Sprintf("%s/%s", owner, name))
+	}
+
+	// Convert the balance amount from transaction currency to user's balance currency
+	balanceCurrency := user.BalanceCurrency
+	var org *Organization
+	if balanceCurrency == "" {
+		// Get organization's balance currency as fallback
+		org, err = getOrganization("admin", owner)
+		if err == nil && org != nil && org.BalanceCurrency != "" {
+			balanceCurrency = org.BalanceCurrency
+		} else {
+			balanceCurrency = "USD"
+		}
+	}
+	convertedBalance := ConvertCurrency(balance, currency, balanceCurrency)
+
+	// Calculate new balance
+	newBalance := AddPrices(user.Balance, convertedBalance)
+
+	// Check balance credit limit
+	// User.BalanceCredit takes precedence over Organization.BalanceCredit
+	var balanceCredit float64
+	if user.BalanceCredit != 0 {
+		balanceCredit = user.BalanceCredit
+	} else {
+		// Get organization's balance credit as fallback
+		if org == nil {
+			org, err = getOrganization("admin", owner)
+			if err != nil {
+				return err
+			}
+		}
+		if org != nil {
+			balanceCredit = org.BalanceCredit
+		}
+	}
+
+	// Validate new balance against credit limit
+	if newBalance < balanceCredit {
+		return fmt.Errorf(i18n.Translate(lang, "general:Insufficient balance: new balance %v would be below credit limit %v"), newBalance, balanceCredit)
+	}
+
+	user.Balance = newBalance
 	_, err = UpdateUser(user.GetId(), user, []string{"balance"}, true)
 	return err
 }

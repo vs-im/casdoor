@@ -61,8 +61,12 @@ import SessionListPage from "./SessionListPage";
 import TokenListPage from "./TokenListPage";
 import TokenEditPage from "./TokenEditPage";
 import ProductListPage from "./ProductListPage";
+import ProductStorePage from "./ProductStorePage";
 import ProductEditPage from "./ProductEditPage";
 import ProductBuyPage from "./ProductBuyPage";
+import OrderListPage from "./OrderListPage";
+import OrderEditPage from "./OrderEditPage";
+import OrderPayPage from "./OrderPayPage";
 import PaymentListPage from "./PaymentListPage";
 import PaymentEditPage from "./PaymentEditPage";
 import PaymentResultPage from "./PaymentResultPage";
@@ -95,6 +99,9 @@ import {clearWeb3AuthToken} from "./auth/Web3Auth";
 import TransactionListPage from "./TransactionListPage";
 import TransactionEditPage from "./TransactionEditPage";
 import VerificationListPage from "./VerificationListPage";
+import TicketListPage from "./TicketListPage";
+import TicketEditPage from "./TicketEditPage";
+
 import * as ApplicationBackend from "./backend/ApplicationBackend";
 // import SingleCard from "./basic/SingleCard";
 
@@ -122,8 +129,9 @@ const BackToAppIcon = memo(BackToAppForwardRef);
 function ManagementPage(props) {
 
   const [menuVisible, setMenuVisible] = useState(false);
-  const navItems = props.account?.organization?.navItems;
-  const widgetItems = props.account?.organization?.widgetItems;
+  const organization = props.account?.organization;
+  const navItems = Setting.isLocalAdminUser(props.account) ? organization?.navItems : (organization?.userNavItems ?? []);
+  const widgetItems = organization?.widgetItems;
 
   const [applications, setApplications] = useState(null);
 
@@ -184,7 +192,7 @@ function ManagementPage(props) {
             Setting.goToLinkSoft({props}, "/");
           }
         } else {
-          Setting.showMessage("error", `Failed to log out: ${res.msg}`);
+          Setting.showMessage("error", `${i18next.t("general:Failed to log out")}: ${res.msg}`);
         }
       });
   }
@@ -260,6 +268,10 @@ function ManagementPage(props) {
 
   function widgetItemsIsAll() {
     return !Array.isArray(widgetItems) || !!widgetItems?.includes("all");
+  }
+
+  function isSpecialMenuItem(item) {
+    return item.key === "#" || item.key === "logo";
   }
 
   function renderWidgets() {
@@ -354,77 +366,77 @@ function ManagementPage(props) {
       Setting.getItem(<Link to="/">{i18next.t("general:Dashboard")}</Link>, "/"),
       Setting.getItem(<Link to="/shortcuts">{i18next.t("general:Shortcuts")}</Link>, "/shortcuts"),
       Setting.getItem(<Link to="/apps">{i18next.t("general:Apps")}</Link>, "/apps"),
+    ]));
+
+    if (Setting.isLocalAdminUser(props.account) && Conf.ShowGithubCorner) {
+      res.push(Setting.getItem(<a href={"https://casdoor.com"}>
+        <span style={{fontWeight: "bold", backgroundColor: "rgba(87,52,211,0.4)", marginTop: "12px", paddingLeft: "5px", paddingRight: "5px", display: "flex", alignItems: "center", height: "40px", borderRadius: "5px"}}>
+          🚀 SaaS Hosting 🔥
+        </span>
+      </a>, "#"));
+    }
+
+    res.push(Setting.getItem(<Link style={{color: textColor}} to="/organizations">{i18next.t("general:User Management")}</Link>, "/orgs", <AppstoreTwoTone twoToneColor={twoToneColor} />, [
+      Setting.getItem(<Link to="/organizations">{i18next.t("general:Organizations")}</Link>, "/organizations"),
+      Setting.getItem(<Link to="/groups">{i18next.t("general:Groups")}</Link>, "/groups"),
+      Setting.getItem(<Link to="/users">{i18next.t("general:Users")}</Link>, "/users"),
+      Setting.getItem(<Link to="/invitations">{i18next.t("general:Invitations")}</Link>, "/invitations"),
+    ]));
+
+    res.push(Setting.getItem(<Link style={{color: textColor}} to="/applications">{i18next.t("general:Identity")}</Link>, "/identity", <LockTwoTone twoToneColor={twoToneColor} />, [
+      Setting.getItem(<Link to="/applications">{i18next.t("general:Applications")}</Link>, "/applications"),
+      Setting.getItem(<Link to="/providers">{i18next.t("general:Providers")}</Link>, "/providers"),
+      Setting.getItem(<Link to="/resources">{i18next.t("general:Resources")}</Link>, "/resources"),
+      Setting.getItem(<Link to="/certs">{i18next.t("general:Certs")}</Link>, "/certs"),
+    ]));
+
+    res.push(Setting.getItem(<Link style={{color: textColor}} to="/roles">{i18next.t("general:Authorization")}</Link>, "/auth", <SafetyCertificateTwoTone twoToneColor={twoToneColor} />, [
+      Setting.getItem(<Link to="/roles">{i18next.t("general:Roles")}</Link>, "/roles"),
+      Setting.getItem(<Link to="/permissions">{i18next.t("general:Permissions")}</Link>, "/permissions"),
+      Setting.getItem(<Link to="/models">{i18next.t("general:Models")}</Link>, "/models"),
+      Setting.getItem(<Link to="/adapters">{i18next.t("general:Adapters")}</Link>, "/adapters"),
+      Setting.getItem(<Link to="/enforcers">{i18next.t("general:Enforcers")}</Link>, "/enforcers"),
     ].filter(item => {
-      return Setting.isLocalAdminUser(props.account);
+      if (!Setting.isLocalAdminUser(props.account) && ["/models", "/adapters", "/enforcers"].includes(item.key)) {
+        return false;
+      } else {
+        return true;
+      }
     })));
 
-    if (Setting.isLocalAdminUser(props.account)) {
-      if (Conf.ShowGithubCorner) {
-        res.push(Setting.getItem(<a href={"https://casdoor.com"}>
-          <span style={{fontWeight: "bold", backgroundColor: "rgba(87,52,211,0.4)", marginTop: "12px", paddingLeft: "5px", paddingRight: "5px", display: "flex", alignItems: "center", height: "40px", borderRadius: "5px"}}>
-            🚀 SaaS Hosting 🔥
-          </span>
-        </a>, "#"));
-      }
+    res.push(Setting.getItem(<Link style={{color: textColor}} to="/sessions">{i18next.t("general:Logging & Auditing")}</Link>, "/logs", <WalletTwoTone twoToneColor={twoToneColor} />, [
+      Setting.getItem(<Link to="/sessions">{i18next.t("general:Sessions")}</Link>, "/sessions"),
+      Conf.CasvisorUrl ? Setting.getItem(<a target="_blank" rel="noreferrer" href={Conf.CasvisorUrl}>{i18next.t("general:Records")}</a>, "/records")
+        : Setting.getItem(<Link to="/records">{i18next.t("general:Records")}</Link>, "/records"),
+      Setting.getItem(<Link to="/tokens">{i18next.t("general:Tokens")}</Link>, "/tokens"),
+      Setting.getItem(<Link to="/verifications">{i18next.t("general:Verifications")}</Link>, "/verifications"),
+    ]));
 
-      res.push(Setting.getItem(<Link style={{color: textColor}} to="/organizations">{i18next.t("general:User Management")}</Link>, "/orgs", <AppstoreTwoTone twoToneColor={twoToneColor} />, [
-        Setting.getItem(<Link to="/organizations">{i18next.t("general:Organizations")}</Link>, "/organizations"),
-        Setting.getItem(<Link to="/groups">{i18next.t("general:Groups")}</Link>, "/groups"),
-        Setting.getItem(<Link to="/users">{i18next.t("general:Users")}</Link>, "/users"),
-        Setting.getItem(<Link to="/invitations">{i18next.t("general:Invitations")}</Link>, "/invitations"),
-      ]));
+    res.push(Setting.getItem(<Link style={{color: textColor}} to="/products">{i18next.t("general:Business & Payments")}</Link>, "/business", <DollarTwoTone twoToneColor={twoToneColor} />, [
+      Setting.getItem(<Link to="/product-store">{i18next.t("general:Product Store")}</Link>, "/product-store"),
+      Setting.getItem(<Link to="/products">{i18next.t("general:Products")}</Link>, "/products"),
+      Setting.getItem(<Link to="/orders">{i18next.t("general:Orders")}</Link>, "/orders"),
+      Setting.getItem(<Link to="/payments">{i18next.t("general:Payments")}</Link>, "/payments"),
+      Setting.getItem(<Link to="/plans">{i18next.t("general:Plans")}</Link>, "/plans"),
+      Setting.getItem(<Link to="/pricings">{i18next.t("general:Pricings")}</Link>, "/pricings"),
+      Setting.getItem(<Link to="/subscriptions">{i18next.t("general:Subscriptions")}</Link>, "/subscriptions"),
+      Setting.getItem(<Link to="/transactions">{i18next.t("general:Transactions")}</Link>, "/transactions"),
+    ]));
 
-      res.push(Setting.getItem(<Link style={{color: textColor}} to="/applications">{i18next.t("general:Identity")}</Link>, "/identity", <LockTwoTone twoToneColor={twoToneColor} />, [
-        Setting.getItem(<Link to="/applications">{i18next.t("general:Applications")}</Link>, "/applications"),
-        Setting.getItem(<Link to="/providers">{i18next.t("general:Providers")}</Link>, "/providers"),
-        Setting.getItem(<Link to="/resources">{i18next.t("general:Resources")}</Link>, "/resources"),
-        Setting.getItem(<Link to="/certs">{i18next.t("general:Certs")}</Link>, "/certs"),
-      ]));
-
-      res.push(Setting.getItem(<Link style={{color: textColor}} to="/roles">{i18next.t("general:Authorization")}</Link>, "/auth", <SafetyCertificateTwoTone twoToneColor={twoToneColor} />, [
-        Setting.getItem(<Link to="/roles">{i18next.t("general:Roles")}</Link>, "/roles"),
-        Setting.getItem(<Link to="/permissions">{i18next.t("general:Permissions")}</Link>, "/permissions"),
-        Setting.getItem(<Link to="/models">{i18next.t("general:Models")}</Link>, "/models"),
-        Setting.getItem(<Link to="/adapters">{i18next.t("general:Adapters")}</Link>, "/adapters"),
-        Setting.getItem(<Link to="/enforcers">{i18next.t("general:Enforcers")}</Link>, "/enforcers"),
-      ].filter(item => {
-        if (!Setting.isLocalAdminUser(props.account) && ["/models", "/adapters", "/enforcers"].includes(item.key)) {
-          return false;
-        } else {
-          return true;
-        }
-      })));
-
-      res.push(Setting.getItem(<Link style={{color: textColor}} to="/sessions">{i18next.t("general:Logging & Auditing")}</Link>, "/logs", <WalletTwoTone twoToneColor={twoToneColor} />, [
-        Setting.getItem(<Link to="/sessions">{i18next.t("general:Sessions")}</Link>, "/sessions"),
-        Conf.CasvisorUrl ? Setting.getItem(<a target="_blank" rel="noreferrer" href={Conf.CasvisorUrl}>{i18next.t("general:Records")}</a>, "/records")
-          : Setting.getItem(<Link to="/records">{i18next.t("general:Records")}</Link>, "/records"),
-        Setting.getItem(<Link to="/tokens">{i18next.t("general:Tokens")}</Link>, "/tokens"),
-        Setting.getItem(<Link to="/verifications">{i18next.t("general:Verifications")}</Link>, "/verifications"),
-      ]));
-
-      res.push(Setting.getItem(<Link style={{color: textColor}} to="/products">{i18next.t("general:Business & Payments")}</Link>, "/business", <DollarTwoTone twoToneColor={twoToneColor} />, [
-        Setting.getItem(<Link to="/products">{i18next.t("general:Products")}</Link>, "/products"),
-        Setting.getItem(<Link to="/payments">{i18next.t("general:Payments")}</Link>, "/payments"),
-        Setting.getItem(<Link to="/plans">{i18next.t("general:Plans")}</Link>, "/plans"),
-        Setting.getItem(<Link to="/pricings">{i18next.t("general:Pricings")}</Link>, "/pricings"),
-        Setting.getItem(<Link to="/subscriptions">{i18next.t("general:Subscriptions")}</Link>, "/subscriptions"),
-        Setting.getItem(<Link to="/transactions">{i18next.t("general:Transactions")}</Link>, "/transactions"),
-      ]));
-
-      if (Setting.isAdminUser(props.account)) {
-        res.push(Setting.getItem(<Link style={{color: textColor}} to="/sysinfo">{i18next.t("general:Admin")}</Link>, "/admin", <SettingTwoTone twoToneColor={twoToneColor} />, [
-          Setting.getItem(<Link to="/sysinfo">{i18next.t("general:System Info")}</Link>, "/sysinfo"),
-          Setting.getItem(<Link to="/forms">{i18next.t("general:Forms")}</Link>, "/forms"),
-          Setting.getItem(<Link to="/syncers">{i18next.t("general:Syncers")}</Link>, "/syncers"),
-          Setting.getItem(<Link to="/webhooks">{i18next.t("general:Webhooks")}</Link>, "/webhooks"),
-          Setting.getItem(<a target="_blank" rel="noreferrer" href={Setting.isLocalhost() ? `${Setting.ServerUrl}/swagger` : "/swagger"}>{i18next.t("general:Swagger")}</a>, "/swagger")]));
-      } else {
-        res.push(Setting.getItem(<Link style={{color: textColor}} to="/syncers">{i18next.t("general:Admin")}</Link>, "/admin", <SettingTwoTone twoToneColor={twoToneColor} />, [
-          Setting.getItem(<Link to="/forms">{i18next.t("general:Forms")}</Link>, "/forms"),
-          Setting.getItem(<Link to="/syncers">{i18next.t("general:Syncers")}</Link>, "/syncers"),
-          Setting.getItem(<Link to="/webhooks">{i18next.t("general:Webhooks")}</Link>, "/webhooks")]));
-      }
+    if (Setting.isAdminUser(props.account)) {
+      res.push(Setting.getItem(<Link style={{color: textColor}} to="/sysinfo">{i18next.t("general:Admin")}</Link>, "/admin", <SettingTwoTone twoToneColor={twoToneColor} />, [
+        Setting.getItem(<Link to="/sysinfo">{i18next.t("general:System Info")}</Link>, "/sysinfo"),
+        Setting.getItem(<Link to="/forms">{i18next.t("general:Forms")}</Link>, "/forms"),
+        Setting.getItem(<Link to="/syncers">{i18next.t("general:Syncers")}</Link>, "/syncers"),
+        Setting.getItem(<Link to="/webhooks">{i18next.t("general:Webhooks")}</Link>, "/webhooks"),
+        Setting.getItem(<Link to="/tickets">{i18next.t("general:Tickets")}</Link>, "/tickets"),
+        Setting.getItem(<a target="_blank" rel="noreferrer" href={Setting.isLocalhost() ? `${Setting.ServerUrl}/swagger` : "/swagger"}>{i18next.t("general:Swagger")}</a>, "/swagger")]));
+    } else {
+      res.push(Setting.getItem(<Link style={{color: textColor}} to="/syncers">{i18next.t("general:Admin")}</Link>, "/admin", <SettingTwoTone twoToneColor={twoToneColor} />, [
+        Setting.getItem(<Link to="/forms">{i18next.t("general:Forms")}</Link>, "/forms"),
+        Setting.getItem(<Link to="/syncers">{i18next.t("general:Syncers")}</Link>, "/syncers"),
+        Setting.getItem(<Link to="/webhooks">{i18next.t("general:Webhooks")}</Link>, "/webhooks"),
+        Setting.getItem(<Link to="/tickets">{i18next.t("general:Tickets")}</Link>, "/tickets")]));
     }
 
     if (navItemsIsAll()) {
@@ -446,10 +458,36 @@ function ManagementPage(props) {
       return item;
     });
 
-    return resFiltered.filter(item => {
-      if (item.key === "#" || item.key === "logo") {return true;}
+    const filteredResult = resFiltered.filter(item => {
+      if (isSpecialMenuItem(item)) {return true;}
       return Array.isArray(item.children) && item.children.length > 0;
     });
+
+    // Count total end items (leaf nodes)
+    let totalEndItems = 0;
+    filteredResult.forEach(item => {
+      if (Array.isArray(item.children)) {
+        totalEndItems += item.children.length;
+      }
+    });
+
+    // If total end items <= MaxItemsForFlatMenu, flatten the menu (show only one level)
+    if (totalEndItems <= Conf.MaxItemsForFlatMenu) {
+      const flattenedResult = [];
+      filteredResult.forEach(item => {
+        if (isSpecialMenuItem(item)) {
+          flattenedResult.push(item);
+        } else if (Array.isArray(item.children)) {
+          // Add children directly without parent group
+          item.children.forEach(child => {
+            flattenedResult.push(child);
+          });
+        }
+      });
+      return flattenedResult;
+    }
+
+    return filteredResult;
   }
 
   function renderLoginIfNotLoggedIn(component) {
@@ -508,9 +546,13 @@ function ManagementPage(props) {
         <Route exact path="/sessions" render={(props) => renderLoginIfNotLoggedIn(<SessionListPage account={account} {...props} />)} />
         <Route exact path="/tokens" render={(props) => renderLoginIfNotLoggedIn(<TokenListPage account={account} {...props} />)} />
         <Route exact path="/tokens/:tokenName" render={(props) => renderLoginIfNotLoggedIn(<TokenEditPage account={account} {...props} />)} />
+        <Route exact path="/product-store" render={(props) => renderLoginIfNotLoggedIn(<ProductStorePage account={account} {...props} />)} />
         <Route exact path="/products" render={(props) => renderLoginIfNotLoggedIn(<ProductListPage account={account} {...props} />)} />
         <Route exact path="/products/:organizationName/:productName" render={(props) => renderLoginIfNotLoggedIn(<ProductEditPage account={account} {...props} />)} />
         <Route exact path="/products/:organizationName/:productName/buy" render={(props) => renderLoginIfNotLoggedIn(<ProductBuyPage account={account} {...props} />)} />
+        <Route exact path="/orders" render={(props) => renderLoginIfNotLoggedIn(<OrderListPage account={account} {...props} />)} />
+        <Route exact path="/orders/:organizationName/:orderName" render={(props) => renderLoginIfNotLoggedIn(<OrderEditPage account={account} {...props} />)} />
+        <Route exact path="/orders/:organizationName/:orderName/pay" render={(props) => renderLoginIfNotLoggedIn(<OrderPayPage account={account} {...props} />)} />
         <Route exact path="/payments" render={(props) => renderLoginIfNotLoggedIn(<PaymentListPage account={account} {...props} />)} />
         <Route exact path="/payments/:organizationName/:paymentName" render={(props) => renderLoginIfNotLoggedIn(<PaymentEditPage account={account} {...props} />)} />
         <Route exact path="/payments/:organizationName/:paymentName/result" render={(props) => renderLoginIfNotLoggedIn(<PaymentResultPage account={account} {...props} />)} />
@@ -529,6 +571,8 @@ function ManagementPage(props) {
         <Route exact path="/transactions/:organizationName/:transactionName" render={(props) => renderLoginIfNotLoggedIn(<TransactionEditPage account={account} {...props} />)} />
         <Route exact path="/webhooks" render={(props) => renderLoginIfNotLoggedIn(<WebhookListPage account={account} {...props} />)} />
         <Route exact path="/webhooks/:webhookName" render={(props) => renderLoginIfNotLoggedIn(<WebhookEditPage account={account} {...props} />)} />
+        <Route exact path="/tickets" render={(props) => renderLoginIfNotLoggedIn(<TicketListPage account={account} {...props} />)} />
+        <Route exact path="/tickets/:organizationName/:ticketName" render={(props) => renderLoginIfNotLoggedIn(<TicketEditPage account={account} {...props} />)} />
         <Route exact path="/ldap/:organizationName/:ldapId" render={(props) => renderLoginIfNotLoggedIn(<LdapEditPage account={account} {...props} />)} />
         <Route exact path="/ldap/sync/:organizationName/:ldapId" render={(props) => renderLoginIfNotLoggedIn(<LdapSyncPage account={account} {...props} />)} />
         <Route exact path="/mfa/setup" render={(props) => renderLoginIfNotLoggedIn(<MfaSetupPage account={account} onfinish={onfinish} {...props} />)} />

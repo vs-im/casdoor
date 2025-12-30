@@ -16,8 +16,9 @@ package object
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/casdoor/casdoor/pp"
+	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/util"
 	"github.com/xorm-io/core"
 )
@@ -27,24 +28,22 @@ type Transaction struct {
 	Name        string `xorm:"varchar(100) notnull pk" json:"name"`
 	CreatedTime string `xorm:"varchar(100)" json:"createdTime"`
 	DisplayName string `xorm:"varchar(100)" json:"displayName"`
-	// Transaction Provider Info
-	Provider string `xorm:"varchar(100)" json:"provider"`
-	Category string `xorm:"varchar(100)" json:"category"`
-	Type     string `xorm:"varchar(100)" json:"type"`
-	// Product Info
-	ProductName        string  `xorm:"varchar(100)" json:"productName"`
-	ProductDisplayName string  `xorm:"varchar(100)" json:"productDisplayName"`
-	Detail             string  `xorm:"varchar(255)" json:"detail"`
-	Tag                string  `xorm:"varchar(100)" json:"tag"`
-	Currency           string  `xorm:"varchar(100)" json:"currency"`
-	Amount             float64 `json:"amount"`
-	ReturnUrl          string  `xorm:"varchar(1000)" json:"returnUrl"`
-	// User Info
-	User        string `xorm:"varchar(100)" json:"user"`
-	Application string `xorm:"varchar(100)" json:"application"`
-	Payment     string `xorm:"varchar(100)" json:"payment"`
 
-	State pp.PaymentState `xorm:"varchar(100)" json:"state"`
+	Application string `xorm:"varchar(100)" json:"application"`
+	Domain      string `xorm:"varchar(1000)" json:"domain"`
+	Category    string `xorm:"varchar(100)" json:"category"`
+	Type        string `xorm:"varchar(100)" json:"type"`
+	Subtype     string `xorm:"varchar(100)" json:"subtype"`
+	Provider    string `xorm:"varchar(100)" json:"provider"`
+	User        string `xorm:"varchar(100)" json:"user"`
+	Tag         string `xorm:"varchar(100)" json:"tag"`
+
+	Amount   float64 `json:"amount"`
+	Currency string  `xorm:"varchar(100)" json:"currency"`
+
+	Payment string `xorm:"varchar(100)" json:"payment"`
+
+	State string `xorm:"varchar(100)" json:"state"`
 }
 
 func GetTransactionCount(owner, field, value string) (int64, error) {
@@ -102,16 +101,28 @@ func getTransaction(owner string, name string) (*Transaction, error) {
 }
 
 func GetTransaction(id string) (*Transaction, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return nil, err
+	}
 	return getTransaction(owner, name)
 }
 
-func UpdateTransaction(id string, transaction *Transaction) (bool, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
-	if p, err := getTransaction(owner, name); err != nil {
+func UpdateTransaction(id string, transaction *Transaction, lang string) (bool, error) {
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
 		return false, err
-	} else if p == nil {
+	}
+	oldTransaction, err := getTransaction(owner, name)
+	if err != nil {
+		return false, err
+	} else if oldTransaction == nil {
 		return false, nil
+	}
+
+	// Revert old balance changes
+	if err := updateBalanceForTransaction(oldTransaction, -oldTransaction.Amount, lang); err != nil {
+		return false, err
 	}
 
 	affected, err := ormer.Engine.ID(core.PK{owner, name}).AllCols().Update(transaction)
@@ -119,19 +130,75 @@ func UpdateTransaction(id string, transaction *Transaction) (bool, error) {
 		return false, err
 	}
 
-	return affected != 0, nil
-}
-
-func AddTransaction(transaction *Transaction) (bool, error) {
-	affected, err := ormer.Engine.Insert(transaction)
-	if err != nil {
-		return false, err
+	// Apply new balance changes
+	if affected != 0 {
+		if err := updateBalanceForTransaction(transaction, transaction.Amount, lang); err != nil {
+			return false, err
+		}
 	}
 
 	return affected != 0, nil
 }
 
-func DeleteTransaction(transaction *Transaction) (bool, error) {
+func AddTransaction(transaction *Transaction, lang string, dryRun bool) (bool, string, error) {
+	transactionId := strings.ReplaceAll(util.GenerateId(), "-", "")
+	transaction.Name = transactionId
+	transaction.DisplayName = transactionId
+
+	// In dry run mode, only validate without making changes
+	if dryRun {
+		err := validateBalanceForTransaction(transaction, transaction.Amount, lang)
+		if err != nil {
+			return false, "", err
+		}
+
+		return true, "", nil
+	}
+
+	affected, err := ormer.Engine.Insert(transaction)
+	if err != nil {
+		return false, "", err
+	}
+
+	if affected != 0 {
+		if err := updateBalanceForTransaction(transaction, transaction.Amount, lang); err != nil {
+			return false, transactionId, err
+		}
+	}
+
+	return affected != 0, transactionId, nil
+}
+
+func AddInternalPaymentTransaction(transaction *Transaction, lang string) (bool, error) {
+	transactionId := strings.ReplaceAll(util.GenerateId(), "-", "")
+	transaction.Name = transactionId
+	transaction.DisplayName = transactionId
+
+	// Validate balance impact first
+	if err := validateBalanceForTransaction(transaction, transaction.Amount, lang); err != nil {
+		return false, err
+	}
+
+	affected, err := ormer.Engine.Insert(transaction)
+	if err != nil {
+		return false, err
+	}
+
+	if affected != 0 {
+		if err := updateBalanceForTransaction(transaction, transaction.Amount, lang); err != nil {
+			return false, err
+		}
+	}
+
+	return affected != 0, nil
+}
+
+func DeleteTransaction(transaction *Transaction, lang string) (bool, error) {
+	// Revert balance changes before deleting
+	if err := updateBalanceForTransaction(transaction, -transaction.Amount, lang); err != nil {
+		return false, err
+	}
+
 	affected, err := ormer.Engine.ID(core.PK{transaction.Owner, transaction.Name}).Delete(&Transaction{})
 	if err != nil {
 		return false, err
@@ -142,4 +209,27 @@ func DeleteTransaction(transaction *Transaction) (bool, error) {
 
 func (transaction *Transaction) GetId() string {
 	return fmt.Sprintf("%s/%s", transaction.Owner, transaction.Name)
+}
+
+func updateBalanceForTransaction(transaction *Transaction, amount float64, lang string) error {
+	currency := transaction.Currency
+	if currency == "" {
+		currency = "USD"
+	}
+
+	if transaction.Tag == "Organization" {
+		// Update organization's own balance
+		return UpdateOrganizationBalance("admin", transaction.Owner, amount, currency, true, lang)
+	} else if transaction.Tag == "User" {
+		// Update user's balance
+		if transaction.User == "" {
+			return fmt.Errorf(i18n.Translate(lang, "general:User is required for User category transaction"))
+		}
+		if err := UpdateUserBalance(transaction.Owner, transaction.User, amount, currency, lang); err != nil {
+			return err
+		}
+		// Update organization's user balance sum
+		return UpdateOrganizationBalance("admin", transaction.Owner, amount, currency, false, lang)
+	}
+	return nil
 }

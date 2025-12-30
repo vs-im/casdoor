@@ -15,11 +15,12 @@
 package controllers
 
 import (
+	"context"
 	"strings"
 	"time"
 
-	"github.com/beego/beego"
-	"github.com/beego/beego/logs"
+	"github.com/beego/beego/v2/core/logs"
+	"github.com/beego/beego/v2/server/web"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
 )
@@ -27,7 +28,7 @@ import (
 // ApiController
 // controller for handlers under /api uri
 type ApiController struct {
-	beego.Controller
+	web.Controller
 }
 
 // RootController
@@ -122,6 +123,26 @@ func (c *ApiController) GetSessionUsername() string {
 	return user.(string)
 }
 
+// GetPaidUsername ...
+func (c *ApiController) GetPaidUsername() string {
+	// check if user session expired
+	sessionData := c.GetSessionData()
+
+	if sessionData != nil &&
+		sessionData.ExpireTime != 0 &&
+		sessionData.ExpireTime < time.Now().Unix() {
+		c.ClearUserSession()
+		return ""
+	}
+
+	user := c.GetSession("paidUsername")
+	if user == nil {
+		return ""
+	}
+
+	return user.(string)
+}
+
 func (c *ApiController) GetSessionToken() string {
 	accessToken := c.GetSession("accessToken")
 	if accessToken == nil {
@@ -148,6 +169,7 @@ func (c *ApiController) GetSessionApplication() *object.Application {
 func (c *ApiController) ClearUserSession() {
 	c.SetSessionUsername("")
 	c.SetSessionData(nil)
+	_ = c.SessionRegenerateID()
 }
 
 func (c *ApiController) ClearTokenSession() {
@@ -216,16 +238,19 @@ func (c *ApiController) setMfaUserSession(userId string) {
 }
 
 func (c *ApiController) getMfaUserSession() string {
-	userId := c.Ctx.Input.CruSession.Get(object.MfaSessionUserId)
+	userId := c.Ctx.Input.CruSession.Get(context.Background(), object.MfaSessionUserId)
 	if userId == nil {
 		return ""
 	}
 	return userId.(string)
 }
 
-func (c *ApiController) setExpireForSession() {
+func (c *ApiController) setExpireForSession(cookieExpireInHours int64) {
 	timestamp := time.Now().Unix()
-	timestamp += 3600 * 24
+	if cookieExpireInHours == 0 {
+		cookieExpireInHours = 720
+	}
+	timestamp += 3600 * cookieExpireInHours
 	c.SetSessionData(&SessionData{
 		ExpireTime: timestamp,
 	})

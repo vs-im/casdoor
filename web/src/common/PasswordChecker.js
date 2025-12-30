@@ -78,7 +78,7 @@ function getOptionDescription(option, password) {
 }
 
 export function renderPasswordPopover(options, password) {
-  return <div style={{width: 240}} >
+  return <div style={{width: "100%"}} >
     {options.map((option, idx) => {
       const {failed} = checkers[option](password);
       return <div key={idx}>{!failed ? <CheckCircleTwoTone twoToneColor={"#52c41a"} /> :

@@ -83,11 +83,17 @@ type Organization struct {
 	DisableSignin          bool       `json:"disableSignin"`
 	IpRestriction          string     `json:"ipRestriction"`
 	NavItems               []string   `xorm:"mediumtext" json:"navItems"`
+	UserNavItems           []string   `xorm:"mediumtext" json:"userNavItems"`
 	WidgetItems            []string   `xorm:"mediumtext" json:"widgetItems"`
 
 	MfaItems           []*MfaItem     `xorm:"varchar(300)" json:"mfaItems"`
 	MfaRememberInHours int            `json:"mfaRememberInHours"`
 	AccountItems       []*AccountItem `xorm:"mediumtext" json:"accountItems"`
+
+	OrgBalance      float64 `json:"orgBalance"`
+	UserBalance     float64 `json:"userBalance"`
+	BalanceCredit   float64 `json:"balanceCredit"`
+	BalanceCurrency string  `xorm:"varchar(100)" json:"balanceCurrency"`
 }
 
 func GetOrganizationCount(owner, name, field, value string) (int64, error) {
@@ -202,7 +208,10 @@ func GetMaskedOrganizations(organizations []*Organization, errs ...error) ([]*Or
 }
 
 func UpdateOrganization(id string, organization *Organization, isGlobalAdmin bool) (bool, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return false, err
+	}
 	org, err := getOrganization(owner, name)
 	if err != nil {
 		return false, err
@@ -231,6 +240,7 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 
 	if !isGlobalAdmin {
 		organization.NavItems = org.NavItems
+		organization.UserNavItems = org.UserNavItems
 		organization.WidgetItems = org.WidgetItems
 	}
 
@@ -422,14 +432,20 @@ func organizationChangeTrigger(oldName string, newName string) error {
 	}
 	for i, u := range role.Users {
 		// u = organization/username
-		owner, name := util.GetOwnerAndNameFromId(u)
+		owner, name, err := util.GetOwnerAndNameFromIdWithError(u)
+		if err != nil {
+			return err
+		}
 		if name == oldName {
 			role.Users[i] = util.GetId(owner, newName)
 		}
 	}
 	for i, u := range role.Roles {
 		// u = organization/username
-		owner, name := util.GetOwnerAndNameFromId(u)
+		owner, name, err := util.GetOwnerAndNameFromIdWithError(u)
+		if err != nil {
+			return err
+		}
 		if name == oldName {
 			role.Roles[i] = util.GetId(owner, newName)
 		}
@@ -447,14 +463,20 @@ func organizationChangeTrigger(oldName string, newName string) error {
 	}
 	for i, u := range permission.Users {
 		// u = organization/username
-		owner, name := util.GetOwnerAndNameFromId(u)
+		owner, name, err := util.GetOwnerAndNameFromIdWithError(u)
+		if err != nil {
+			return err
+		}
 		if name == oldName {
 			permission.Users[i] = util.GetId(owner, newName)
 		}
 	}
 	for i, u := range permission.Roles {
 		// u = organization/username
-		owner, name := util.GetOwnerAndNameFromId(u)
+		owner, name, err := util.GetOwnerAndNameFromIdWithError(u)
+		if err != nil {
+			return err
+		}
 		if name == oldName {
 			permission.Roles[i] = util.GetId(owner, newName)
 		}
@@ -566,4 +588,41 @@ func (org *Organization) GetInitScore() (int, error) {
 	} else {
 		return strconv.Atoi(conf.GetConfigString("initScore"))
 	}
+}
+
+func UpdateOrganizationBalance(owner string, name string, balance float64, currency string, isOrgBalance bool, lang string) error {
+	organization, err := getOrganization(owner, name)
+	if err != nil {
+		return err
+	}
+	if organization == nil {
+		return fmt.Errorf(i18n.Translate(lang, "auth:the organization: %s is not found"), fmt.Sprintf("%s/%s", owner, name))
+	}
+
+	// Convert the balance amount from transaction currency to organization's balance currency
+	balanceCurrency := organization.BalanceCurrency
+	if balanceCurrency == "" {
+		balanceCurrency = "USD"
+	}
+	convertedBalance := ConvertCurrency(balance, currency, balanceCurrency)
+
+	var columns []string
+	var newBalance float64
+	if isOrgBalance {
+		newBalance = AddPrices(organization.OrgBalance, convertedBalance)
+		// Check organization balance credit limit
+		if newBalance < organization.BalanceCredit {
+			return fmt.Errorf(i18n.Translate(lang, "general:Insufficient balance: new organization balance %v would be below credit limit %v"), newBalance, organization.BalanceCredit)
+		}
+		organization.OrgBalance = newBalance
+		columns = []string{"org_balance"}
+	} else {
+		// User balance is just a sum of all users' balances, no credit limit check here
+		// Individual user credit limits are checked in UpdateUserBalance
+		organization.UserBalance = AddPrices(organization.UserBalance, convertedBalance)
+		columns = []string{"user_balance"}
+	}
+
+	_, err = ormer.Engine.ID(core.PK{owner, name}).Cols(columns...).Update(organization)
+	return err
 }

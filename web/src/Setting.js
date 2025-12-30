@@ -293,6 +293,26 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/payment_gc.png`,
       url: "https://gc.org",
     },
+    "Polar": {
+      logo: `${StaticBaseUrl}/img/payment_polar.png`,
+      url: "https://polar.sh/",
+    },
+    "Paddle": {
+      logo: `${StaticBaseUrl}/img/payment_paddle.png`,
+      url: "https://www.paddle.com/",
+    },
+    "FastSpring": {
+      logo: `${StaticBaseUrl}/img/payment_fastspring.png`,
+      url: "https://fastspring.com/",
+    },
+    "Lemon Squeezy": {
+      logo: `${StaticBaseUrl}/img/payment_lemonsqueezy.png`,
+      url: "https://www.lemonsqueezy.com/",
+    },
+    "Adyen": {
+      logo: `${StaticBaseUrl}/img/payment_adyen.png`,
+      url: "https://www.adyen.com/",
+    },
   },
   Captcha: {
     "Default": {
@@ -421,6 +441,10 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/cucloud.png`,
       url: "https://www.cucloud.cn/",
     },
+    "WeCom": {
+      logo: `${StaticBaseUrl}/img/social_wecom.png`,
+      url: "https://work.weixin.qq.com/",
+    },
   },
   "Face ID": {
     "Alibaba Cloud Facebody": {
@@ -434,7 +458,189 @@ export const OtherProviderInfo = {
       url: "",
     },
   },
+  "ID Verification": {
+    "Jumio": {
+      logo: `${StaticBaseUrl}/img/social_jumio.png`,
+      url: "https://www.jumio.com/",
+    },
+    "Alibaba Cloud": {
+      logo: `${StaticBaseUrl}/img/social_aliyun.png`,
+      url: "https://www.aliyun.com/product/idverification",
+    },
+  },
 };
+
+export const UserFields = ["owner", "name", "password", "display_name", "id", "type", "email", "phone", "country_code",
+  "is_admin", "homepage", "birthday", "gender", "password_type", "password_salt", "external_id", "avatar", "first_name", "last_name",
+  "avatar_type", "permanent_avatar", "email_verified", "region", "location", "address",
+  "affiliation", "title", "id_card_type", "id_card", "real_name", "is_verified", "bio", "tag", "language",
+  "education", "score", "karma", "ranking", "balance", "currency", "is_default_avatar", "is_online",
+  "is_forbidden", "is_deleted", "signup_application", "hash", "pre_hash", "access_key", "access_secret", "access_token",
+  "created_ip", "last_signin_time", "last_signin_ip", "github", "google", "qq", "wechat", "facebook", "dingtalk",
+  "weibo", "gitee", "linkedin", "wecom", "lark", "gitlab", "adfs", "baidu", "alipay", "casdoor", "infoflow", "apple",
+  "azuread", "azureadb2c", "slack", "steam", "bilibili", "okta", "douyin", "kwai", "line", "amazon", "auth0",
+  "battlenet", "bitbucket", "box", "cloudfoundry", "dailymotion", "deezer", "digitalocean", "discord", "dropbox",
+  "eveonline", "fitbit", "gitea", "heroku", "influxcloud", "instagram", "intercom", "kakao", "lastfm", "mailru",
+  "meetup", "microsoftonline", "naver", "nextcloud", "onedrive", "oura", "patreon", "paypal", "salesforce", "shopify",
+  "soundcloud", "spotify", "strava", "stripe", "tiktok", "tumblr", "twitch", "twitter", "typetalk", "uber", "vk",
+  "wepay", "xero", "yahoo", "yammer", "yandex", "zoom", "metamask", "web3onboard", "custom", "webauthnCredentials",
+  "preferred_mfa_type", "recovery_codes", "totp_secret", "mfa_phone_enabled", "mfa_email_enabled", "invitation",
+  "invitation_code", "face_ids", "ldap", "properties", "roles", "permissions", "groups", "last_change_password_time",
+  "last_signin_wrong_time", "signin_wrong_times", "managedAccounts", "mfaAccounts", "need_update_password",
+  "created_time", "updated_time", "deleted_time",
+  "ip_whitelist"];
+
+export const GroupFields = ["owner", "name", "created_time", "updated_time", "display_name", "manager",
+  "contact_email", "type", "parent_id", "is_top_group", "is_enabled"];
+
+export const RoleFields = ["owner", "name", "created_time", "display_name", "description",
+  "users", "groups", "roles", "domains", "is_enabled"];
+
+export const PermissionFields = ["owner", "name", "created_time", "display_name", "description",
+  "users", "groups", "roles", "domains", "model", "adapter", "resource_type",
+  "resources", "actions", "effect", "is_enabled", "submitter", "approver", "approve_time", "state"];
+
+export const GetTranslatedUserItems = () => {
+  return [
+    {name: "Organization", label: i18next.t("general:Organization")},
+    {name: "ID", label: i18next.t("general:ID")},
+    {name: "Name", label: i18next.t("general:Name")},
+    {name: "Display name", label: i18next.t("general:Display name")},
+    {name: "First name", label: i18next.t("general:First name")},
+    {name: "Last name", label: i18next.t("general:Last name")},
+    {name: "Avatar", label: i18next.t("general:Avatar")},
+    {name: "User type", label: i18next.t("general:User type")},
+    {name: "Password", label: i18next.t("general:Password")},
+    {name: "Email", label: i18next.t("general:Email")},
+    {name: "Phone", label: i18next.t("general:Phone")},
+    {name: "Country code", label: i18next.t("user:Country code")},
+    {name: "Country/Region", label: i18next.t("user:Country/Region")},
+    {name: "Location", label: i18next.t("user:Location")},
+    {name: "Address", label: i18next.t("user:Address")},
+    {name: "Affiliation", label: i18next.t("user:Affiliation")},
+    {name: "Title", label: i18next.t("user:Title")},
+    {name: "ID card type", label: i18next.t("user:ID card type")},
+    {name: "ID card", label: i18next.t("user:ID card")},
+    {name: "ID card info", label: i18next.t("user:ID card info")},
+    {name: "Homepage", label: i18next.t("user:Homepage")},
+    {name: "Bio", label: i18next.t("user:Bio")},
+    {name: "Tag", label: i18next.t("user:Tag")},
+    {name: "Language", label: i18next.t("user:Language")},
+    {name: "Gender", label: i18next.t("user:Gender")},
+    {name: "Birthday", label: i18next.t("user:Birthday")},
+    {name: "Education", label: i18next.t("user:Education")},
+    {name: "Balance", label: i18next.t("user:Balance")},
+    {name: "Balance currency", label: i18next.t("organization:Balance currency")},
+    {name: "Balance credit", label: i18next.t("organization:Balance credit")},
+    {name: "Transactions", label: i18next.t("transaction:Transactions")},
+    {name: "Score", label: i18next.t("user:Score")},
+    {name: "Karma", label: i18next.t("user:Karma")},
+    {name: "Ranking", label: i18next.t("user:Ranking")},
+    {name: "Signup application", label: i18next.t("general:Signup application")},
+    {name: "API key", label: i18next.t("general:API key")},
+    {name: "Groups", label: i18next.t("general:Groups")},
+    {name: "Roles", label: i18next.t("general:Roles")},
+    {name: "Permissions", label: i18next.t("general:Permissions")},
+    {name: "3rd-party logins", label: i18next.t("user:3rd-party logins")},
+    {name: "Properties", label: i18next.t("user:Properties")},
+    {name: "Is online", label: i18next.t("user:Is online")},
+    {name: "Is admin", label: i18next.t("user:Is admin")},
+    {name: "Is forbidden", label: i18next.t("user:Is forbidden")},
+    {name: "Is deleted", label: i18next.t("user:Is deleted")},
+    {name: "Need update password", label: i18next.t("user:Need update password")},
+    {name: "IP whitelist", label: i18next.t("general:IP whitelist")},
+    {name: "Multi-factor authentication", label: i18next.t("user:Multi-factor authentication")},
+    {name: "WebAuthn credentials", label: i18next.t("user:WebAuthn credentials")},
+    {name: "Managed accounts", label: i18next.t("user:Managed accounts")},
+    {name: "Face ID", label: i18next.t("user:Face ID")},
+    {name: "MFA accounts", label: i18next.t("user:MFA accounts")},
+    {name: "MFA items", label: i18next.t("general:MFA items")},
+  ];
+};
+
+export function getUserColumns() {
+  const items = GetTranslatedUserItems();
+  return UserFields.map(field => {
+    let transField = "";
+    if (field === "webauthnCredentials") {
+      transField = "WebAuthn credentials";
+    } else if (field === "region") {
+      transField = "Country/Region";
+    } else if (field === "mfaAccounts") {
+      transField = "MFA accounts";
+    } else if (field === "face_ids") {
+      transField = "Face ID";
+    } else if (field === "managedAccounts") {
+      transField = "Managed accounts";
+    } else {
+      transField = field.toLowerCase().split("_").join(" ");
+      transField = transField.charAt(0).toUpperCase() + transField.slice(1);
+      transField = transField.replace("ip", "IP")
+        .replace("Ip", "IP")
+        .replace("Id", "ID")
+        .replace("id", "ID");
+    }
+    if (transField === "Owner") {
+      transField = "Organization";
+    }
+    const transFieldItem = items.find(item => item.name === transField);
+    if (transFieldItem === undefined) {
+      const toTranslateList = ["general", "user", "organization"].map(ns => `${ns}:${transField}`);
+      const transResult = toTranslateList.map(item => i18next.t(item) === transField ? null : i18next.t(item))
+        .find(item => item !== null);
+      transField = transResult ? transResult : transField;
+    }
+    return `${transFieldItem ? transFieldItem.label : transField}#${field}`;
+  });
+}
+
+export function getGroupColumns() {
+  return GroupFields.map(field => {
+    let transField = field.toLowerCase().split("_").join(" ");
+    transField = transField.charAt(0).toUpperCase() + transField.slice(1);
+    transField = transField.replace("Id", "ID");
+    if (transField === "Owner") {
+      transField = "Organization";
+    }
+    const toTranslateList = ["general", "group"].map(ns => `${ns}:${transField}`);
+    const transResult = toTranslateList.map(item => i18next.t(item) === transField ? null : i18next.t(item))
+      .find(item => item !== null);
+    transField = transResult ? transResult : transField;
+    return `${transField}#${field}`;
+  });
+}
+
+export function getRoleColumns() {
+  return RoleFields.map(field => {
+    let transField = field.toLowerCase().split("_").join(" ");
+    transField = transField.charAt(0).toUpperCase() + transField.slice(1);
+    transField = transField.replace("Id", "ID");
+    if (transField === "Owner") {
+      transField = "Organization";
+    }
+    const toTranslateList = ["general", "role"].map(ns => `${ns}:${transField}`);
+    const transResult = toTranslateList.map(item => i18next.t(item) === transField ? null : i18next.t(item))
+      .find(item => item !== null);
+    transField = transResult ? transResult : transField;
+    return `${transField}#${field}`;
+  });
+}
+
+export function getPermissionColumns() {
+  return PermissionFields.map(field => {
+    let transField = field.toLowerCase().split("_").join(" ");
+    transField = transField.charAt(0).toUpperCase() + transField.slice(1);
+    transField = transField.replace("Id", "ID");
+    if (transField === "Owner") {
+      transField = "Organization";
+    }
+    const toTranslateList = ["general", "permission"].map(ns => `${ns}:${transField}`);
+    const transResult = toTranslateList.map(item => i18next.t(item) === transField ? null : i18next.t(item))
+      .find(item => item !== null);
+    transField = transResult ? transResult : transField;
+    return `${transField}#${field}`;
+  });
+}
 
 export function initCountries() {
   const countries = require("i18n-iso-countries");
@@ -1065,6 +1271,7 @@ export function getProviderTypeOptions(category) {
         {id: "Spotify", name: "Spotify"},
         {id: "Strava", name: "Strava"},
         {id: "Stripe", name: "Stripe"},
+        {id: "Telegram", name: "Telegram"},
         {id: "TikTok", name: "TikTok"},
         {id: "Tumblr", name: "Tumblr"},
         {id: "Twitch", name: "Twitch"},
@@ -1154,6 +1361,11 @@ export function getProviderTypeOptions(category) {
       {id: "Stripe", name: "Stripe"},
       {id: "AirWallex", name: "AirWallex"},
       {id: "GC", name: "GC"},
+      {id: "Polar", name: "Polar"},
+      {id: "Paddle", name: "Paddle"},
+      {id: "FastSpring", name: "FastSpring"},
+      {id: "Lemon Squeezy", name: "Lemon Squeezy"},
+      {id: "Adyen", name: "Adyen"},
     ]);
   } else if (category === "Captcha") {
     return ([
@@ -1191,6 +1403,7 @@ export function getProviderTypeOptions(category) {
       {id: "Rocket Chat", name: "Rocket Chat"},
       {id: "Viber", name: "Viber"},
       {id: "CUCloud", name: "CUCloud"},
+      {id: "WeCom", name: "WeCom"},
     ]);
   } else if (category === "Face ID") {
     return ([
@@ -1199,6 +1412,11 @@ export function getProviderTypeOptions(category) {
   } else if (category === "MFA") {
     return ([
       {id: "RADIUS", name: "RADIUS"},
+    ]);
+  } else if (category === "ID Verification") {
+    return ([
+      {id: "Jumio", name: "Jumio"},
+      {id: "Alibaba Cloud", name: "Alibaba Cloud"},
     ]);
   } else {
     return [];
@@ -1558,6 +1776,35 @@ export function builtInObject(obj) {
   return obj.owner === "built-in" && BuiltInObjects.includes(obj.name);
 }
 
+export const CurrencyOptions = [
+  {id: "USD", name: "USD"},
+  {id: "CNY", name: "CNY"},
+  {id: "EUR", name: "EUR"},
+  {id: "JPY", name: "JPY"},
+  {id: "GBP", name: "GBP"},
+  {id: "AUD", name: "AUD"},
+  {id: "CAD", name: "CAD"},
+  {id: "CHF", name: "CHF"},
+  {id: "HKD", name: "HKD"},
+  {id: "SGD", name: "SGD"},
+  {id: "BRL", name: "BRL"},
+  {id: "PLN", name: "PLN"},
+  {id: "KRW", name: "KRW"},
+  {id: "INR", name: "INR"},
+  {id: "RUB", name: "RUB"},
+  {id: "MXN", name: "MXN"},
+  {id: "ZAR", name: "ZAR"},
+  {id: "TRY", name: "TRY"},
+  {id: "SEK", name: "SEK"},
+  {id: "NOK", name: "NOK"},
+  {id: "DKK", name: "DKK"},
+  {id: "THB", name: "THB"},
+  {id: "MYR", name: "MYR"},
+  {id: "TWD", name: "TWD"},
+  {id: "CZK", name: "CZK"},
+  {id: "HUF", name: "HUF"},
+];
+
 export function getCurrencySymbol(currency) {
   if (currency === "USD" || currency === "usd") {
     return "$";
@@ -1616,6 +1863,57 @@ export function getCurrencySymbol(currency) {
   }
 }
 
+export function getCurrencyCountryCode(currency) {
+  const currencyToCountry = {
+    USD: "US",
+    CNY: "CN",
+    EUR: "EU",
+    JPY: "JP",
+    GBP: "GB",
+    AUD: "AU",
+    CAD: "CA",
+    CHF: "CH",
+    HKD: "HK",
+    SGD: "SG",
+    BRL: "BR",
+    PLN: "PL",
+    KRW: "KR",
+    INR: "IN",
+    RUB: "RU",
+    MXN: "MX",
+    ZAR: "ZA",
+    TRY: "TR",
+    SEK: "SE",
+    NOK: "NO",
+    DKK: "DK",
+    THB: "TH",
+    MYR: "MY",
+    TWD: "TW",
+    CZK: "CZ",
+    HUF: "HU",
+  };
+
+  return currencyToCountry[currency?.toUpperCase()] || null;
+}
+
+export function getCurrencyWithFlag(currency) {
+  const translationKey = `currency:${currency}`;
+  const translatedText = i18next.t(translationKey);
+  const currencyText = translatedText === translationKey ? currency : translatedText;
+
+  const countryCode = getCurrencyCountryCode(currency);
+  if (!countryCode) {
+    return currencyText;
+  }
+
+  return (
+    <span>
+      <img src={`${StaticBaseUrl}/flag-icons/${countryCode}.svg`} alt={`${currency} flag`} height={20} style={{marginRight: 5}} />
+      {currencyText}
+    </span>
+  );
+}
+
 export function getFriendlyUserName(account) {
   if (account.firstName !== "" && account.lastName !== "") {
     return `${account.firstName}, ${account.lastName}`;
@@ -1628,9 +1926,16 @@ export function getFriendlyUserName(account) {
   }
 }
 
+export function isAnonymousUserName(userName) {
+  if (!userName) {
+    return false;
+  }
+
+  return /^u-[0-9a-f]{8}$/i.test(userName);
+}
+
 export function getUserCommonFields() {
-  return ["Owner", "Name", "CreatedTime", "UpdatedTime", "DeletedTime", "Id", "Type", "Password", "PasswordSalt", "DisplayName", "FirstName", "LastName", "Avatar", "PermanentAvatar",
-    "Email", "EmailVerified", "Phone", "Location", "Address", "Affiliation", "Title", "IdCardType", "IdCard", "Homepage", "Bio", "Tag", "Region", "Language", "Gender", "Birthday", "Education", "Score", "Ranking", "IsDefaultAvatar", "IsOnline", "IsAdmin", "IsForbidden", "IsDeleted", "CreatedIp", "AvatarType", "CountryCode", "Karma", "Hash", "PreHash", "RegisterType", "RegisterSource", "AccessKey", "AccessSecret", "Github", "Google", "Qq", "Wechat", "Facebook", "Dingtalk", "Weibo", "Gitee", "Linkedin", "Wecom", "Lark", "Gitlab", "LastSigninTime", "LastSigninIp", "Ldap", "Properties", "Roles", "Permissions", "Groups", "LastSigninWrongTime", "SigninWrongTimes", "ManagedAccounts", "X-Hasura-Allowed-Roles", "X-Hasura-Default-Role", "Vd"];
+  return ["Owner", "Name", "CreatedTime", "UpdatedTime", "DeletedTime", "Id", "ExternalId", "Type", "Password", "PasswordSalt", "PasswordType", "DisplayName", "FirstName", "LastName", "Avatar", "AvatarType", "PermanentAvatar", "Email", "EmailVerified", "Phone", "CountryCode", "Location", "Address", "Affiliation", "Title", "IdCardType", "IdCard", "RealName", "IsVerified", "Homepage", "Bio", "Tag", "Region", "Language", "Gender", "Birthday", "Education", "Score", "Karma", "Ranking", "Balance", "BalanceCredit", "Currency", "BalanceCurrency", "IsDefaultAvatar", "IsOnline", "IsAdmin", "IsForbidden", "IsDeleted", "SignupApplication", "RegisterType", "RegisterSource", "CreatedIp", "LastSigninTime", "LastSigninIp", "PreferredMfaType", "TotpSecret", "RecoveryCodes", "MfaPhoneEnabled", "MfaEmailEnabled", "MfaRadiusEnabled", "MfaRadiusUsername", "MfaRadiusProvider", "MfaPushEnabled", "MfaPushReceiver", "MfaPushProvider", "WebauthnCredentials", "FaceIds", "Invitation", "InvitationCode", "Ldap", "Properties", "Groups", "Hash", "PreHash", "AccessKey", "AccessSecret", "Github", "Google", "Qq", "Wechat", "Facebook", "Dingtalk", "Weibo", "Gitee", "Linkedin", "Wecom", "Lark", "Gitlab", "Roles", "Permissions", "LastSigninWrongTime", "SigninWrongTimes", "ManagedAccounts", "X-Hasura-Allowed-Roles", "X-Hasura-Default-Role", "Vd"];
 }
 
 export function getDefaultFooterContent() {

@@ -15,9 +15,11 @@
 package object
 
 import (
+	"context"
 	"fmt"
+	"slices"
 
-	"github.com/beego/beego"
+	"github.com/beego/beego/v2/server/web"
 	"github.com/casdoor/casdoor/util"
 	"github.com/xorm-io/core"
 )
@@ -46,6 +48,17 @@ func GetSessions(owner string) ([]*Session, error) {
 	} else {
 		err = ormer.Engine.Desc("created_time").Find(&sessions)
 	}
+	if err != nil {
+		return sessions, err
+	}
+
+	return sessions, nil
+}
+
+func GetUserSessions(owner string, name string) ([]*Session, error) {
+	sessions := []*Session{}
+
+	err := ormer.Engine.Desc("created_time").Where("owner = ? and name = ?", owner, name).Find(&sessions)
 	if err != nil {
 		return sessions, err
 	}
@@ -154,7 +167,7 @@ func AddSession(session *Session) (bool, error) {
 	}
 }
 
-func DeleteSession(id string) (bool, error) {
+func DeleteSession(id, curSessionId string) (bool, error) {
 	owner, name, application := util.GetOwnerAndNameAndOtherFromId(id)
 	if owner == CasdoorOrganization && application == CasdoorApplication {
 		session, err := GetSingleSession(id)
@@ -162,12 +175,27 @@ func DeleteSession(id string) (bool, error) {
 			return false, err
 		}
 
-		if session != nil {
-			DeleteBeegoSession(session.SessionId)
+		if session == nil {
+			return false, fmt.Errorf("session is nil")
 		}
+
+		if slices.Contains(session.SessionId, curSessionId) {
+			return false, fmt.Errorf("session:session id %s is the current session and cannot be deleted", curSessionId)
+		}
+
+		DeleteBeegoSession(session.SessionId)
 	}
 
 	affected, err := ormer.Engine.ID(core.PK{owner, name, application}).Delete(&Session{})
+	if err != nil {
+		return false, err
+	}
+
+	return affected != 0, nil
+}
+
+func DeleteAllUserSessions(owner string, name string) (bool, error) {
+	affected, err := ormer.Engine.Where("owner = ? and name = ?", owner, name).Delete(&Session{})
 	if err != nil {
 		return false, err
 	}
@@ -191,7 +219,7 @@ func DeleteSessionId(id string, sessionId string) (bool, error) {
 
 	session.SessionId = util.DeleteVal(session.SessionId, sessionId)
 	if len(session.SessionId) == 0 {
-		return DeleteSession(id)
+		return DeleteSession(id, "")
 	} else {
 		return UpdateSession(id, session)
 	}
@@ -199,7 +227,7 @@ func DeleteSessionId(id string, sessionId string) (bool, error) {
 
 func DeleteBeegoSession(sessionIds []string) {
 	for _, sessionId := range sessionIds {
-		err := beego.GlobalSessions.GetProvider().SessionDestroy(sessionId)
+		err := web.GlobalSessions.GetProvider().SessionDestroy(context.Background(), sessionId)
 		if err != nil {
 			return
 		}

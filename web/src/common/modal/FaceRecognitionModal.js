@@ -35,6 +35,10 @@ const FaceRecognitionModal = (props) => {
   const [currentFaceIndex, setCurrentFaceIndex] = React.useState();
 
   React.useEffect(() => {
+    if (!visible || modelsLoaded) {
+      return;
+    }
+
     const loadModels = async() => {
       // const MODEL_URL = "https://justadudewhohacks.github.io/face-api.js/models";
       const MODEL_URL = `${Setting.StaticBaseUrl}/casdoor/models`;
@@ -51,7 +55,7 @@ const FaceRecognitionModal = (props) => {
       });
     };
     loadModels();
-  }, []);
+  }, [visible, modelsLoaded]);
 
   React.useEffect(() => {
     if (withImage) {
@@ -304,7 +308,7 @@ const FaceRecognitionModal = (props) => {
               if (maxScore < 0.9) {
                 message.error(i18next.t("login:Face recognition failed"));
               }
-            }}> {i18next.t("application:Generate Face ID")}</Button> : null
+            }}> {i18next.t("general:Generate")}</Button> : null
           }
         </Space>
         {

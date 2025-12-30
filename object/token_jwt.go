@@ -364,6 +364,7 @@ func getClaimsCustom(claims Claims, tokenField []string, tokenAttributes []*JwtI
 
 	userValue := reflect.ValueOf(claims.User).Elem()
 
+	// Always include standard JWT registered claims
 	res["iss"] = claims.RegisteredClaims.Issuer
 	res["sub"] = claims.RegisteredClaims.Subject
 	res["aud"] = claims.RegisteredClaims.Audience
@@ -371,13 +372,32 @@ func getClaimsCustom(claims Claims, tokenField []string, tokenAttributes []*JwtI
 	res["nbf"] = claims.RegisteredClaims.NotBefore
 	res["iat"] = claims.RegisteredClaims.IssuedAt
 	res["jti"] = claims.RegisteredClaims.ID
+
+	// Always include tokenType (essential metadata)
 	res["tokenType"] = claims.TokenType
+
+	// Always include azp if present (authorized party)
+	if claims.Azp != "" {
+		res["azp"] = claims.Azp
+	}
+
+	// Always include nonce and scope as they are built-in OAuth/OIDC fields (even if empty)
 	res["nonce"] = claims.Nonce
-	res["tag"] = claims.Tag
 	res["scope"] = claims.Scope
-	res["azp"] = claims.Azp
-	res["signinMethod"] = claims.SigninMethod
-	res["provider"] = claims.Provider
+
+	// Create a map for quick lookup of selected token fields
+	selectedFields := make(map[string]bool)
+	for _, field := range tokenField {
+		selectedFields[field] = true
+	}
+
+	// Only include signinMethod and provider if they are explicitly selected in tokenFields
+	if selectedFields["signinMethod"] {
+		res["signinMethod"] = claims.SigninMethod
+	}
+	if selectedFields["provider"] {
+		res["provider"] = claims.Provider
+	}
 
 	for _, field := range tokenField {
 		if strings.HasPrefix(field, "Properties.") {
@@ -416,8 +436,11 @@ func getClaimsCustom(claims Claims, tokenField []string, tokenAttributes []*JwtI
 
 	for _, item := range tokenAttributes {
 		valueList := replaceAttributeValue(claims.User, item.Value)
+		if len(valueList) == 0 {
+			continue
+		}
 
-		if len(valueList) == 1 {
+		if item.Type == "String" {
 			res[item.Name] = valueList[0]
 		} else {
 			res[item.Name] = valueList
@@ -451,8 +474,8 @@ func refineUser(user *User) *User {
 
 func generateJwtToken(application *Application, user *User, provider string, signinMethod string, nonce string, scope string, host string) (string, string, string, error) {
 	nowTime := time.Now()
-	expireTime := nowTime.Add(time.Duration(application.ExpireInHours) * time.Hour)
-	refreshExpireTime := nowTime.Add(time.Duration(application.RefreshExpireInHours) * time.Hour)
+	expireTime := nowTime.Add(time.Duration(application.ExpireInHours * float64(time.Hour)))
+	refreshExpireTime := nowTime.Add(time.Duration(application.RefreshExpireInHours * float64(time.Hour)))
 	if application.RefreshExpireInHours == 0 {
 		refreshExpireTime = expireTime
 	}

@@ -95,8 +95,8 @@ const sideTemplate = `<style>
   }
 </style>
 <div class="left-model">
-  <span class="side-logo"> <img src="${Setting.StaticBaseUrl}/img/casdoor-logo_1185x256.png" alt="Casdoor" style="width: 120px"> 
-    <span>SSO</span> 
+  <span class="side-logo"> <img src="${Setting.StaticBaseUrl}/img/casdoor-logo_1185x256.png" alt="Casdoor" style="width: 120px">
+    <span>SSO</span>
   </span>
   <div class="img">
     <img src="${Setting.StaticBaseUrl}/img/casbin.svg" alt="Casdoor"/>
@@ -180,7 +180,7 @@ class ApplicationEditPage extends React.Component {
   }
 
   getGroups() {
-    GroupBackend.getGroups(this.state.organizationName)
+    GroupBackend.getGroups(this.state.owner)
       .then((res) => {
         if (res.status === "ok") {
           this.setState({
@@ -500,7 +500,8 @@ class ApplicationEditPage extends React.Component {
           </Col>
           <Col span={22} >
             <Select virtual={false} disabled={this.state.application.tokenFormat !== "JWT-Custom"} mode="tags" showSearch style={{width: "100%"}} value={this.state.application.tokenFields} onChange={(value => {this.updateApplicationField("tokenFields", value);})}>
-              <Option key={"provider"} value={"provider"}>{"Provider"}</Option>)
+              <Option key={"signinMethod"} value={"signinMethod"}>{"SigninMethod"}</Option>
+              <Option key={"provider"} value={"provider"}>{"Provider"}</Option>
               {
                 [...Setting.getUserCommonFields(), "permissionNames"].map((item, index) => <Option key={index} value={item}>{item}</Option>)
               }
@@ -537,7 +538,7 @@ class ApplicationEditPage extends React.Component {
             {Setting.getLabel(i18next.t("application:Token expire"), i18next.t("application:Token expire - Tooltip"))} :
           </Col>
           <Col span={22} >
-            <InputNumber style={{width: "150px"}} value={this.state.application.expireInHours} min={1} step={1} precision={0} addonAfter="Hours" onChange={value => {
+            <InputNumber style={{width: "150px"}} value={this.state.application.expireInHours} min={0.01} step={1} precision={2} addonAfter="Hours" onChange={value => {
               this.updateApplicationField("expireInHours", value);
             }} />
           </Col>
@@ -547,8 +548,18 @@ class ApplicationEditPage extends React.Component {
             {Setting.getLabel(i18next.t("application:Refresh token expire"), i18next.t("application:Refresh token expire - Tooltip"))} :
           </Col>
           <Col span={22} >
-            <InputNumber style={{width: "150px"}} value={this.state.application.refreshExpireInHours} min={1} step={1} precision={0} addonAfter="Hours" onChange={value => {
+            <InputNumber style={{width: "150px"}} value={this.state.application.refreshExpireInHours} min={0.01} step={1} precision={2} addonAfter="Hours" onChange={value => {
               this.updateApplicationField("refreshExpireInHours", value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("application:Cookie expire"), i18next.t("application:Cookie expire - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <InputNumber style={{width: "150px"}} value={this.state.application.cookieExpireInHours || 720} min={1} step={1} precision={0} addonAfter="Hours" onChange={value => {
+              this.updateApplicationField("cookieExpireInHours", value);
             }} />
           </Col>
         </Row>
@@ -906,18 +917,32 @@ class ApplicationEditPage extends React.Component {
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("general:SAML attributes"), i18next.t("general:SAML attributes - Tooltip"))} :
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+            {Setting.getLabel(i18next.t("application:Disable SAML attributes"), i18next.t("application:Disable SAML attributes - Tooltip"))} :
           </Col>
-          <Col span={22} >
-            <SamlAttributeTable
-              title={i18next.t("general:SAML attributes")}
-              table={this.state.application.samlAttributes}
-              application={this.state.application}
-              onUpdateTable={(value) => {this.updateApplicationField("samlAttributes", value);}}
-            />
+          <Col span={1} >
+            <Switch checked={this.state.application.disableSamlAttributes} onChange={checked => {
+              this.updateApplicationField("disableSamlAttributes", checked);
+            }} />
           </Col>
         </Row>
+        {
+          !this.state.application.disableSamlAttributes ? (
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(i18next.t("general:SAML attributes"), i18next.t("general:SAML attributes - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <SamlAttributeTable
+                  title={i18next.t("general:SAML attributes")}
+                  table={this.state.application.samlAttributes}
+                  application={this.state.application}
+                  onUpdateTable={(value) => {this.updateApplicationField("samlAttributes", value);}}
+                />
+              </Col>
+            </Row>
+          ) : null
+        }
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("application:SAML metadata"), i18next.t("application:SAML metadata - Tooltip"))} :

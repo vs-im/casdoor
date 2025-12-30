@@ -19,9 +19,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/beego/beego/context"
+	"github.com/beego/beego/v2/server/web/context"
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/idp"
+	"github.com/casdoor/casdoor/idv"
 	"github.com/casdoor/casdoor/pp"
 	"github.com/casdoor/casdoor/util"
 	"github.com/xorm-io/core"
@@ -182,7 +183,10 @@ func getProvider(owner string, name string) (*Provider, error) {
 }
 
 func GetProvider(id string) (*Provider, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return nil, err
+	}
 	return getProvider(owner, name)
 }
 
@@ -197,7 +201,10 @@ func GetWechatMiniProgramProvider(application *Application) *Provider {
 }
 
 func UpdateProvider(id string, provider *Provider) (bool, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return false, err
+	}
 	if p, err := getProvider(owner, name); err != nil {
 		return false, err
 	} else if p == nil {
@@ -339,6 +346,36 @@ func GetPaymentProvider(p *Provider) (pp.PaymentProvider, error) {
 			return nil, err
 		}
 		return pp, nil
+	} else if typ == "Polar" {
+		pp, err := pp.NewPolarPaymentProvider(p.ClientSecret)
+		if err != nil {
+			return nil, err
+		}
+		return pp, nil
+	} else if typ == "Paddle" {
+		pp, err := pp.NewPaddlePaymentProvider(p.ClientSecret)
+		if err != nil {
+			return nil, err
+		}
+		return pp, nil
+	} else if typ == "FastSpring" {
+		pp, err := pp.NewFastSpringPaymentProvider(p.ClientId, p.ClientSecret, p.Host)
+		if err != nil {
+			return nil, err
+		}
+		return pp, nil
+	} else if typ == "Lemon Squeezy" {
+		pp, err := pp.NewLemonSqueezyPaymentProvider(p.ClientId, p.ClientSecret)
+		if err != nil {
+			return nil, err
+		}
+		return pp, nil
+	} else if typ == "Adyen" {
+		pp, err := pp.NewAdyenPaymentProvider(p.ClientSecret, p.ClientId2)
+		if err != nil {
+			return nil, err
+		}
+		return pp, nil
 	} else {
 		return nil, fmt.Errorf("the payment provider type: %s is not supported", p.Type)
 	}
@@ -349,7 +386,10 @@ func (p *Provider) GetId() string {
 }
 
 func GetCaptchaProviderByOwnerName(applicationId, lang string) (*Provider, error) {
-	owner, name := util.GetOwnerAndNameFromId(applicationId)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(applicationId)
+	if err != nil {
+		return nil, err
+	}
 	provider := Provider{Owner: owner, Name: name, Category: "Captcha"}
 	existed, err := ormer.Engine.Get(&provider)
 	if err != nil {
@@ -380,6 +420,12 @@ func GetCaptchaProviderByApplication(applicationId, isCurrentProvider, lang stri
 			continue
 		}
 		if provider.Provider.Category == "Captcha" {
+			// For CAPTCHA providers, "None" means disabled (don't show CAPTCHA at all)
+			// This is different from SMS/Email providers where "None" is treated as "All"
+			// CAPTCHA Rule options are: "None" (disabled), "Dynamic", "Always", "Internet-Only"
+			if provider.Rule == "None" || provider.Rule == "" {
+				return nil, nil
+			}
 			return GetCaptchaProviderByOwnerName(util.GetId(provider.Provider.Owner, provider.Provider.Name), lang)
 		}
 	}
@@ -387,7 +433,10 @@ func GetCaptchaProviderByApplication(applicationId, isCurrentProvider, lang stri
 }
 
 func GetFaceIdProviderByOwnerName(applicationId, lang string) (*Provider, error) {
-	owner, name := util.GetOwnerAndNameFromId(applicationId)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(applicationId)
+	if err != nil {
+		return nil, err
+	}
 	provider := Provider{Owner: owner, Name: name, Category: "Face ID"}
 	existed, err := ormer.Engine.Get(&provider)
 	if err != nil {
@@ -419,6 +468,47 @@ func GetFaceIdProviderByApplication(applicationId, isCurrentProvider, lang strin
 		}
 		if provider.Provider.Category == "Face ID" {
 			return GetFaceIdProviderByOwnerName(util.GetId(provider.Provider.Owner, provider.Provider.Name), lang)
+		}
+	}
+	return nil, nil
+}
+
+func GetIdvProviderByOwnerName(applicationId, lang string) (*Provider, error) {
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(applicationId)
+	if err != nil {
+		return nil, err
+	}
+	provider := Provider{Owner: owner, Name: name, Category: "ID Verification"}
+	existed, err := ormer.Engine.Get(&provider)
+	if err != nil {
+		return nil, err
+	}
+
+	if !existed {
+		return nil, fmt.Errorf(i18n.Translate(lang, "provider:the provider: %s does not exist"), applicationId)
+	}
+
+	return &provider, nil
+}
+
+func GetIdvProviderByApplication(applicationId, isCurrentProvider, lang string) (*Provider, error) {
+	if isCurrentProvider == "true" {
+		return GetIdvProviderByOwnerName(applicationId, lang)
+	}
+	application, err := GetApplication(applicationId)
+	if err != nil {
+		return nil, err
+	}
+
+	if application == nil || len(application.Providers) == 0 {
+		return nil, fmt.Errorf(i18n.Translate(lang, "provider:Invalid application id"))
+	}
+	for _, provider := range application.Providers {
+		if provider.Provider == nil {
+			continue
+		}
+		if provider.Provider.Category == "ID Verification" {
+			return GetIdvProviderByOwnerName(util.GetId(provider.Provider.Owner, provider.Provider.Name), lang)
 		}
 	}
 	return nil, nil
@@ -489,4 +579,11 @@ func FromProviderToIdpInfo(ctx *context.Context, provider *Provider) *idp.Provid
 	}
 
 	return providerInfo
+}
+
+func GetIdvProviderFromProvider(provider *Provider) idv.IdvProvider {
+	if provider.Category != "ID Verification" {
+		return nil
+	}
+	return idv.GetIdvProvider(provider.Type, provider.ClientId, provider.ClientSecret, provider.Endpoint)
 }

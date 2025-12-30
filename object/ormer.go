@@ -25,7 +25,7 @@ import (
 
 	"github.com/casvisor/casvisor-go-sdk/casvisorsdk"
 
-	"github.com/beego/beego"
+	"github.com/beego/beego/v2/server/web"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/util"
 	xormadapter "github.com/casdoor/xorm-adapter/v3"
@@ -38,36 +38,47 @@ import (
 	_ "modernc.org/sqlite" // db = sqlite
 )
 
+const (
+	defaultConfigPath     = "conf/app.conf"
+	defaultExportFilePath = "init_data_dump.json"
+)
+
 var (
 	ormer          *Ormer = nil
 	createDatabase        = true
-	configPath            = "conf/app.conf"
+	configPath            = defaultConfigPath
+	exportData            = false
+	exportFilePath        = defaultExportFilePath
 )
 
 func InitFlag() {
-	createDatabase = getCreateDatabaseFlag()
-	configPath = getConfigFlag()
+	createDatabasePtr := flag.Bool("createDatabase", false, "true if you need to create database")
+	configPathPtr := flag.String("config", defaultConfigPath, "set it to \"/your/path/app.conf\" if your config file is not in: \"/conf/app.conf\"")
+	exportDataPtr := flag.Bool("export", false, "export database to JSON file and exit (use -exportPath to specify custom location)")
+	exportFilePathPtr := flag.String("exportPath", defaultExportFilePath, "path to the exported data file (used with -export)")
+	flag.Parse()
+
+	createDatabase = *createDatabasePtr
+	configPath = *configPathPtr
+	exportData = *exportDataPtr
+	exportFilePath = *exportFilePathPtr
 }
 
-func getCreateDatabaseFlag() bool {
-	res := flag.Bool("createDatabase", false, "true if you need to create database")
-	flag.Parse()
-	return *res
+func ShouldExportData() bool {
+	return exportData
 }
 
-func getConfigFlag() string {
-	res := flag.String("config", "conf/app.conf", "set it to \"/your/path/app.conf\" if your config file is not in: \"/conf/app.conf\"")
-	flag.Parse()
-	return *res
+func GetExportFilePath() string {
+	return exportFilePath
 }
 
 func InitConfig() {
-	err := beego.LoadAppConfig("ini", "../conf/app.conf")
+	err := web.LoadAppConfig("ini", "../conf/app.conf")
 	if err != nil {
 		panic(err)
 	}
 
-	beego.BConfig.WebConfig.Session.SessionOn = true
+	web.BConfig.WebConfig.Session.SessionOn = true
 
 	InitAdapter()
 	CreateTables()
@@ -373,6 +384,11 @@ func (a *Ormer) createTable() {
 		panic(err)
 	}
 
+	err = a.Engine.Sync2(new(Order))
+	if err != nil {
+		panic(err)
+	}
+
 	err = a.Engine.Sync2(new(Plan))
 	if err != nil {
 		panic(err)
@@ -429,6 +445,11 @@ func (a *Ormer) createTable() {
 	}
 
 	err = a.Engine.Sync2(new(Form))
+	if err != nil {
+		panic(err)
+	}
+
+	err = a.Engine.Sync2(new(Ticket))
 	if err != nil {
 		panic(err)
 	}

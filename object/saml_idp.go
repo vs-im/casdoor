@@ -48,6 +48,8 @@ func NewSamlResponse(application *Application, user *User, host string, certific
 	expireTime := time.Now().UTC().Add(time.Hour * 24).Format(time.RFC3339)
 	samlResponse.CreateAttr("xmlns:samlp", "urn:oasis:names:tc:SAML:2.0:protocol")
 	samlResponse.CreateAttr("xmlns:saml", "urn:oasis:names:tc:SAML:2.0:assertion")
+	samlResponse.CreateAttr("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
+	samlResponse.CreateAttr("xmlns:xs", "http://www.w3.org/2001/XMLSchema")
 	arId := uuid.New()
 
 	samlResponse.CreateAttr("ID", fmt.Sprintf("_%s", arId))
@@ -102,48 +104,48 @@ func NewSamlResponse(application *Application, user *User, host string, certific
 	authnStatement.CreateAttr("SessionNotOnOrAfter", expireTime)
 	authnStatement.CreateElement("saml:AuthnContext").CreateElement("saml:AuthnContextClassRef").SetText("urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport")
 
-	attributes := assertion.CreateElement("saml:AttributeStatement")
+	if !application.DisableSamlAttributes {
+		attributes := assertion.CreateElement("saml:AttributeStatement")
 
-	email := attributes.CreateElement("saml:Attribute")
-	email.CreateAttr("Name", "Email")
-	email.CreateAttr("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
-	email.CreateElement("saml:AttributeValue").CreateAttr("xsi:type", "xs:string").Element().SetText(user.Email)
+		email := attributes.CreateElement("saml:Attribute")
+		email.CreateAttr("Name", "Email")
+		email.CreateAttr("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
+		email.CreateElement("saml:AttributeValue").CreateAttr("xsi:type", "xs:string").Element().SetText(user.Email)
 
-	name := attributes.CreateElement("saml:Attribute")
-	name.CreateAttr("Name", "Name")
-	name.CreateAttr("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
-	name.CreateElement("saml:AttributeValue").CreateAttr("xsi:type", "xs:string").Element().SetText(user.Name)
+		name := attributes.CreateElement("saml:Attribute")
+		name.CreateAttr("Name", "Name")
+		name.CreateAttr("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
+		name.CreateElement("saml:AttributeValue").CreateAttr("xsi:type", "xs:string").Element().SetText(user.Name)
 
-	displayName := attributes.CreateElement("saml:Attribute")
-	displayName.CreateAttr("Name", "DisplayName")
-	displayName.CreateAttr("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
-	displayName.CreateElement("saml:AttributeValue").CreateAttr("xsi:type", "xs:string").Element().SetText(user.DisplayName)
+		displayName := attributes.CreateElement("saml:Attribute")
+		displayName.CreateAttr("Name", "DisplayName")
+		displayName.CreateAttr("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
+		displayName.CreateElement("saml:AttributeValue").CreateAttr("xsi:type", "xs:string").Element().SetText(user.DisplayName)
 
-	err := ExtendUserWithRolesAndPermissions(user)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, item := range application.SamlAttributes {
-		role := attributes.CreateElement("saml:Attribute")
-		role.CreateAttr("Name", item.Name)
-		role.CreateAttr("NameFormat", item.NameFormat)
-
-		valueList := replaceAttributeValue(user, item.Value)
-		for _, value := range valueList {
-			av := role.CreateElement("saml:AttributeValue")
-			av.CreateAttr("xmlns:xs", "http://www.w3.org/2001/XMLSchema")
-			av.CreateAttr("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
-			av.CreateAttr("xsi:type", "xs:string").Element().SetText(value)
+		err := ExtendUserWithRolesAndPermissions(user)
+		if err != nil {
+			return nil, err
 		}
-	}
 
-	roles := attributes.CreateElement("saml:Attribute")
-	roles.CreateAttr("Name", "Roles")
-	roles.CreateAttr("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
+		for _, item := range application.SamlAttributes {
+			role := attributes.CreateElement("saml:Attribute")
+			role.CreateAttr("Name", item.Name)
+			role.CreateAttr("NameFormat", item.NameFormat)
 
-	for _, role := range user.Roles {
-		roles.CreateElement("saml:AttributeValue").CreateAttr("xsi:type", "xs:string").Element().SetText(role.Name)
+			valueList := replaceAttributeValue(user, item.Value)
+			for _, value := range valueList {
+				av := role.CreateElement("saml:AttributeValue")
+				av.CreateAttr("xsi:type", "xs:string").Element().SetText(value)
+			}
+		}
+
+		roles := attributes.CreateElement("saml:Attribute")
+		roles.CreateAttr("Name", "Roles")
+		roles.CreateAttr("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
+
+		for _, role := range user.Roles {
+			roles.CreateElement("saml:AttributeValue").CreateAttr("xsi:type", "xs:string").Element().SetText(role.Name)
+		}
 	}
 
 	return samlResponse, nil
@@ -412,6 +414,8 @@ func GetSamlResponse(application *Application, user *User, samlRequest string, h
 
 	doc := etree.NewDocument()
 	doc.SetRoot(samlResponse)
+
+	// Write to bytes
 	xmlBytes, err := doc.WriteToBytes()
 	if err != nil {
 		return "", "", "", fmt.Errorf("err: Failed to serializes the SAML request into bytes, %s", err.Error())

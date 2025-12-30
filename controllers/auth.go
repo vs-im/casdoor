@@ -15,6 +15,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
@@ -27,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/beego/beego"
+	"github.com/beego/beego/v2/server/web"
 	"github.com/casdoor/casdoor/captcha"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/form"
@@ -137,6 +138,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 				c.ResponseError(fmt.Sprintf(c.T("auth:paid-user %s does not have active or pending subscription and the application: %s does not have default pricing"), user.Name, application.Name))
 				return
 			} else {
+				c.SetSession("paidUsername", user.GetId())
 				// let the paid-user select plan
 				c.ResponseOk("SelectPlan", pricing)
 				return
@@ -150,14 +152,14 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		util.LogInfo(c.Ctx, "API: [%s] signed in", userId)
 		resp = &Response{Status: "ok", Msg: "", Data: userId, Data3: user.NeedUpdatePassword}
 	} else if form.Type == ResponseTypeCode {
-		clientId := c.Input().Get("clientId")
-		responseType := c.Input().Get("responseType")
-		redirectUri := c.Input().Get("redirectUri")
-		scope := c.Input().Get("scope")
-		state := c.Input().Get("state")
-		nonce := c.Input().Get("nonce")
-		challengeMethod := c.Input().Get("code_challenge_method")
-		codeChallenge := c.Input().Get("code_challenge")
+		clientId := c.Ctx.Input.Query("clientId")
+		responseType := c.Ctx.Input.Query("responseType")
+		redirectUri := c.Ctx.Input.Query("redirectUri")
+		scope := c.Ctx.Input.Query("scope")
+		state := c.Ctx.Input.Query("state")
+		nonce := c.Ctx.Input.Query("nonce")
+		challengeMethod := c.Ctx.Input.Query("code_challenge_method")
+		codeChallenge := c.Ctx.Input.Query("code_challenge")
 
 		if challengeMethod != "S256" && challengeMethod != "null" && challengeMethod != "" {
 			c.ResponseError(c.T("auth:Challenge method should be S256"))
@@ -179,8 +181,8 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		if !object.IsGrantTypeValid(form.Type, application.GrantTypes) {
 			resp = &Response{Status: "error", Msg: fmt.Sprintf("error: grant_type: %s is not supported in this application", form.Type), Data: ""}
 		} else {
-			scope := c.Input().Get("scope")
-			nonce := c.Input().Get("nonce")
+			scope := c.Ctx.Input.Query("scope")
+			nonce := c.Ctx.Input.Query("nonce")
 			token, _ := object.GetTokenByUser(application, user, scope, nonce, c.Ctx.Request.Host)
 			resp = tokenToResponse(token)
 
@@ -226,7 +228,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		}
 	} else if form.Type == ResponseTypeCas {
 		// not oauth but CAS SSO protocol
-		service := c.Input().Get("service")
+		service := c.Ctx.Input.Query("service")
 		resp = wrapErrorResponse(nil)
 		if service != "" {
 			st, err := object.GenerateCasToken(userId, service)
@@ -245,9 +247,18 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		resp = wrapErrorResponse(fmt.Errorf("unknown response type: %s", form.Type))
 	}
 
-	// if user did not check auto signin
-	if resp.Status == "ok" && !form.AutoSignin {
-		c.setExpireForSession()
+	// For all successful logins, set the session expiration; if auto signin is not checked, cap it at 24 hours.
+	if resp.Status == "ok" {
+		expireInHours := application.CookieExpireInHours
+
+		if expireInHours == 0 {
+			expireInHours = 720
+		}
+
+		if !form.AutoSignin && expireInHours > 24 {
+			expireInHours = 24
+		}
+		c.setExpireForSession(expireInHours)
 	}
 
 	if application.EnableExclusiveSignin {
@@ -259,7 +270,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 
 		for _, session := range sessions {
 			for _, sid := range session.SessionId {
-				err := beego.GlobalSessions.GetProvider().SessionDestroy(sid)
+				err := web.GlobalSessions.GetProvider().SessionDestroy(context.Background(), sid)
 				if err != nil {
 					c.ResponseError(err.Error(), nil)
 					return
@@ -273,9 +284,9 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			Owner:       user.Owner,
 			Name:        user.Name,
 			Application: application.Name,
-			SessionId:   []string{c.Ctx.Input.CruSession.SessionID()},
+			SessionId:   []string{c.Ctx.Input.CruSession.SessionID(context.Background())},
 
-			ExclusiveSignin: true,
+			ExclusiveSignin: application.EnableExclusiveSignin,
 		})
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
@@ -298,14 +309,14 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 // @Success 200 {object} controllers.Response The Response object
 // @router /get-app-login [get]
 func (c *ApiController) GetApplicationLogin() {
-	clientId := c.Input().Get("clientId")
-	responseType := c.Input().Get("responseType")
-	redirectUri := c.Input().Get("redirectUri")
-	scope := c.Input().Get("scope")
-	state := c.Input().Get("state")
-	id := c.Input().Get("id")
-	loginType := c.Input().Get("type")
-	userCode := c.Input().Get("userCode")
+	clientId := c.Ctx.Input.Query("clientId")
+	responseType := c.Ctx.Input.Query("responseType")
+	redirectUri := c.Ctx.Input.Query("redirectUri")
+	scope := c.Ctx.Input.Query("scope")
+	state := c.Ctx.Input.Query("state")
+	id := c.Ctx.Input.Query("id")
+	loginType := c.Ctx.Input.Query("type")
+	userCode := c.Ctx.Input.Query("userCode")
 
 	var application *object.Application
 	var msg string
@@ -416,7 +427,7 @@ func checkMfaEnable(c *ApiController, user *object.User, organization *object.Or
 		}
 		if len(mfaAllowList) >= 1 {
 			c.SetSession("verificationCodeType", verificationType)
-			c.Ctx.Input.CruSession.SessionRelease(c.Ctx.ResponseWriter)
+			c.Ctx.Input.CruSession.SessionRelease(context.Background(), c.Ctx.ResponseWriter)
 			c.ResponseOk(object.NextMfa, mfaAllowList)
 			return true
 		}
@@ -453,13 +464,6 @@ func (c *ApiController) Login() {
 	verificationType := ""
 
 	if authForm.Username != "" {
-		if authForm.Type == ResponseTypeLogin {
-			if c.GetSessionUsername() != "" {
-				c.ResponseError(c.T("account:Please sign out first"), c.GetSessionUsername())
-				return
-			}
-		}
-
 		var user *object.User
 		if authForm.SigninMethod == "Face ID" {
 			if user, err = object.GetUserByFields(authForm.Organization, authForm.Username); err != nil {
@@ -723,6 +727,7 @@ func (c *ApiController) Login() {
 			return
 		}
 		userInfo := &idp.UserInfo{}
+		var token *oauth2.Token
 		if provider.Category == "SAML" {
 			// SAML
 			userInfo, err = object.ParseSamlResponse(authForm.SamlResponse, provider, c.Ctx.Request.Host)
@@ -753,7 +758,6 @@ func (c *ApiController) Login() {
 			}
 
 			// https://github.com/golang/oauth2/issues/123#issuecomment-103715338
-			var token *oauth2.Token
 			token, err = idProvider.GetToken(authForm.Code)
 			if err != nil {
 				c.ResponseError(err.Error())
@@ -803,7 +807,7 @@ func (c *ApiController) Login() {
 			if user != nil && !user.IsDeleted {
 				// Sign in via OAuth (want to sign up but already have account)
 				// sync info from 3rd-party if possible
-				_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo, provider.UserMapping)
+				_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo, token, provider.UserMapping)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
@@ -864,6 +868,11 @@ func (c *ApiController) Login() {
 					if application.IsSignupItemRequired("Invitation code") {
 						c.ResponseError(c.T("check:Invitation code cannot be blank"))
 						return
+					}
+
+					// Handle UseEmailAsUsername for OAuth and Web3
+					if organization.UseEmailAsUsername && userInfo.Email != "" {
+						userInfo.Username = userInfo.Email
 					}
 
 					// Handle username conflicts
@@ -948,7 +957,7 @@ func (c *ApiController) Login() {
 				}
 
 				// sync info from 3rd-party if possible
-				_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo, provider.UserMapping)
+				_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo, token, provider.UserMapping)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
@@ -996,7 +1005,7 @@ func (c *ApiController) Login() {
 			}
 
 			// sync info from 3rd-party if possible
-			_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo, provider.UserMapping)
+			_, err = object.SetUserOAuthProperties(organization, user, provider.Type, userInfo, token, provider.UserMapping)
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -1148,8 +1157,8 @@ func (c *ApiController) Login() {
 }
 
 func (c *ApiController) GetSamlLogin() {
-	providerId := c.Input().Get("id")
-	relayState := c.Input().Get("relayState")
+	providerId := c.Ctx.Input.Query("id")
+	relayState := c.Ctx.Input.Query("relayState")
 	authURL, method, err := object.GenerateSamlRequest(providerId, relayState, c.Ctx.Request.Host, c.GetAcceptLanguage())
 	if err != nil {
 		c.ResponseError(err.Error())
@@ -1159,8 +1168,8 @@ func (c *ApiController) GetSamlLogin() {
 }
 
 func (c *ApiController) HandleSamlLogin() {
-	relayState := c.Input().Get("RelayState")
-	samlResponse := c.Input().Get("SAMLResponse")
+	relayState := c.Ctx.Input.Query("RelayState")
+	samlResponse := c.Ctx.Input.Query("SAMLResponse")
 	decode, err := base64.StdEncoding.DecodeString(relayState)
 	if err != nil {
 		c.ResponseError(err.Error())
@@ -1192,9 +1201,9 @@ func (c *ApiController) HandleOfficialAccountEvent() {
 		c.ResponseError(err.Error())
 		return
 	}
-	signature := c.Input().Get("signature")
-	timestamp := c.Input().Get("timestamp")
-	nonce := c.Input().Get("nonce")
+	signature := c.Ctx.Input.Query("signature")
+	timestamp := c.Ctx.Input.Query("timestamp")
+	nonce := c.Ctx.Input.Query("nonce")
 	var data struct {
 		MsgType      string `xml:"MsgType"`
 		Event        string `xml:"Event"`
@@ -1212,7 +1221,7 @@ func (c *ApiController) HandleOfficialAccountEvent() {
 		return
 	}
 	if data.Ticket == "" {
-		c.ResponseError(err.Error())
+		c.ResponseError("empty ticket")
 		return
 	}
 
@@ -1222,10 +1231,11 @@ func (c *ApiController) HandleOfficialAccountEvent() {
 		c.ResponseError(err.Error())
 		return
 	}
-	if data.Ticket == "" {
-		c.ResponseError("empty ticket")
+	if provider == nil {
+		c.ResponseError(fmt.Sprintf(c.T("auth:The provider: %s does not exist"), providerId))
 		return
 	}
+
 	if !idp.VerifyWechatSignature(provider.Content, nonce, timestamp, signature) {
 		c.ResponseError("invalid signature")
 		return
@@ -1251,7 +1261,7 @@ func (c *ApiController) HandleOfficialAccountEvent() {
 // @Param   ticket     query    string  true        "The eventId of QRCode"
 // @Success 200 {object} controllers.Response The Response object
 func (c *ApiController) GetWebhookEventType() {
-	ticket := c.Input().Get("ticket")
+	ticket := c.Ctx.Input.Query("ticket")
 
 	idp.Lock.RLock()
 	_, ok := idp.WechatCacheMap[ticket]
@@ -1271,12 +1281,17 @@ func (c *ApiController) GetWebhookEventType() {
 // @Param   id     query    string  true        "The id ( owner/name ) of provider"
 // @Success 200 {object} controllers.Response The Response object
 func (c *ApiController) GetQRCode() {
-	providerId := c.Input().Get("id")
+	providerId := c.Ctx.Input.Query("id")
 	provider, err := object.GetProvider(providerId)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
 	}
+	if provider == nil {
+		c.ResponseError(fmt.Sprintf(c.T("auth:The provider: %s does not exist"), providerId))
+		return
+	}
+
 	code, ticket, err := idp.GetWechatOfficialAccountQRCode(provider.ClientId2, provider.ClientSecret2, providerId)
 	if err != nil {
 		c.ResponseError(err.Error())
@@ -1294,9 +1309,9 @@ func (c *ApiController) GetQRCode() {
 // @Success 200 {object} controllers.Response The Response object
 // @router /get-captcha-status [get]
 func (c *ApiController) GetCaptchaStatus() {
-	organization := c.Input().Get("organization")
-	userId := c.Input().Get("userId")
-	applicationName := c.Input().Get("application")
+	organization := c.Ctx.Input.Query("organization")
+	userId := c.Ctx.Input.Query("userId")
+	applicationName := c.Ctx.Input.Query("application")
 
 	application, err := object.GetApplication(fmt.Sprintf("admin/%s", applicationName))
 	if err != nil {
@@ -1339,8 +1354,8 @@ func (c *ApiController) Callback() {
 // @router /device-auth [post]
 // @Success 200 {object} object.DeviceAuthResponse The Response object
 func (c *ApiController) DeviceAuth() {
-	clientId := c.Input().Get("client_id")
-	scope := c.Input().Get("scope")
+	clientId := c.Ctx.Input.Query("client_id")
+	scope := c.Ctx.Input.Query("scope")
 	application, err := object.GetApplicationByClientId(clientId)
 	if err != nil {
 		c.Data["json"] = object.TokenError{

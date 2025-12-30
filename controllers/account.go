@@ -15,6 +15,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -80,11 +81,6 @@ type LaravelResponse struct {
 // @Success 200 {object} controllers.Response The Response object
 // @router /signup [post]
 func (c *ApiController) Signup() {
-	if c.GetSessionUsername() != "" {
-		c.ResponseError(c.T("account:Please sign out first"), c.GetSessionUsername())
-		return
-	}
-
 	var authForm form.AuthForm
 	err := json.Unmarshal(c.Ctx.Input.RequestBody, &authForm)
 	if err != nil {
@@ -197,7 +193,7 @@ func (c *ApiController) Signup() {
 
 	userType := "normal-user"
 	if authForm.Plan != "" && authForm.Pricing != "" {
-		err = object.CheckPricingAndPlan(authForm.Organization, authForm.Pricing, authForm.Plan)
+		err = object.CheckPricingAndPlan(authForm.Organization, authForm.Pricing, authForm.Plan, c.GetAcceptLanguage())
 		if err != nil {
 			c.ResponseError(err.Error())
 			return
@@ -218,7 +214,7 @@ func (c *ApiController) Signup() {
 		Tag:               authForm.Tag,
 		Education:         authForm.Education,
 		Avatar:            organization.DefaultAvatar,
-		Email:             authForm.Email,
+		Email:             strings.ToLower(authForm.Email),
 		Phone:             authForm.Phone,
 		CountryCode:       authForm.CountryCode,
 		Address:           []string{},
@@ -290,6 +286,8 @@ func (c *ApiController) Signup() {
 
 	if user.Type == "normal-user" {
 		c.SetSessionUsername(user.GetId())
+	} else if user.Type == "paid-user" {
+		c.SetSession("paidUsername", user.GetId())
 	}
 
 	if authForm.Email != "" {
@@ -343,8 +341,12 @@ func (c *ApiController) Logout() {
 
 		c.ClearUserSession()
 		c.ClearTokenSession()
-		owner, username := util.GetOwnerAndNameFromId(user)
-		_, err := object.DeleteSessionId(util.GetSessionId(owner, username, object.CasdoorApplication), c.Ctx.Input.CruSession.SessionID())
+		owner, username, err := util.GetOwnerAndNameFromIdWithError(user)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		_, err = object.DeleteSessionId(util.GetSessionId(owner, username, object.CasdoorApplication), c.Ctx.Input.CruSession.SessionID(context.Background()))
 		if err != nil {
 			c.ResponseError(err.Error())
 			return
@@ -391,9 +393,13 @@ func (c *ApiController) Logout() {
 		c.ClearUserSession()
 		c.ClearTokenSession()
 		// TODO https://github.com/casdoor/casdoor/pull/1494#discussion_r1095675265
-		owner, username := util.GetOwnerAndNameFromId(user)
+		owner, username, err := util.GetOwnerAndNameFromIdWithError(user)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
 
-		_, err = object.DeleteSessionId(util.GetSessionId(owner, username, object.CasdoorApplication), c.Ctx.Input.CruSession.SessionID())
+		_, err = object.DeleteSessionId(util.GetSessionId(owner, username, object.CasdoorApplication), c.Ctx.Input.CruSession.SessionID(context.Background()))
 		if err != nil {
 			c.ResponseError(err.Error())
 			return
@@ -423,6 +429,106 @@ func (c *ApiController) Logout() {
 	}
 }
 
+// SsoLogout
+// @Title SsoLogout
+// @Tag Login API
+// @Description logout the current user from all applications or current session only
+// @Param   logoutAll   query    string  false     "Whether to logout from all sessions. Accepted values: 'true', '1', or empty (default: true). Any other value means false."
+// @Success 200 {object} controllers.Response The Response object
+// @router /sso-logout [get,post]
+func (c *ApiController) SsoLogout() {
+	user := c.GetSessionUsername()
+
+	if user == "" {
+		c.ResponseOk()
+		return
+	}
+
+	// Check if user wants to logout from all sessions or just current session
+	// Default is true for backward compatibility
+	logoutAll := c.Ctx.Input.Query("logoutAll")
+	logoutAllSessions := logoutAll == "" || logoutAll == "true" || logoutAll == "1"
+
+	c.ClearUserSession()
+	c.ClearTokenSession()
+	owner, username, err := util.GetOwnerAndNameFromIdWithError(user)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	currentSessionId := c.Ctx.Input.CruSession.SessionID(context.Background())
+	_, err = object.DeleteSessionId(util.GetSessionId(owner, username, object.CasdoorApplication), currentSessionId)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	var tokens []*object.Token
+	var sessionIds []string
+
+	if logoutAllSessions {
+		// Logout from all sessions: expire all tokens and delete all sessions
+		// Get tokens before expiring them (for session-level logout notification)
+		tokens, err = object.GetTokensByUser(owner, username)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		_, err = object.ExpireTokenByUser(owner, username)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		sessions, err := object.GetUserSessions(owner, username)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		for _, session := range sessions {
+			sessionIds = append(sessionIds, session.SessionId...)
+		}
+		object.DeleteBeegoSession(sessionIds)
+
+		_, err = object.DeleteAllUserSessions(owner, username)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		util.LogInfo(c.Ctx, "API: [%s] logged out from all applications", user)
+	} else {
+		// Logout from current session only
+		sessionIds = []string{currentSessionId}
+
+		// Only delete the current session's Beego session
+		object.DeleteBeegoSession(sessionIds)
+
+		util.LogInfo(c.Ctx, "API: [%s] logged out from current session", user)
+	}
+
+	// Send SSO logout notifications to all notification providers in the user's signup application
+	// Now includes session-level information for targeted logout
+	userObj, err := object.GetUser(user)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	if userObj != nil {
+		err = object.SendSsoLogoutNotifications(userObj, sessionIds, tokens)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+	}
+
+	c.ResponseOk()
+}
+
 // GetAccount
 // @Title GetAccount
 // @Tag Account API
@@ -436,7 +542,7 @@ func (c *ApiController) GetAccount() {
 		return
 	}
 
-	managedAccounts := c.Input().Get("managedAccounts")
+	managedAccounts := c.Ctx.Input.Query("managedAccounts")
 	if managedAccounts == "1" {
 		user, err = object.ExtendManagedAccountsWithUser(user)
 		if err != nil {
@@ -554,8 +660,8 @@ func (c *ApiController) GetUserinfo2() {
 // @router /get-captcha [get]
 // @Success 200 {object} object.Userinfo The Response object
 func (c *ApiController) GetCaptcha() {
-	applicationId := c.Input().Get("applicationId")
-	isCurrentProvider := c.Input().Get("isCurrentProvider")
+	applicationId := c.Ctx.Input.Query("applicationId")
+	isCurrentProvider := c.Ctx.Input.Query("isCurrentProvider")
 
 	captchaProvider, err := object.GetCaptchaProviderByApplication(applicationId, isCurrentProvider, c.GetAcceptLanguage())
 	if err != nil {

@@ -16,17 +16,23 @@ import {Button, Input} from "antd";
 import React from "react";
 import i18next from "i18next";
 import * as UserBackend from "../backend/UserBackend";
+import * as Setting from "../Setting";
 import {SafetyOutlined} from "@ant-design/icons";
 import {CaptchaModal} from "./modal/CaptchaModal";
 
 const {Search} = Input;
 
-export const SendCodeInput = ({value, disabled, textBefore, onChange, onButtonClickArgs, application, method, countryCode}) => {
+export const SendCodeInput = ({value, disabled, captchaValue, useInlineCaptcha, textBefore, onChange, onButtonClickArgs, application, method, countryCode, refreshCaptcha}) => {
   const [visible, setVisible] = React.useState(false);
   const [buttonLeftTime, setButtonLeftTime] = React.useState(0);
   const [buttonLoading, setButtonLoading] = React.useState(false);
 
-  const handleCountDown = (leftTime = 60) => {
+  const getCodeResendTimeout = () => {
+    // Use application's codeResendTimeout if available, otherwise default to 60 seconds
+    return (application && application.codeResendTimeout > 0) ? application.codeResendTimeout : 60;
+  };
+
+  const handleCountDown = (leftTime = getCodeResendTimeout()) => {
     let leftTimeSecond = leftTime;
     setButtonLeftTime(leftTimeSecond);
     const countDown = () => {
@@ -46,13 +52,36 @@ export const SendCodeInput = ({value, disabled, textBefore, onChange, onButtonCl
     UserBackend.sendCode(captchaType, captchaToken, clintSecret, method, countryCode, ...onButtonClickArgs).then(res => {
       setButtonLoading(false);
       if (res) {
-        handleCountDown(60);
+        handleCountDown(getCodeResendTimeout());
+      } else {
+        if (useInlineCaptcha) {
+          refreshCaptcha?.();
+        }
+      }
+    }).catch(() => {
+      setButtonLoading(false);
+      if (useInlineCaptcha) {
+        refreshCaptcha?.();
       }
     });
   };
 
   const handleCancel = () => {
     setVisible(false);
+  };
+
+  const handleSearch = () => {
+    if (!useInlineCaptcha) {
+      setVisible(true);
+      return;
+    }
+
+    // client secret is validated in backend 
+    if (!captchaValue?.captchaType || !captchaValue?.captchaToken) {
+      Setting.showMessage("error", i18next.t("general:Please complete the captcha correctly"));
+      return;
+    }
+    handleOk(captchaValue.captchaType, captchaValue.captchaToken, captchaValue.clientSecret);
   };
 
   return (
@@ -70,17 +99,21 @@ export const SendCodeInput = ({value, disabled, textBefore, onChange, onButtonCl
             {buttonLeftTime > 0 ? `${buttonLeftTime} s` : buttonLoading ? i18next.t("code:Sending") : i18next.t("code:Send Code")}
           </Button>
         }
-        onSearch={() => setVisible(true)}
+        onSearch={handleSearch}
         autoComplete="one-time-code"
       />
-      <CaptchaModal
-        owner={application.owner}
-        name={application.name}
-        visible={visible}
-        onOk={handleOk}
-        onCancel={handleCancel}
-        isCurrentProvider={false}
-      />
+      {
+        useInlineCaptcha ? null : (
+          <CaptchaModal
+            owner={application.owner}
+            name={application.name}
+            visible={visible}
+            onOk={handleOk}
+            onCancel={handleCancel}
+            isCurrentProvider={false}
+          />
+        )
+      }
     </React.Fragment>
   );
 };

@@ -143,6 +143,9 @@ class SubscriptionListPage extends BaseListPage {
         key: "startTime",
         width: "140px",
         ...this.getColumnSearchProps("startTime"),
+        render: (text, record, index) => {
+          return Setting.getFormattedDate(text);
+        },
       },
       {
         title: i18next.t("subscription:End time"),
@@ -150,6 +153,9 @@ class SubscriptionListPage extends BaseListPage {
         key: "endTime",
         width: "140px",
         ...this.getColumnSearchProps("endTime"),
+        render: (text, record, index) => {
+          return Setting.getFormattedDate(text);
+        },
       },
       {
         title: i18next.t("general:Plan"),
@@ -226,10 +232,12 @@ class SubscriptionListPage extends BaseListPage {
         width: "230px",
         fixed: (Setting.isMobile()) ? "false" : "right",
         render: (text, record, index) => {
+          const isAdmin = Setting.isLocalAdminUser(this.props.account);
           return (
             <div>
-              <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} type="primary" onClick={() => this.props.history.push(`/subscriptions/${record.owner}/${record.name}`)}>{i18next.t("general:Edit")}</Button>
+              <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} type="primary" onClick={() => this.props.history.push({pathname: `/subscriptions/${record.owner}/${record.name}`, mode: isAdmin ? "edit" : "view"})}>{isAdmin ? i18next.t("general:Edit") : i18next.t("general:View")}</Button>
               <PopconfirmModal
+                disabled={!isAdmin}
                 title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
                 onConfirm={() => this.deleteSubscription(index)}
               >
@@ -250,12 +258,15 @@ class SubscriptionListPage extends BaseListPage {
     return (
       <div>
         <Table scroll={{x: "max-content"}} columns={columns} dataSource={subscriptions} rowKey={(record) => `${record.owner}/${record.name}`} size="middle" bordered pagination={paginationProps}
-          title={() => (
-            <div>
-              {i18next.t("general:Subscriptions")}&nbsp;&nbsp;&nbsp;&nbsp;
-              <Button type="primary" size="small" onClick={this.addSubscription.bind(this)}>{i18next.t("general:Add")}</Button>
-            </div>
-          )}
+          title={() => {
+            const isAdmin = Setting.isLocalAdminUser(this.props.account);
+            return (
+              <div>
+                {i18next.t("general:Subscriptions")}&nbsp;&nbsp;&nbsp;&nbsp;
+                <Button type="primary" size="small" disabled={!isAdmin} onClick={this.addSubscription.bind(this)}>{i18next.t("general:Add")}</Button>
+              </div>
+            );
+          }}
           loading={this.state.loading}
           onChange={this.handleTableChange}
         />

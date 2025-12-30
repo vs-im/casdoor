@@ -52,6 +52,7 @@ const defaultUserMapping = {
 
 const defaultEmailMapping = {
   fromName: "fromName",
+  fromAddress: "fromAddress",
   toAddress: "toAddress",
   subject: "subject",
   content: "content",
@@ -272,6 +273,10 @@ class ProviderEditPage extends React.Component {
           this.updateUserMappingField("fromName", e.target.value);
         }} />
         {Setting.getLabel(i18next.t("provider:From address"), i18next.t("provider:From address - Tooltip"))} :
+        <Input value={this.state.provider.userMapping.fromAddress} onChange={e => {
+          this.updateUserMappingField("fromAddress", e.target.value);
+        }} />
+        {Setting.getLabel(i18next.t("provider:To address"), i18next.t("provider:To address - Tooltip"))} :
         <Input value={this.state.provider.userMapping.toAddress} onChange={e => {
           this.updateUserMappingField("toAddress", e.target.value);
         }} />
@@ -336,6 +341,12 @@ class ProviderEditPage extends React.Component {
       } else {
         return Setting.getLabel(i18next.t("provider:Client ID"), i18next.t("provider:Client ID - Tooltip"));
       }
+    case "ID Verification":
+      if (provider.type === "Alibaba Cloud") {
+        return Setting.getLabel(i18next.t("provider:Access key"), i18next.t("provider:Access key - Tooltip"));
+      } else {
+        return Setting.getLabel(i18next.t("provider:Client ID"), i18next.t("provider:Client ID - Tooltip"));
+      }
     default:
       return Setting.getLabel(i18next.t("provider:Client ID"), i18next.t("provider:Client ID - Tooltip"));
     }
@@ -384,8 +395,14 @@ class ProviderEditPage extends React.Component {
     case "Notification":
       if (provider.type === "Line" || provider.type === "Telegram" || provider.type === "Bark" || provider.type === "DingTalk" || provider.type === "Discord" || provider.type === "Slack" || provider.type === "Pushover" || provider.type === "Pushbullet") {
         return Setting.getLabel(i18next.t("provider:Secret key"), i18next.t("provider:Secret key - Tooltip"));
-      } else if (provider.type === "Lark" || provider.type === "Microsoft Teams") {
+      } else if (provider.type === "Lark" || provider.type === "Microsoft Teams" || provider.type === "WeCom") {
         return Setting.getLabel(i18next.t("provider:Endpoint"), i18next.t("provider:Endpoint - Tooltip"));
+      } else {
+        return Setting.getLabel(i18next.t("provider:Client secret"), i18next.t("provider:Client secret - Tooltip"));
+      }
+    case "ID Verification":
+      if (provider.type === "Alibaba Cloud") {
+        return Setting.getLabel(i18next.t("provider:Secret access key"), i18next.t("provider:Secret access key - Tooltip"));
       } else {
         return Setting.getLabel(i18next.t("provider:Client secret"), i18next.t("provider:Client secret - Tooltip"));
       }
@@ -453,6 +470,13 @@ class ProviderEditPage extends React.Component {
         [
           {id: "Internal", name: i18next.t("provider:Internal")},
           {id: "Third-party", name: i18next.t("provider:Third-party")},
+        ]
+      );
+    } else if (type === "WeChat") {
+      return (
+        [
+          {id: "Web", name: i18next.t("provider:Web")},
+          {id: "Mobile", name: i18next.t("provider:Mobile")},
         ]
       );
     } else {
@@ -699,12 +723,16 @@ class ProviderEditPage extends React.Component {
                 this.updateProviderField("type", "RADIUS");
                 this.updateProviderField("host", "");
                 this.updateProviderField("port", 1812);
+              } else if (value === "ID Verification") {
+                this.updateProviderField("type", "Jumio");
+                this.updateProviderField("endpoint", "");
               }
             })}>
               {
                 [
                   {id: "Captcha", name: "Captcha"},
                   {id: "Email", name: "Email"},
+                  {id: "ID Verification", name: "ID Verification"},
                   {id: "MFA", name: "MFA"},
                   {id: "Notification", name: "Notification"},
                   {id: "OAuth", name: "OAuth"},
@@ -759,7 +787,7 @@ class ProviderEditPage extends React.Component {
           </Col>
         </Row>
         {
-          this.state.provider.type !== "WeCom" && this.state.provider.type !== "Infoflow" ? null : (
+          this.state.provider.type !== "WeCom" && this.state.provider.type !== "Infoflow" && this.state.provider.type !== "WeChat" ? null : (
             <React.Fragment>
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={2}>
@@ -923,7 +951,7 @@ class ProviderEditPage extends React.Component {
                 {
                   (this.state.provider.category === "Storage" && this.state.provider.type === "Google Cloud Storage") ||
                   (this.state.provider.category === "Email" && (this.state.provider.type === "Azure ACS" || this.state.provider.type === "SendGrid")) ||
-                  (this.state.provider.category === "Notification" && (this.state.provider.type === "Line" || this.state.provider.type === "Telegram" || this.state.provider.type === "Bark" || this.state.provider.type === "Discord" || this.state.provider.type === "Slack" || this.state.provider.type === "Pushbullet" || this.state.provider.type === "Pushover" || this.state.provider.type === "Lark" || this.state.provider.type === "Microsoft Teams")) ? null : (
+                  (this.state.provider.category === "Notification" && (this.state.provider.type === "Line" || this.state.provider.type === "Telegram" || this.state.provider.type === "Bark" || this.state.provider.type === "Discord" || this.state.provider.type === "Slack" || this.state.provider.type === "Pushbullet" || this.state.provider.type === "Pushover" || this.state.provider.type === "Lark" || this.state.provider.type === "Microsoft Teams" || this.state.provider.type === "WeCom")) ? null : (
                       <Row style={{marginTop: "20px"}} >
                         <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
                           {this.getClientIdLabel(this.state.provider)} :
@@ -1059,7 +1087,7 @@ class ProviderEditPage extends React.Component {
             </Row>
           )
         }
-        {["Face ID", "Storage"].includes(this.state.provider.category) || ["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "CUCloud"].includes(this.state.provider.type) ? (
+        {["Face ID", "Storage", "ID Verification"].includes(this.state.provider.category) || ["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "CUCloud"].includes(this.state.provider.type) ? (
           <div>
             {["Local File System", "CUCloud"].includes(this.state.provider.type) ? null : (
               <Row style={{marginTop: "20px"}} >
@@ -1073,7 +1101,7 @@ class ProviderEditPage extends React.Component {
                 </Col>
               </Row>
             )}
-            {["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "Local File System", "MinIO", "Tencent Cloud COS", "Google Cloud Storage", "Qiniu Cloud Kodo", "Synology", "Casdoor", "CUCloud", "Alibaba Cloud Facebody"].includes(this.state.provider.type) ? null : (
+            {this.state.provider.category === "ID Verification" || ["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "Local File System", "MinIO", "Tencent Cloud COS", "Google Cloud Storage", "Qiniu Cloud Kodo", "Synology", "Casdoor", "CUCloud", "Alibaba Cloud Facebody"].includes(this.state.provider.type) ? null : (
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={2}>
                   {Setting.getLabel(i18next.t("provider:Endpoint (Intranet)"), i18next.t("provider:Region endpoint for Intranet"))} :
@@ -1085,7 +1113,7 @@ class ProviderEditPage extends React.Component {
                 </Col>
               </Row>
             )}
-            {["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "Local File System", "CUCloud", "Alibaba Cloud Facebody"].includes(this.state.provider.type) ? null : (
+            {this.state.provider.category === "ID Verification" || ["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "Local File System", "CUCloud", "Alibaba Cloud Facebody"].includes(this.state.provider.type) ? null : (
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={2}>
                   {["Casdoor"].includes(this.state.provider.type) ?
@@ -1099,7 +1127,7 @@ class ProviderEditPage extends React.Component {
                 </Col>
               </Row>
             )}
-            {["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "CUCloud", "Alibaba Cloud Facebody"].includes(this.state.provider.type) ? null : (
+            {this.state.provider.category === "ID Verification" || ["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "CUCloud", "Alibaba Cloud Facebody"].includes(this.state.provider.type) ? null : (
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={2}>
                   {Setting.getLabel(i18next.t("provider:Path prefix"), i18next.t("provider:Path prefix - Tooltip"))} :
@@ -1111,7 +1139,7 @@ class ProviderEditPage extends React.Component {
                 </Col>
               </Row>
             )}
-            {["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "Synology", "Casdoor", "CUCloud", "Alibaba Cloud Facebody"].includes(this.state.provider.type) ? null : (
+            {this.state.provider.category === "ID Verification" || ["Custom HTTP SMS", "Custom HTTP Email", "SendGrid", "Synology", "Casdoor", "CUCloud", "Alibaba Cloud Facebody"].includes(this.state.provider.type) ? null : (
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={2}>
                   {Setting.getLabel(i18next.t("provider:Domain"), i18next.t("provider:Domain - Tooltip"))} :
@@ -1795,6 +1823,20 @@ class ProviderEditPage extends React.Component {
                     this.updateProviderField("metadata", JSON.stringify(options));
                   }}
                 />
+              </Col>
+            </Row>
+          ) : null
+        }
+        {
+          (this.state.provider.type === "GC" || this.state.provider.type === "FastSpring") ? (
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(i18next.t("provider:Host"), i18next.t("provider:Host - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <Input prefix={<LinkOutlined />} value={this.state.provider.host} onChange={e => {
+                  this.updateProviderField("host", e.target.value);
+                }} />
               </Col>
             </Row>
           ) : null

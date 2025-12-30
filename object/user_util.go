@@ -30,6 +30,7 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/xorm-io/core"
+	"golang.org/x/oauth2"
 )
 
 func GetUserByField(organizationName string, field string, value string) (*User, error) {
@@ -74,7 +75,8 @@ func GetUserByFields(organization string, field string) (*User, error) {
 
 	// check email
 	if strings.Contains(field, "@") {
-		user, err = GetUserByField(organization, "email", field)
+		normalizedEmail := strings.ToLower(field)
+		user, err = GetUserByField(organization, "email", normalizedEmail)
 		if user != nil || err != nil {
 			return user, err
 		}
@@ -182,7 +184,12 @@ func getUserExtraProperty(user *User, providerType, key string) (string, error) 
 	return extra[key], nil
 }
 
-func SetUserOAuthProperties(organization *Organization, user *User, providerType string, userInfo *idp.UserInfo, userMapping ...map[string]string) (bool, error) {
+func SetUserOAuthProperties(organization *Organization, user *User, providerType string, userInfo *idp.UserInfo, token *oauth2.Token, userMapping ...map[string]string) (bool, error) {
+	// Store the original OAuth provider token if available
+	if token != nil && token.AccessToken != "" {
+		user.OriginalToken = token.AccessToken
+	}
+
 	if userInfo.Id != "" {
 		propertyName := fmt.Sprintf("oauth_%s_id", providerType)
 		setUserProperty(user, propertyName, userInfo.Id)
@@ -858,7 +865,7 @@ func StringArrayToStruct[T any](stringArray [][]string) ([]*T, error) {
 	instances := []*T{}
 	var err error
 
-	for _, m := range excelMap {
+	for idx, m := range excelMap {
 		instance := new(T)
 		reflectedInstance := reflect.ValueOf(instance).Elem()
 
@@ -885,7 +892,7 @@ func StringArrayToStruct[T any](stringArray [][]string) ([]*T, error) {
 			case reflect.Int:
 				intVal, err := strconv.Atoi(v)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("line %d - column %s: %s", idx+1, fName, err.Error())
 				}
 				fv.SetInt(int64(intVal))
 				continue
@@ -913,7 +920,7 @@ func StringArrayToStruct[T any](stringArray [][]string) ([]*T, error) {
 			}
 
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("line %d: %s", idx, err.Error())
 			}
 		}
 		instances = append(instances, instance)

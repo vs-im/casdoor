@@ -35,10 +35,8 @@ type Payment struct {
 	ProductName        string  `xorm:"varchar(100)" json:"productName"`
 	ProductDisplayName string  `xorm:"varchar(100)" json:"productDisplayName"`
 	Detail             string  `xorm:"varchar(255)" json:"detail"`
-	Tag                string  `xorm:"varchar(100)" json:"tag"`
 	Currency           string  `xorm:"varchar(100)" json:"currency"`
 	Price              float64 `json:"price"`
-	ReturnUrl          string  `xorm:"varchar(1000)" json:"returnUrl"`
 	IsRecharge         bool    `xorm:"bool" json:"isRecharge"`
 
 	// Payer Info
@@ -54,7 +52,8 @@ type Payment struct {
 	InvoiceRemark string `xorm:"varchar(100)" json:"invoiceRemark"`
 	InvoiceUrl    string `xorm:"varchar(255)" json:"invoiceUrl"`
 	// Order Info
-	OutOrderId string          `xorm:"varchar(100)" json:"outOrderId"`
+	Order      string          `xorm:"varchar(100)" json:"order"`      // Internal order name
+	OutOrderId string          `xorm:"varchar(100)" json:"outOrderId"` // External payment provider's order ID
 	PayUrl     string          `xorm:"varchar(2000)" json:"payUrl"`
 	SuccessUrl string          `xorm:"varchar(2000)" json:"successUrl"` // `successUrl` is redirected from `payUrl` after pay success
 	State      pp.PaymentState `xorm:"varchar(100)" json:"state"`
@@ -116,12 +115,18 @@ func getPayment(owner string, name string) (*Payment, error) {
 }
 
 func GetPayment(id string) (*Payment, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return nil, err
+	}
 	return getPayment(owner, name)
 }
 
 func UpdatePayment(id string, payment *Payment) (bool, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return false, err
+	}
 	if p, err := getPayment(owner, name); err != nil {
 		return false, err
 	} else if p == nil {
@@ -201,7 +206,11 @@ func notifyPayment(body []byte, owner string, paymentName string) (*Payment, *pp
 	}
 
 	if payment.IsRecharge {
-		err = UpdateUserBalance(payment.Owner, payment.User, payment.Price)
+		currency := payment.Currency
+		if currency == "" {
+			currency = "USD"
+		}
+		err = UpdateUserBalance(payment.Owner, payment.User, payment.Price, currency, "en")
 		return payment, notifyResult, err
 	}
 
@@ -229,10 +238,56 @@ func NotifyPayment(body []byte, owner string, paymentName string) (*Payment, err
 		}
 
 		if transaction != nil {
-			transaction.State = payment.State
-			_, err = UpdateTransaction(transaction.GetId(), transaction)
+			transaction.State = string(payment.State)
+			_, err = UpdateTransaction(transaction.GetId(), transaction, "en")
 			if err != nil {
 				return nil, err
+			}
+		}
+
+		// Update order state based on payment status
+		if payment.Order != "" {
+			order, err := getOrder(payment.Owner, payment.Order)
+			if err != nil {
+				return nil, err
+			}
+			if order == nil {
+				return nil, fmt.Errorf("the order: %s does not exist", payment.Order)
+			}
+
+			if payment.State == pp.PaymentStatePaid {
+				order.State = "Paid"
+				order.Message = "Payment successful"
+				order.EndTime = util.GetCurrentTime()
+			} else if payment.State == pp.PaymentStateError {
+				order.State = "PaymentFailed"
+				order.Message = payment.Message
+			} else if payment.State == pp.PaymentStateCanceled {
+				order.State = "Canceled"
+				order.Message = "Payment was cancelled"
+			} else if payment.State == pp.PaymentStateTimeout {
+				order.State = "Timeout"
+				order.Message = "Payment timed out"
+			}
+			_, err = UpdateOrder(order.GetId(), order)
+			if err != nil {
+				return nil, err
+			}
+
+			// Update product stock after order state is persisted
+			if payment.State == pp.PaymentStatePaid {
+				product, err := getProduct(payment.Owner, payment.ProductName)
+				if err != nil {
+					return nil, err
+				}
+				if product == nil {
+					return nil, fmt.Errorf("the product: %s does not exist", payment.ProductName)
+				}
+
+				err = UpdateProductStock(product)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}

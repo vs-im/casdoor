@@ -67,7 +67,12 @@ func GetIdProvider(idpInfo *ProviderInfo, redirectUrl string) (IdProvider, error
 	case "QQ":
 		return NewQqIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
 	case "WeChat":
-		return NewWeChatIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
+		if idpInfo.SubType == "Mobile" {
+			return NewWeChatMobileIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
+		} else {
+			// Default to Web (PC QR code login) for backward compatibility
+			return NewWeChatIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
+		}
 	case "Facebook":
 		return NewFacebookIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
 	case "DingTalk":
@@ -124,6 +129,8 @@ func GetIdProvider(idpInfo *ProviderInfo, redirectUrl string) (IdProvider, error
 		return NewWeb3OnboardIdProvider(), nil
 	case "Twitter":
 		return NewTwitterIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
+	case "Telegram":
+		return NewTelegramIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
 	default:
 		if isGothSupport(idpInfo.Type) {
 			return NewGothIdProvider(idpInfo.Type, idpInfo.ClientId, idpInfo.ClientSecret, idpInfo.ClientId2, idpInfo.ClientSecret2, redirectUrl, idpInfo.HostUrl)

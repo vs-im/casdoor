@@ -17,7 +17,7 @@ package routers
 import (
 	"net/http"
 
-	"github.com/beego/beego/context"
+	"github.com/beego/beego/v2/server/web/context"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
@@ -69,6 +69,11 @@ func CorsFilter(ctx *context.Context) {
 	}
 
 	if ctx.Request.Method == "POST" && ctx.Request.RequestURI == "/api/login/oauth/access_token" {
+		setCorsHeaders(ctx, origin)
+		return
+	}
+
+	if ctx.Request.Method == "POST" && ctx.Request.RequestURI == "/api/acs" {
 		setCorsHeaders(ctx, origin)
 		return
 	}

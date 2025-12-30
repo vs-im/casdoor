@@ -63,6 +63,7 @@ type SamlItem struct {
 type JwtItem struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+	Type  string `json:"type"`
 }
 
 type Application struct {
@@ -91,6 +92,7 @@ type Application struct {
 	EnableSamlCompress    bool            `json:"enableSamlCompress"`
 	EnableSamlC14n10      bool            `json:"enableSamlC14n10"`
 	EnableSamlPostBinding bool            `json:"enableSamlPostBinding"`
+	DisableSamlAttributes bool            `json:"disableSamlAttributes"`
 	UseEmailAsSamlNameId  bool            `json:"useEmailAsSamlNameId"`
 	EnableWebAuthn        bool            `json:"enableWebAuthn"`
 	EnableLinkWithEmail   bool            `json:"enableLinkWithEmail"`
@@ -117,8 +119,9 @@ type Application struct {
 	TokenSigningMethod      string     `xorm:"varchar(100)" json:"tokenSigningMethod"`
 	TokenFields             []string   `xorm:"varchar(1000)" json:"tokenFields"`
 	TokenAttributes         []*JwtItem `xorm:"mediumtext" json:"tokenAttributes"`
-	ExpireInHours           int        `json:"expireInHours"`
-	RefreshExpireInHours    int        `json:"refreshExpireInHours"`
+	ExpireInHours           float64    `json:"expireInHours"`
+	RefreshExpireInHours    float64    `json:"refreshExpireInHours"`
+	CookieExpireInHours     int64      `json:"cookieExpireInHours"`
 	SignupUrl               string     `xorm:"varchar(200)" json:"signupUrl"`
 	SigninUrl               string     `xorm:"varchar(200)" json:"signinUrl"`
 	ForgetUrl               string     `xorm:"varchar(200)" json:"forgetUrl"`
@@ -363,6 +366,22 @@ func extendApplicationWithSigninMethods(application *Application) (err error) {
 	return
 }
 
+func extendApplicationWithSignupItems(application *Application) (err error) {
+	if len(application.SignupItems) == 0 {
+		application.SignupItems = []*SignupItem{
+			{Name: "ID", Visible: false, Required: true, Prompted: false, Rule: "Random"},
+			{Name: "Username", Visible: true, Required: true, Prompted: false, Rule: "None"},
+			{Name: "Display name", Visible: true, Required: true, Prompted: false, Rule: "None"},
+			{Name: "Password", Visible: true, Required: true, Prompted: false, Rule: "None"},
+			{Name: "Confirm password", Visible: true, Required: true, Prompted: false, Rule: "None"},
+			{Name: "Email", Visible: true, Required: true, Prompted: false, Rule: "None"},
+			{Name: "Phone", Visible: true, Required: true, Prompted: false, Rule: "None"},
+			{Name: "Agreement", Visible: true, Required: true, Prompted: false, Rule: "None"},
+		}
+	}
+	return
+}
+
 func getApplication(owner string, name string) (*Application, error) {
 	if owner == "" || name == "" {
 		return nil, nil
@@ -449,7 +468,10 @@ func GetApplicationByUser(user *User) (*Application, error) {
 }
 
 func GetApplicationByUserId(userId string) (application *Application, err error) {
-	_, name := util.GetOwnerAndNameFromId(userId)
+	_, name, err := util.GetOwnerAndNameFromIdWithError(userId)
+	if err != nil {
+		return nil, err
+	}
 	if IsAppUser(userId) {
 		application, err = getApplication("admin", name)
 		return
@@ -557,6 +579,7 @@ func GetMaskedApplication(application *Application, userId string) *Application 
 	application.EnableSamlCompress = false
 	application.EnableSamlC14n10 = false
 	application.EnableSamlPostBinding = false
+	application.DisableSamlAttributes = false
 	application.EnableWebAuthn = false
 	application.EnableLinkWithEmail = false
 	application.SamlReplyUrl = "***"
@@ -645,15 +668,18 @@ func GetAllowedApplications(applications []*Application, userId string, lang str
 	return res, nil
 }
 
-func UpdateApplication(id string, application *Application, isGlobalAdmin bool) (bool, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+func UpdateApplication(id string, application *Application, isGlobalAdmin bool, lang string) (bool, error) {
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return false, err
+	}
 	oldApplication, err := getApplication(owner, name)
 	if oldApplication == nil {
 		return false, err
 	}
 
 	if !isGlobalAdmin && oldApplication.Organization != application.Organization {
-		return false, fmt.Errorf("auth:Unauthorized operation")
+		return false, fmt.Errorf(i18n.Translate(lang, "auth:Unauthorized operation"))
 	}
 
 	if name == "hasura" {
@@ -719,6 +745,22 @@ func AddApplication(application *Application) (bool, error) {
 		return false, nil
 	}
 
+	// Initialize default values for required fields to prevent UI errors
+	err = extendApplicationWithSignupItems(application)
+	if err != nil {
+		return false, err
+	}
+
+	err = extendApplicationWithSigninItems(application)
+	if err != nil {
+		return false, err
+	}
+
+	err = extendApplicationWithSigninMethods(application)
+	if err != nil {
+		return false, err
+	}
+
 	for _, providerItem := range application.Providers {
 		providerItem.Provider = nil
 	}
@@ -762,6 +804,9 @@ func (application *Application) IsRedirectUriValid(redirectUri string) bool {
 	}
 
 	for _, targetUri := range application.RedirectUris {
+		if targetUri == "" {
+			continue
+		}
 		targetUriRegex := regexp.MustCompile(targetUri)
 		if targetUriRegex.MatchString(redirectUri) || strings.Contains(redirectUri, targetUri) {
 			return true

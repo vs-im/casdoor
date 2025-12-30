@@ -154,7 +154,10 @@ func updateUsedByCode(token *Token) (bool, error) {
 }
 
 func GetToken(id string) (*Token, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return nil, err
+	}
 	return getToken(owner, name)
 }
 
@@ -181,7 +184,10 @@ func (token *Token) popularHashes() {
 }
 
 func UpdateToken(id string, token *Token, isGlobalAdmin bool) (bool, error) {
-	owner, name := util.GetOwnerAndNameFromId(id)
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return false, err
+	}
 	if t, err := getToken(owner, name); err != nil {
 		return false, err
 	} else if t == nil {
@@ -213,6 +219,15 @@ func AddToken(token *Token) (bool, error) {
 
 func DeleteToken(token *Token) (bool, error) {
 	affected, err := ormer.Engine.ID(core.PK{token.Owner, token.Name}).Where("organization = ?", token.Organization).Delete(&Token{})
+	if err != nil {
+		return false, err
+	}
+
+	return affected != 0, nil
+}
+
+func ExpireTokenByUser(owner, username string) (bool, error) {
+	affected, err := ormer.Engine.Where("organization = ? and user = ?", owner, username).Cols("expires_in").Update(&Token{ExpiresIn: 0})
 	if err != nil {
 		return false, err
 	}

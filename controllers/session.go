@@ -15,9 +15,11 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 
-	"github.com/beego/beego/utils/pagination"
+	"github.com/beego/beego/v2/core/utils/pagination"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
 )
@@ -30,13 +32,13 @@ import (
 // @Success 200 {array} string The Response object
 // @router /get-sessions [get]
 func (c *ApiController) GetSessions() {
-	limit := c.Input().Get("pageSize")
-	page := c.Input().Get("p")
-	field := c.Input().Get("field")
-	value := c.Input().Get("value")
-	sortField := c.Input().Get("sortField")
-	sortOrder := c.Input().Get("sortOrder")
-	owner := c.Input().Get("owner")
+	limit := c.Ctx.Input.Query("pageSize")
+	page := c.Ctx.Input.Query("p")
+	field := c.Ctx.Input.Query("field")
+	value := c.Ctx.Input.Query("value")
+	sortField := c.Ctx.Input.Query("sortField")
+	sortOrder := c.Ctx.Input.Query("sortOrder")
+	owner := c.Ctx.Input.Query("owner")
 
 	if limit == "" || page == "" {
 		sessions, err := object.GetSessions(owner)
@@ -53,7 +55,7 @@ func (c *ApiController) GetSessions() {
 			c.ResponseError(err.Error())
 			return
 		}
-		paginator := pagination.SetPaginator(c.Ctx, limit, count)
+		paginator := pagination.NewPaginator(c.Ctx.Request, limit, count)
 		sessions, err := object.GetPaginationSessions(owner, paginator.Offset(), limit, field, value, sortField, sortOrder)
 		if err != nil {
 			c.ResponseError(err.Error())
@@ -68,11 +70,11 @@ func (c *ApiController) GetSessions() {
 // @Title GetSingleSession
 // @Tag Session API
 // @Description Get session for one user in one application.
-// @Param   sessionPkId     query    string  true        "The id(organization/user/application) of session"
+// @Param   sessionPkId     query    string  true        "The session ID in format: organization/user/application (e.g., built-in/admin/app-built-in)"
 // @Success 200 {array} string The Response object
 // @router /get-session [get]
 func (c *ApiController) GetSingleSession() {
-	id := c.Input().Get("sessionPkId")
+	id := c.Ctx.Input.Query("sessionPkId")
 
 	session, err := object.GetSingleSession(id)
 	if err != nil {
@@ -87,8 +89,8 @@ func (c *ApiController) GetSingleSession() {
 // @Title UpdateSession
 // @Tag Session API
 // @Description Update session for one user in one application.
-// @Param   id     query    string  true        "The id(organization/user/application) of session"
-// @Success 200 {array} string The Response object
+// @Param   body     body    object.Session  true        "The session object to update"
+// @Success 200 {object} controllers.Response The Response object
 // @router /update-session [post]
 func (c *ApiController) UpdateSession() {
 	var session object.Session
@@ -106,9 +108,8 @@ func (c *ApiController) UpdateSession() {
 // @Title AddSession
 // @Tag Session API
 // @Description Add session for one user in one application. If there are other existing sessions, join the session into the list.
-// @Param   id     query    string  true        "The id(organization/user/application) of session"
-// @Param   sessionId     query    string  true        "sessionId to be added"
-// @Success 200 {array} string The Response object
+// @Param   body     body    object.Session  true        "The session object to add"
+// @Success 200 {object} controllers.Response The Response object
 // @router /add-session [post]
 func (c *ApiController) AddSession() {
 	var session object.Session
@@ -126,8 +127,8 @@ func (c *ApiController) AddSession() {
 // @Title DeleteSession
 // @Tag Session API
 // @Description Delete session for one user in one application.
-// @Param   id     query    string  true        "The id(organization/user/application) of session"
-// @Success 200 {array} string The Response object
+// @Param   body     body    object.Session  true        "The session object to delete"
+// @Success 200 {object} controllers.Response The Response object
 // @router /delete-session [post]
 func (c *ApiController) DeleteSession() {
 	var session object.Session
@@ -137,7 +138,21 @@ func (c *ApiController) DeleteSession() {
 		return
 	}
 
-	c.Data["json"] = wrapActionResponse(object.DeleteSession(util.GetSessionId(session.Owner, session.Name, session.Application)))
+	curSessionId := c.Ctx.Input.CruSession.SessionID(context.Background())
+
+	sessionId := c.Ctx.Input.Query("sessionId")
+	if curSessionId == sessionId && sessionId != "" {
+		c.ResponseError(fmt.Sprintf(c.T("session:session id %s is the current session and cannot be deleted"), curSessionId))
+		return
+	}
+
+	if sessionId != "" {
+		c.Data["json"] = wrapActionResponse(object.DeleteSessionId(util.GetSessionId(session.Owner, session.Name, session.Application), sessionId))
+		c.ServeJSON()
+		return
+	}
+
+	c.Data["json"] = wrapActionResponse(object.DeleteSession(util.GetSessionId(session.Owner, session.Name, session.Application), curSessionId))
 	c.ServeJSON()
 }
 
@@ -145,13 +160,13 @@ func (c *ApiController) DeleteSession() {
 // @Title IsSessionDuplicated
 // @Tag Session API
 // @Description Check if there are other different sessions for one user in one application.
-// @Param   sessionPkId     query    string  true        "The id(organization/user/application) of session"
-// @Param   sessionId     query    string  true        "sessionId to be checked"
+// @Param   sessionPkId     query    string  true        "The session ID in format: organization/user/application (e.g., built-in/admin/app-built-in)"
+// @Param   sessionId     query    string  true        "The specific session ID to check"
 // @Success 200 {array} string The Response object
 // @router /is-session-duplicated [get]
 func (c *ApiController) IsSessionDuplicated() {
-	id := c.Input().Get("sessionPkId")
-	sessionId := c.Input().Get("sessionId")
+	id := c.Ctx.Input.Query("sessionPkId")
+	sessionId := c.Ctx.Input.Query("sessionId")
 
 	isUserSessionDuplicated, err := object.IsSessionDuplicated(id, sessionId)
 	if err != nil {

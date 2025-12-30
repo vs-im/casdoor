@@ -17,7 +17,7 @@ package routers
 import (
 	"fmt"
 
-	"github.com/beego/beego/context"
+	"github.com/beego/beego/v2/server/web/context"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
 	"github.com/casvisor/casvisor-go-sdk/casvisorsdk"
@@ -77,7 +77,11 @@ func AfterRecordMessage(ctx *context.Context) {
 
 	userId := ctx.Input.Params()["recordUserId"]
 	if userId != "" {
-		record.Organization, record.User = util.GetOwnerAndNameFromId(userId)
+		owner, user, err := util.GetOwnerAndNameFromIdWithError(userId)
+		if err != nil {
+			panic(err)
+		}
+		record.Organization, record.User = owner, user
 	}
 
 	var record2 *casvisorsdk.Record

@@ -33,7 +33,7 @@ class OrganizationListPage extends BaseListPage {
       displayName: `New Organization - ${randomName}`,
       websiteUrl: "https://door.casdoor.com",
       favicon: `${Setting.StaticBaseUrl}/img/favicon.png`,
-      passwordType: "plain",
+      passwordType: "bcrypt",
       PasswordSalt: "",
       passwordOptions: ["AtLeast6"],
       passwordObfuscatorType: "Plain",
@@ -51,6 +51,7 @@ class OrganizationListPage extends BaseListPage {
       enableTour: true,
       disableSignin: false,
       mfaRememberInHours: DefaultMfaRememberInHours,
+      balanceCurrency: "USD",
       accountItems: [
         {name: "Organization", visible: true, viewRule: "Public", modifyRule: "Admin"},
         {name: "ID", visible: true, viewRule: "Public", modifyRule: "Immutable"},
@@ -80,6 +81,9 @@ class OrganizationListPage extends BaseListPage {
         {name: "Score", visible: true, viewRule: "Public", modifyRule: "Admin"},
         {name: "Karma", visible: true, viewRule: "Public", modifyRule: "Admin"},
         {name: "Ranking", visible: true, viewRule: "Public", modifyRule: "Admin"},
+        {name: "Balance", visible: true, viewRule: "Public", modifyRule: "Admin"},
+        {name: "Balance credit", visible: true, viewRule: "Public", modifyRule: "Admin"},
+        {name: "Balance currency", visible: true, viewRule: "Public", modifyRule: "Admin"},
         {name: "Signup application", visible: true, viewRule: "Public", modifyRule: "Admin"},
         {name: "Register type", visible: true, viewRule: "Public", modifyRule: "Admin"},
         {name: "Register source", visible: true, viewRule: "Public", modifyRule: "Admin"},
@@ -238,6 +242,46 @@ class OrganizationListPage extends BaseListPage {
         },
       },
       {
+        title: i18next.t("organization:Org balance"),
+        dataIndex: "orgBalance",
+        key: "orgBalance",
+        width: "120px",
+        sorter: true,
+        render: (text, record, index) => {
+          return text ?? 0;
+        },
+      },
+      {
+        title: i18next.t("organization:User balance"),
+        dataIndex: "userBalance",
+        key: "userBalance",
+        width: "120px",
+        sorter: true,
+        render: (text, record, index) => {
+          return text ?? 0;
+        },
+      },
+      {
+        title: i18next.t("organization:Balance credit"),
+        dataIndex: "balanceCredit",
+        key: "balanceCredit",
+        width: "120px",
+        sorter: true,
+        render: (text, record, index) => {
+          return text ?? 0;
+        },
+      },
+      {
+        title: i18next.t("organization:Balance currency"),
+        dataIndex: "balanceCurrency",
+        key: "balanceCurrency",
+        width: "140px",
+        sorter: true,
+        render: (text, record, index) => {
+          return text || "USD";
+        },
+      },
+      {
         title: i18next.t("organization:Soft deletion"),
         dataIndex: "enableSoftDeletion",
         key: "enableSoftDeletion",
@@ -245,7 +289,7 @@ class OrganizationListPage extends BaseListPage {
         sorter: true,
         render: (text, record, index) => {
           return (
-            <Switch disabled checkedChildren="ON" unCheckedChildren="OFF" checked={text} />
+            <Switch disabled checkedChildren={i18next.t("general:ON")} unCheckedChildren={i18next.t("general:OFF")} checked={text} />
           );
         },
       },

@@ -15,7 +15,7 @@
 import React from "react";
 import {DeleteOutlined, DownOutlined, UpOutlined} from "@ant-design/icons";
 import {Button, Col, Row, Select, Table, Tooltip} from "antd";
-import {EmailMfaType, SmsMfaType, TotpMfaType} from "../auth/MfaSetupPage";
+import {EmailMfaType, PushMfaType, SmsMfaType, TotpMfaType} from "../auth/MfaSetupPage";
 import {MfaRuleOptional, MfaRulePrompted, MfaRuleRequired} from "../Setting";
 import * as Setting from "../Setting";
 import i18next from "i18next";
@@ -26,6 +26,7 @@ const MfaItems = [
   {name: "Phone", value: SmsMfaType},
   {name: "Email", value: EmailMfaType},
   {name: "App", value: TotpMfaType},
+  {name: "Push", value: PushMfaType},
 ];
 
 const RuleItems = [
@@ -117,7 +118,7 @@ class MfaTable extends React.Component {
                 });
 
                 if (value === MfaRuleRequired && requiredCount >= 1) {
-                  Setting.showMessage("error", "Only 1 MFA methods can be required");
+                  Setting.showMessage("error", i18next.t("general:Only 1 MFA method can be required"));
                   return;
                 }
                 this.updateField(table, index, "rule", value);
