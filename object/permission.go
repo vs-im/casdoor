@@ -20,6 +20,7 @@ import (
 
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/util"
+	"github.com/xorm-io/builder"
 	"github.com/xorm-io/core"
 )
 
@@ -354,6 +355,83 @@ func GetPermissionsByRole(roleId string) ([]*Permission, error) {
 	for _, permission := range permissions {
 		if util.InSlice(permission.Roles, roleId) {
 			res = append(res, permission)
+		}
+	}
+
+	return res, nil
+}
+
+func GetPermissionsByGroup(groupId string) ([]*Permission, error) {
+	permissions := []*Permission{}
+	err := ormer.Engine.Where("groups like ?", "%"+groupId+"\"%").Find(&permissions)
+	if err != nil {
+		return permissions, err
+	}
+
+	res := []*Permission{}
+	for _, permission := range permissions {
+		if util.InSlice(permission.Groups, groupId) {
+			res = append(res, permission)
+		}
+	}
+
+	return res, nil
+}
+
+func GetPermissionsByUsers(userIds []string) ([]*Permission, error) {
+	if len(userIds) == 0 {
+		return []*Permission{}, nil
+	}
+
+	names := []string{}
+	uuids := []string{}
+
+	for _, id := range userIds {
+		if strings.Contains(id, "/") {
+			names = append(names, id)
+		} else {
+			uuids = append(uuids, id)
+		}
+	}
+
+	if len(uuids) > 0 {
+		users, err := GetGlobalUsersWithFilter(builder.In("id", util.StringToInterfaceArray(uuids)...))
+		if err != nil {
+			return nil, err
+		}
+		for _, user := range users {
+			names = append(names, util.GetId(user.Owner, user.Name))
+		}
+	}
+
+	if len(names) == 0 {
+		return []*Permission{}, nil
+	}
+
+	permissions := []*Permission{}
+	session := ormer.Engine.NewSession()
+	defer session.Close()
+
+	for i, name := range names {
+		if i == 0 {
+			session.Where("users like ?", "%"+name+"\"%")
+		} else {
+			session.Or("users like ?", "%"+name+"\"%")
+		}
+	}
+
+	err := session.Find(&permissions)
+	if err != nil {
+		return permissions, err
+	}
+
+	res := []*Permission{}
+	for _, permission := range permissions {
+		for _, name := range names {
+			if util.InSlice(permission.Users, name) {
+				res = append(res, permission)
+				break
+			}
 		}
 	}
 

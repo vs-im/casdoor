@@ -17,6 +17,8 @@ package controllers
 import (
 	"encoding/json"
 
+	"strings"
+
 	"github.com/beego/beego/v2/core/utils/pagination"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
@@ -37,6 +39,31 @@ func (c *ApiController) GetPermissions() {
 	value := c.Ctx.Input.Query("value")
 	sortField := c.Ctx.Input.Query("sortField")
 	sortOrder := c.Ctx.Input.Query("sortOrder")
+	userIds := c.Ctx.Input.Query("userIds")
+	group := c.Ctx.Input.Query("group")
+
+	if userIds != "" {
+		ids := strings.Split(userIds, ",")
+		permissions, err := object.GetPermissionsByUsers(ids)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		c.ResponseOk(permissions)
+		return
+	}
+
+	if group != "" {
+		permissions, err := object.GetPermissionsByGroup(group)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		c.ResponseOk(permissions)
+		return
+	}
 
 	if limit == "" || page == "" {
 		permissions, err := object.GetPermissions(owner)
