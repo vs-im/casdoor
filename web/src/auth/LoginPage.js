@@ -13,7 +13,8 @@
 // limitations under the License.
 
 import React, {Suspense, lazy} from "react";
-import {Button, Checkbox, Col, Form, Input, Result, Spin, Tabs} from "antd";
+import {Button, Checkbox, Col, Form, Input, Result, Tabs} from "antd";
+import Loading from "../common/Loading";
 import {ArrowLeftOutlined, LockOutlined, UserOutlined} from "@ant-design/icons";
 import {withRouter} from "react-router-dom";
 import * as UserWebauthnBackend from "../backend/UserWebauthnBackend";
@@ -32,13 +33,15 @@ import i18next from "i18next";
 import CustomGithubCorner from "../common/CustomGithubCorner";
 import {SendCodeInput} from "../common/SendCodeInput";
 import LanguageSelect from "../common/select/LanguageSelect";
-import {CaptchaModal, CaptchaRule} from "../common/modal/CaptchaModal";
+import {CaptchaModal} from "../common/modal/CaptchaModal";
 import RedirectForm from "../common/RedirectForm";
 import {RequiredMfa} from "./mfa/MfaAuthVerifyForm";
 import {GoogleOneTapLoginVirtualButton} from "./GoogleLoginButton";
 import * as ProviderButton from "./ProviderButton";
 import {createFormAndSubmit, goToLink} from "../Setting";
 import WeChatLoginPanel from "./WeChatLoginPanel";
+import DeviceLoginPanel from "./DeviceLoginPanel";
+import NativeSsoPanel from "./NativeSsoPanel";
 import {CountryCodeSelect} from "../common/select/CountryCodeSelect";
 const FaceRecognitionCommonModal = lazy(() => import("../common/modal/FaceRecognitionCommonModal"));
 const FaceRecognitionModal = lazy(() => import("../common/modal/FaceRecognitionModal"));
@@ -118,11 +121,18 @@ class LoginPage extends React.Component {
       userCode: props.userCode ?? (props.match?.params?.userCode ?? null),
       userCodeStatus: "",
       prefilledUsername: urlParams.get("username") || urlParams.get("login_hint"),
+      nativeSsoActive: false,
+      nativeSsoSuppressed: false,
+      nativeSsoFallbackVisible: false,
+      nativeSsoKnownAgent: null,
+      nativeSsoRestartKey: 0,
+      nativeSsoOverlay: "",
       params: {
         username: username,
         password: password,
       }
     };
+    this.nativeSsoOverlayTimer = null;
 
     if (this.state.type === "cas" && props.match?.params.casApplicationName !== undefined) {
       this.state.owner = props.match?.params?.owner;
@@ -135,12 +145,15 @@ class LoginPage extends React.Component {
     this.refreshInlineCaptcha = this.refreshInlineCaptcha.bind(this);
   }
 
-  refreshInlineCaptcha() {
-    this.captchaRef.current?.loadCaptcha?.();
+  componentWillUnmount() {
+    if (this.nativeSsoOverlayTimer !== null) {
+      clearTimeout(this.nativeSsoOverlayTimer);
+      this.nativeSsoOverlayTimer = null;
+    }
   }
 
-  isInlineCaptchaEnabled(application = this.getApplicationObj()) {
-    return application?.signinItems?.some(signinItem => signinItem.name === "Captcha" && signinItem.rule === "inline");
+  refreshInlineCaptcha() {
+    this.captchaRef.current?.loadCaptcha?.();
   }
 
   componentDidMount() {
@@ -190,21 +203,6 @@ class LoginPage extends React.Component {
           values["application"] = this.props.application.name;
           this.login(values);
         }
-      }
-    }
-  }
-
-  getCaptchaRule(application) {
-    const captchaProviderItems = this.getCaptchaProviderItems(application);
-    if (captchaProviderItems) {
-      if (captchaProviderItems.some(providerItem => providerItem.rule === "Always")) {
-        return CaptchaRule.Always;
-      } else if (captchaProviderItems.some(providerItem => providerItem.rule === "Dynamic")) {
-        return CaptchaRule.Dynamic;
-      } else if (captchaProviderItems.some(providerItem => providerItem.rule === "Internet-Only")) {
-        return CaptchaRule.InternetOnly;
-      } else {
-        return CaptchaRule.Never;
       }
     }
   }
@@ -266,7 +264,7 @@ class LoginPage extends React.Component {
             this.setState({
               msg: res.msg,
             });
-            return ;
+            return;
           }
           this.onUpdateApplication(res.data);
         });
@@ -308,6 +306,11 @@ class LoginPage extends React.Component {
       case "WebAuthn": return "webAuthn";
       case "LDAP": return "ldap";
       case "Face ID": return "faceId";
+      case "Device login":
+        if (application?.signinMethods[0]?.rule === "Tab") {
+          return "device";
+        }
+        break;
       }
     }
 
@@ -325,6 +328,8 @@ class LoginPage extends React.Component {
       return "LDAP";
     } else if (this.state.loginMethod === "faceId") {
       return "Face ID";
+    } else if (this.state.loginMethod === "device") {
+      return "Device login";
     } else {
       return "Password";
     }
@@ -336,8 +341,8 @@ class LoginPage extends React.Component {
     }
     switch (this.state.loginMethod) {
     case "verificationCode": return i18next.t("login:Email or phone");
-    case "verificationCodeEmail": return i18next.t("login:Email");
-    case "verificationCodePhone": return i18next.t("login:Phone");
+    case "verificationCodeEmail": return i18next.t("general:Email");
+    case "verificationCodePhone": return i18next.t("general:Phone");
     case "ldap": return i18next.t("login:LDAP username, Email or phone");
     default: return i18next.t("login:username, Email or phone");
     }
@@ -417,7 +422,15 @@ class LoginPage extends React.Component {
 
   sendPopupData(message, redirectUri) {
     const params = new URLSearchParams(this.props.location.search);
-    if (params.get("popup") === "1") {
+    const popup = params.get("popup");
+    const popupType = params.get("popup_type") || "window";
+    if (popup !== "1") {
+      return;
+    }
+
+    if (popupType === "iframe") {
+      window.parent.postMessage(message, new URL(redirectUri).origin);
+    } else {
       window.opener.postMessage(message, redirectUri);
     }
   }
@@ -437,7 +450,14 @@ class LoginPage extends React.Component {
 
     if (resp.data3) {
       sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
-      Setting.goToLinkSoft(ths, `/forget/${application.name}`);
+      Setting.goToLinkSoft(ths, "/account");
+      return;
+    }
+
+    // Check if consent is required
+    if (resp.data?.required === true) {
+      // Consent required, redirect to consent page
+      Setting.goToLinkSoft(ths, `/consent/${application.name}?${window.location.search.substring(1)}`);
       return;
     }
 
@@ -470,7 +490,13 @@ class LoginPage extends React.Component {
           }, 1000);
         }
       } else {
-        Setting.goToLink(redirectUrl);
+        const params = new URLSearchParams(this.props.location.search);
+        const popupType = params.get("popup_type") || "window";
+        const popup = params.get("popup");
+        const isIframePopup = popup === "1" && popupType === "iframe";
+        if (!isIframePopup) {
+          Setting.goToLink(redirectUrl);
+        }
         this.sendPopupData({type: "loginSuccess", data: {code: code, state: oAuthParams.state}}, oAuthParams.redirectUri);
       }
     }
@@ -525,20 +551,20 @@ class LoginPage extends React.Component {
       } else {
         values["password"] = passwordCipher;
       }
-      const captchaRule = this.getCaptchaRule(this.getApplicationObj());
+      const captchaRule = Setting.getCaptchaRule(this.getApplicationObj());
       const application = this.getApplicationObj();
-      const inlineCaptchaEnabled = this.isInlineCaptchaEnabled(application);
+      const inlineCaptchaEnabled = Setting.isInlineCaptchaEnabled(application);
       if (!inlineCaptchaEnabled) {
-        if (captchaRule === CaptchaRule.Always) {
+        if (captchaRule === Setting.CaptchaRule.Always) {
           this.setState({
             openCaptchaModal: true,
             values: values,
           });
           return;
-        } else if (captchaRule === CaptchaRule.Dynamic) {
+        } else if (captchaRule === Setting.CaptchaRule.Dynamic) {
           this.checkCaptchaStatus(values);
           return;
-        } else if (captchaRule === CaptchaRule.InternetOnly) {
+        } else if (captchaRule === Setting.CaptchaRule.InternetOnly) {
           this.checkCaptchaStatus(values);
           return;
         }
@@ -555,7 +581,7 @@ class LoginPage extends React.Component {
     // here we are supposed to determine whether Casdoor is working as an OAuth server or CAS server
     values["language"] = this.state.userLang ?? "";
     const usedCaptcha = this.state.captchaValues !== undefined;
-    const inlineCaptchaEnabled = this.isInlineCaptchaEnabled();
+    const inlineCaptchaEnabled = Setting.isInlineCaptchaEnabled(this.getApplicationObj());
     const shouldRefreshCaptcha = usedCaptcha && inlineCaptchaEnabled && !this.state.loginMethod?.includes("verificationCode");
     if (this.state.type === "cas") {
       // CAS
@@ -612,21 +638,23 @@ class LoginPage extends React.Component {
             if (responseType === "login") {
               if (res.data3) {
                 sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
-                Setting.goToLinkSoft(this, `/forget/${this.state.applicationName}`);
+                Setting.goToLinkSoft(this, "/account");
+                return;
               }
               Setting.showMessage("success", i18next.t("application:Logged in successfully"));
               this.props.onLoginSuccess();
             } else if (responseType === "code") {
               this.postCodeLoginAction(res);
             } else if (responseType === "device") {
-              Setting.showMessage("success", "Successful login");
+              Setting.showMessage("success", i18next.t("application:Logged in successfully"));
               this.setState({
                 userCodeStatus: "success",
               });
             } else if (responseTypes.includes("token") || responseTypes.includes("id_token")) {
               if (res.data3) {
                 sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
-                Setting.goToLinkSoft(this, `/forget/${this.state.applicationName}`);
+                Setting.goToLinkSoft(this, "/account");
+                return;
               }
               const amendatoryResponseType = responseType === "token" ? "access_token" : responseType;
               const accessToken = res.data;
@@ -648,7 +676,8 @@ class LoginPage extends React.Component {
               }
               if (res.data3) {
                 sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
-                Setting.goToLinkSoft(this, `/forget/${this.state.applicationName}`);
+                Setting.goToLinkSoft(this, "/account");
+                return;
               }
               if (res.data2.method === "POST") {
                 this.setState({
@@ -659,7 +688,7 @@ class LoginPage extends React.Component {
               } else {
                 const SAMLResponse = res.data;
                 const redirectUri = res.data2.redirectUrl;
-                Setting.goToLink(`${redirectUri}${redirectUri.includes("?") ? "&" : "?"}SAMLResponse=${encodeURIComponent(SAMLResponse)}&RelayState=${oAuthParams.relayState}`);
+                Setting.goToLink(`${redirectUri}${redirectUri.includes("?") ? "&" : "?"}SAMLResponse=${encodeURIComponent(SAMLResponse)}&RelayState=${encodeURIComponent(oAuthParams.relayState)}`);
               }
             }
           };
@@ -673,6 +702,7 @@ class LoginPage extends React.Component {
             }
           }
         }).finally(() => {
+          localStorage.setItem("lastLoginOrg", values?.organization || "");
           this.setState({loginLoading: false, loading: false});
         });
     }
@@ -770,7 +800,11 @@ class LoginPage extends React.Component {
       return (
         <div key={resultItemKey} className="login-languages">
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
-          <LanguageSelect languages={application.organizationObj.languages} onClick={key => {this.setState({userLang: key});}} />
+          <LanguageSelect
+            languages={application.organizationObj.languages}
+            mode={signinItem.rule}
+            onClick={key => {this.setState({userLang: key});}}
+          />
         </div>
       );
     } else if (signinItem.name === "Signin methods") {
@@ -784,6 +818,10 @@ class LoginPage extends React.Component {
     } else if (signinItem.name === "Username") {
       if (this.state.loginMethod === "wechat") {
         return (<WeChatLoginPanel application={application} loginMethod={this.state.loginMethod} />);
+      }
+
+      if (this.state.loginMethod === "device") {
+        return (<DeviceLoginPanel application={application} onSuccess={(deviceCode) => this.handleDeviceLoginComplete(deviceCode)} />);
       }
 
       if (this.state.loginMethod === "verificationCodePhone") {
@@ -937,7 +975,7 @@ class LoginPage extends React.Component {
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <div className="login-forget-password">
             <Form.Item name="autoSignin" valuePropName="checked" noStyle>
-              <Checkbox style={{float: "left"}}>
+              <Checkbox className="login-auto-signin" style={{float: "left"}}>
                 {i18next.t("login:Auto sign in")}
               </Checkbox>
             </Form.Item>
@@ -950,7 +988,7 @@ class LoginPage extends React.Component {
     } else if (signinItem.name === "Agreement") {
       return AgreementModal.isAgreementRequired(application) ? AgreementModal.renderAgreementFormItem(application, true, {}, this) : null;
     } else if (signinItem.name === "Login button") {
-      if (this.state.loginMethod === "wechat") {
+      if (this.state.loginMethod === "wechat" || this.state.loginMethod === "device") {
         return null;
       }
       return (
@@ -965,9 +1003,35 @@ class LoginPage extends React.Component {
             {
               this.state.loginMethod === "webAuthn" ? i18next.t("login:Sign in with WebAuthn") :
                 this.state.loginMethod === "faceId" ? i18next.t("login:Sign in with Face ID") :
-                  signinItem.label ? signinItem.label : i18next.t("login:Sign In")
+                  this.state.type === "device" ? i18next.t("login:Approve and sign in") :
+                    signinItem.label ? signinItem.label : i18next.t("login:Sign In")
             }
           </Button>
+          {this.renderNativeSsoFallbackLink()}
+          {
+            this.state.type === "device" ? (
+              <Button
+                style={{marginTop: 12}}
+                block
+                onClick={() => {
+                  const cancelToken = new URLSearchParams(this.props.location.search).get("cancelToken") || "";
+                  AuthBackend.cancelDeviceLogin(this.state.userCode, cancelToken)
+                    .then((res) => {
+                      if (res.status === "ok") {
+                        this.setState({userCodeStatus: "canceled"});
+                      } else {
+                        Setting.showMessage("error", res.msg || i18next.t("general:Failed to cancel"));
+                      }
+                    })
+                    .catch(() => {
+                      Setting.showMessage("error", i18next.t("general:Failed to cancel"));
+                    });
+                }}
+              >
+                {i18next.t("general:Cancel")}
+              </Button>
+            ) : null
+          }
           {
             this.state.loginMethod === "faceId" ?
               this.state.haveFaceIdProvider ? <Suspense fallback={null}><FaceRecognitionCommonModal visible={this.state.openFaceRecognitionModal} onOk={(FaceIdImage) => {
@@ -1027,7 +1091,7 @@ class LoginPage extends React.Component {
                 >
                   {availableProviders.map((providerItem) => {
                     if (providerHint === providerItem.provider.name) {
-                      goToLink(Provider.getAuthUrl(application, providerItem.provider, "signup"));
+                      goToLink(Provider.getAuthUrl(application, providerItem.provider, this.state.mode ?? "signup"));
                       return;
                     }
                     return ProviderButton.renderProviderLogo(
@@ -1036,7 +1100,8 @@ class LoginPage extends React.Component {
                       30,
                       5,
                       "medium",
-                      this.props.location
+                      this.props.location,
+                      this.state.mode ?? "signup"
                     );
                   })}
                 </div>
@@ -1108,6 +1173,16 @@ class LoginPage extends React.Component {
       );
     }
 
+    if (this.state.userCodeStatus === "canceled") {
+      return (
+        <Result
+          status="warning"
+          title={i18next.t("login:Device login was canceled")}
+        >
+        </Result>
+      );
+    }
+
     const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application) || Setting.isFaceIdEnabled(application);
     if (showForm) {
       let loginWidth = 320;
@@ -1136,6 +1211,7 @@ class LoginPage extends React.Component {
           size="large"
           ref={this.form}
         >
+          {this.renderDeviceLoginHeader(application)}
           <Form.Item
             hidden={true}
             name="application"
@@ -1185,40 +1261,24 @@ class LoginPage extends React.Component {
     }
   }
 
-  getCaptchaProviderItems(application) {
-    const providers = application?.providers;
-
-    if (providers === undefined || providers === null) {
-      return null;
-    }
-
-    return providers.filter(providerItem => {
-      if (providerItem.provider === undefined || providerItem.provider === null) {
-        return false;
-      }
-
-      return providerItem.provider.category === "Captcha";
-    });
-  }
-
   renderCaptchaModal(application, noModal) {
-    if (this.getCaptchaRule(this.getApplicationObj()) === CaptchaRule.Never) {
+    if (Setting.getCaptchaRule(this.getApplicationObj()) === Setting.CaptchaRule.Never) {
       return null;
     }
-    const captchaProviderItems = this.getCaptchaProviderItems(application);
+    const captchaProviderItems = Setting.getCaptchaProviderItems(application);
     const alwaysProviderItems = captchaProviderItems.filter(providerItem => providerItem.rule === "Always");
     const dynamicProviderItems = captchaProviderItems.filter(providerItem => providerItem.rule === "Dynamic");
     const internetOnlyProviderItems = captchaProviderItems.filter(providerItem => providerItem.rule === "Internet-Only");
 
     // Select provider based on the active captcha rule, not fixed priority
-    const captchaRule = this.getCaptchaRule(this.getApplicationObj());
+    const captchaRule = Setting.getCaptchaRule(this.getApplicationObj());
     let provider = null;
 
-    if (captchaRule === CaptchaRule.Always && alwaysProviderItems.length > 0) {
+    if (captchaRule === Setting.CaptchaRule.Always && alwaysProviderItems.length > 0) {
       provider = alwaysProviderItems[0].provider;
-    } else if (captchaRule === CaptchaRule.Dynamic && dynamicProviderItems.length > 0) {
+    } else if (captchaRule === Setting.CaptchaRule.Dynamic && dynamicProviderItems.length > 0) {
       provider = dynamicProviderItems[0].provider;
-    } else if (captchaRule === CaptchaRule.InternetOnly && internetOnlyProviderItems.length > 0) {
+    } else if (captchaRule === Setting.CaptchaRule.InternetOnly && internetOnlyProviderItems.length > 0) {
       provider = internetOnlyProviderItems[0].provider;
     }
 
@@ -1232,9 +1292,11 @@ class LoginPage extends React.Component {
       visible={this.state.openCaptchaModal}
       noModal={noModal}
       onUpdateToken={(captchaType, captchaToken, clientSecret) => {
-        this.setState({captchaValues: {
-          captchaType, captchaToken, clientSecret,
-        }});
+        this.setState({
+          captchaValues: {
+            captchaType, captchaToken, clientSecret,
+          },
+        });
       }}
       onOk={(captchaType, captchaToken, clientSecret) => {
         const values = this.state.values;
@@ -1279,6 +1341,185 @@ class LoginPage extends React.Component {
     }
   }
 
+  showNativeSsoOverlay(messageText) {
+    if (this.nativeSsoOverlayTimer !== null) {
+      clearTimeout(this.nativeSsoOverlayTimer);
+      this.nativeSsoOverlayTimer = null;
+    }
+
+    this.setState({nativeSsoOverlay: messageText});
+    this.nativeSsoOverlayTimer = setTimeout(() => {
+      this.setState({nativeSsoOverlay: ""});
+      this.nativeSsoOverlayTimer = null;
+    }, 2200);
+  }
+
+  handleNativeSsoFallback(messageText, agent) {
+    this.setState({
+      nativeSsoActive: false,
+      nativeSsoSuppressed: true,
+      nativeSsoFallbackVisible: true,
+      nativeSsoKnownAgent: agent || this.state.nativeSsoKnownAgent,
+    });
+
+    if (messageText) {
+      this.showNativeSsoOverlay(messageText);
+    }
+  }
+
+  retryNativeSso() {
+    this.setState((prevState) => ({
+      nativeSsoSuppressed: false,
+      nativeSsoFallbackVisible: true,
+      nativeSsoRestartKey: prevState.nativeSsoRestartKey + 1,
+    }));
+  }
+
+  handleNativeSsoSuccess(result) {
+    const accessToken = result?.accessToken || result?.token?.access_token || "";
+    if (accessToken === "") {
+      this.handleNativeSsoFallback(i18next.t("login:Invalid Native SSO response"));
+      return;
+    }
+
+    const oAuthParams = Util.getOAuthGetParameters();
+    AuthBackend.completeNativeSso(accessToken, oAuthParams).then((res) => {
+      if (res.status === "ok") {
+        const responseType = oAuthParams?.responseType || "login";
+        const responseTypes = responseType.split(" ");
+        const responseMode = oAuthParams?.responseMode || "query";
+        if (responseType === "login") {
+          if (res.data3) {
+            sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
+            Setting.goToLinkSoft(this, "/account");
+            return;
+          }
+          Setting.showMessage("success", i18next.t("application:Logged in successfully"));
+          this.props.onLoginSuccess();
+        } else if (responseType === "code") {
+          this.postCodeLoginAction(res);
+        } else if (responseType === "device") {
+          Setting.showMessage("success", i18next.t("application:Logged in successfully"));
+          this.setState({
+            userCodeStatus: "success",
+          });
+        } else if (responseTypes.includes("token") || responseTypes.includes("id_token")) {
+          if (res.data3) {
+            sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
+            Setting.goToLinkSoft(this, "/account");
+            return;
+          }
+          const amendatoryResponseType = responseType === "token" ? "access_token" : responseType;
+          const nativeSsoAccessToken = res.data;
+          if (responseMode === "form_post") {
+            const params = {
+              token: responseTypes.includes("token") ? res.data : null,
+              id_token: responseTypes.includes("id_token") ? res.data : null,
+              token_type: "bearer",
+              state: oAuthParams?.state,
+            };
+            createFormAndSubmit(oAuthParams?.redirectUri, params);
+          } else {
+            Setting.goToLink(`${oAuthParams.redirectUri}#${amendatoryResponseType}=${nativeSsoAccessToken}&state=${oAuthParams.state}&token_type=bearer`);
+          }
+        } else {
+          this.handleNativeSsoFallback(i18next.t("login:Invalid Native SSO response"));
+        }
+      } else {
+        this.handleNativeSsoFallback(res.msg || i18next.t("login:Native SSO was denied"));
+      }
+    }).catch((error) => {
+      this.handleNativeSsoFallback(error.message || i18next.t("login:Native SSO was denied"));
+    });
+  }
+
+  renderNativeSsoFallbackLink() {
+    if (!this.state.nativeSsoFallbackVisible) {
+      return null;
+    }
+
+    return (
+      <div style={{marginTop: 20, textAlign: "center", fontSize: 16, lineHeight: "22px"}}>
+        <a onClick={() => this.retryNativeSso()}>{i18next.t("login:Native SSO")}</a>
+      </div>
+    );
+  }
+
+  renderNativeSsoOverlay() {
+    if (this.state.nativeSsoOverlay === "") {
+      return null;
+    }
+
+    return (
+      <div style={{
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        zIndex: 1000,
+        width: 210,
+        height: 205,
+        padding: "0 28px",
+        borderRadius: 10,
+        background: "rgba(0, 0, 0, 0.68)",
+        color: "#fff",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        fontSize: 20,
+        fontWeight: 500,
+        lineHeight: 1.25,
+        pointerEvents: "none",
+      }}>
+        <div style={{fontSize: 58, lineHeight: 1, fontWeight: 200, marginBottom: 34}}>
+          {"×"}
+        </div>
+        <div>{this.state.nativeSsoOverlay}</div>
+      </div>
+    );
+  }
+
+  shouldRenderNativeSso(application) {
+    return this.state.mode === "signin" && this.state.type !== "device" && application?.clientId;
+  }
+
+  handleDeviceLoginComplete(deviceCode) {
+    const oAuthParams = Util.getOAuthGetParameters();
+    AuthBackend.completeDeviceLogin(deviceCode, oAuthParams).then((res) => {
+      if (res.status === "ok") {
+        const responseType = oAuthParams?.responseType ?? "login";
+        const responseTypes = responseType.split(" ");
+        const responseMode = oAuthParams?.responseMode || "query";
+        if (responseType === "code") {
+          this.postCodeLoginAction(res);
+        } else if (responseTypes.includes("token") || responseTypes.includes("id_token")) {
+          const amendatoryResponseType = responseType === "token" ? "access_token" : responseType;
+          const accessToken = res.data;
+          if (responseMode === "form_post") {
+            const params = {
+              token: responseTypes.includes("token") ? res.data : null,
+              id_token: responseTypes.includes("id_token") ? res.data : null,
+              token_type: "bearer",
+              state: oAuthParams?.state,
+            };
+            createFormAndSubmit(oAuthParams?.redirectUri, params);
+          } else {
+            Setting.goToLink(`${oAuthParams.redirectUri}#${amendatoryResponseType}=${accessToken}&state=${oAuthParams.state}&token_type=bearer`);
+          }
+        } else {
+          Setting.showMessage("success", i18next.t("application:Logged in successfully"));
+          this.props.onLoginSuccess();
+        }
+      } else {
+        Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${res.msg}`);
+      }
+    }).catch((err) => {
+      Setting.showMessage("error", err.message);
+    });
+  }
+
   renderSignedInBox() {
     if (this.props.account === undefined || this.props.account === null) {
       this.sendSilentSigninData("user-not-logged-in");
@@ -1301,7 +1542,7 @@ class LoginPage extends React.Component {
     return (
       <div>
         <div style={{fontSize: 16, textAlign: "left"}}>
-          {i18next.t("login:Continue with")}&nbsp;:
+          {this.state.type === "device" ? i18next.t("login:Continue with your current account to approve this sign-in") : i18next.t("login:Continue with")}&nbsp;:
         </div>
         <br />
         <div onClick={() => {
@@ -1316,6 +1557,36 @@ class LoginPage extends React.Component {
         <div style={{fontSize: 16, textAlign: "left"}}>
           {i18next.t("login:Or sign in with another account")}&nbsp;:
         </div>
+      </div>
+    );
+  }
+
+  renderDeviceLoginHeader(application) {
+    if (this.state.type !== "device" || !this.state.userCode) {
+      return null;
+    }
+
+    return (
+      <div style={{textAlign: "center", marginBottom: 16}}>
+        <h3 style={{marginBottom: 8}}>{i18next.t("login:Approve sign-in on this device")}</h3>
+        <div style={{marginBottom: 4}}>
+          <strong>{application.displayName}</strong>
+        </div>
+        <div style={{color: "#8c8c8c"}}>
+          {i18next.t("login:Confirmation code")}: {this.state.userCode}
+        </div>
+      </div>
+    );
+  }
+
+  renderDeviceLoginSidePanel(application) {
+    if (!application?.signinMethods?.some(signinMethod => signinMethod?.name === "Device login" && signinMethod.rule === "Login page") || this.state.type === "device") {
+      return null;
+    }
+
+    return (
+      <div style={{display: "flex", justifyContent: "center", alignItems: "center"}}>
+        <DeviceLoginPanel application={application} onSuccess={(deviceCode) => this.handleDeviceLoginComplete(deviceCode)} />
       </div>
     );
   }
@@ -1353,9 +1624,12 @@ class LoginPage extends React.Component {
         const rawId = assertion.rawId;
         const sig = assertion.response.signature;
         const userHandle = assertion.response.userHandle;
+        const resourceQuery = oAuthParams?.resource
+          ? `&resource=${encodeURIComponent(oAuthParams.resource)}`
+          : "";
         let finishUrl = `${Setting.ServerUrl}/api/webauthn/signin/finish?responseType=${values["type"]}`;
         if (values["type"] === "code") {
-          finishUrl = `${Setting.ServerUrl}/api/webauthn/signin/finish?responseType=${values["type"]}&clientId=${oAuthParams.clientId}&scope=${oAuthParams.scope}&redirectUri=${oAuthParams.redirectUri}&nonce=${oAuthParams.nonce}&state=${oAuthParams.state}&codeChallenge=${oAuthParams.codeChallenge}&challengeMethod=${oAuthParams.challengeMethod}`;
+          finishUrl = `${Setting.ServerUrl}/api/webauthn/signin/finish?responseType=${values["type"]}&clientId=${oAuthParams.clientId}&scope=${oAuthParams.scope}&redirectUri=${oAuthParams.redirectUri}&nonce=${oAuthParams.nonce}&state=${oAuthParams.state}&codeChallenge=${oAuthParams.codeChallenge}&challengeMethod=${oAuthParams.challengeMethod}${resourceQuery}`;
         }
         return fetch(finishUrl, {
           method: "POST",
@@ -1446,7 +1720,7 @@ class LoginPage extends React.Component {
                 onButtonClickArgs={[this.state.username, this.state.validEmail ? "email" : "phone", Setting.getApplicationName(application)]}
                 application={application}
                 captchaValue={this.state.captchaValues}
-                useInlineCaptcha={this.isInlineCaptchaEnabled(application)}
+                useInlineCaptcha={Setting.isInlineCaptchaEnabled(application)}
                 refreshCaptcha={this.refreshInlineCaptcha}
               />
             </Form.Item>
@@ -1475,7 +1749,7 @@ class LoginPage extends React.Component {
               onButtonClickArgs={[this.state.username, this.state.validEmail ? "email" : "phone", Setting.getApplicationName(application)]}
               application={application}
               captchaValue={this.state.captchaValues}
-              useInlineCaptcha={this.isInlineCaptchaEnabled(application)}
+              useInlineCaptcha={Setting.isInlineCaptchaEnabled(application)}
               refreshCaptcha={this.refreshInlineCaptcha}
             />
           </Form.Item>
@@ -1503,6 +1777,7 @@ class LoginPage extends React.Component {
       [generateItemKey("WebAuthn", "None"), {label: i18next.t("login:WebAuthn"), key: "webAuthn"}],
       [generateItemKey("LDAP", "None"), {label: i18next.t("login:LDAP"), key: "ldap"}],
       [generateItemKey("Face ID", "None"), {label: i18next.t("login:Face ID"), key: "faceId"}],
+      [generateItemKey("Device login", "Tab"), {label: i18next.t("login:Device login"), key: "device"}],
       [generateItemKey("WeChat", "Tab"), {label: i18next.t("login:WeChat"), key: "wechat"}],
       [generateItemKey("WeChat", "None"), {label: i18next.t("login:WeChat"), key: "wechat"}],
     ]);
@@ -1511,6 +1786,11 @@ class LoginPage extends React.Component {
       if (signinMethod.rule === "Hide password") {
         return;
       }
+
+      if (this.state.type === "device" && signinMethod.name === "Device login") {
+        return;
+      }
+
       const item = itemsMap.get(generateItemKey(signinMethod.name, signinMethod.rule));
       if (item) {
         let label = signinMethod.name === signinMethod.displayName ? item.label : signinMethod.displayName;
@@ -1658,22 +1938,41 @@ class LoginPage extends React.Component {
       );
     }
 
-    const visibleOAuthProviderItems = (application.providers === null) ? [] : application.providers.filter(providerItem => this.isProviderVisible(providerItem));
+    const visibleOAuthProviderItems = (application.providers === null) ? [] : application.providers.filter(providerItem => this.isProviderVisible(providerItem) && providerItem.provider?.category !== "SAML");
     if (this.props.preview !== "auto" && !Setting.isPasswordEnabled(application) && !Setting.isCodeSigninEnabled(application) && !Setting.isWebAuthnEnabled(application) && !Setting.isLdapEnabled(application) && visibleOAuthProviderItems.length === 1) {
-      Setting.goToLink(Provider.getAuthUrl(application, visibleOAuthProviderItems[0].provider, "signup"));
+      Setting.goToLink(Provider.getAuthUrl(application, visibleOAuthProviderItems[0].provider, this.state.mode ?? "signup"));
       return (
-        <div style={{display: "flex", justifyContent: "center", alignItems: "center", width: "100%"}}>
-          <Spin size="large" tip={i18next.t("login:Signing in...")} />
-        </div>
+        <Loading type="page" tip={i18next.t("login:Signing in...")} />
       );
     }
 
     const wechatSigninMethods = application.signinMethods?.filter(method => method.name === "WeChat" && method.rule === "Login page");
+    const sidePanels = [];
+
+    if (wechatSigninMethods?.length > 0) {
+      sidePanels.push(
+        <div key="wechat-panel">
+          <h3 style={{textAlign: "center", width: 320}}>{i18next.t("provider:Please use WeChat to scan the QR code and follow the official account for sign in")}</h3>
+          <WeChatLoginPanel application={application} loginMethod={this.state.loginMethod} />
+        </div>
+      );
+    }
+
+    if (application.signinMethods?.some(method => method.name === "Device login" && method.rule === "Login page") && this.state.type !== "device") {
+      sidePanels.push(
+        <div key="device-panel">
+          {this.renderDeviceLoginSidePanel(application)}
+        </div>
+      );
+    }
+
+    const showNativeSso = this.shouldRenderNativeSso(application);
 
     return (
       <React.Fragment>
         <CustomGithubCorner />
         <div className="login-content" style={{margin: this.props.preview ?? this.parseOffset(application.formOffset)}}>
+          {this.renderNativeSsoOverlay()}
           {Setting.inIframe() || Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCss}} />}
           {Setting.inIframe() || !Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCssMobile}} />}
           <div className={Setting.isDarkTheme(this.props.themeAlgorithm) ? "login-panel-dark" : "login-panel"}>
@@ -1682,20 +1981,25 @@ class LoginPage extends React.Component {
             </div>
             <div className="login-form">
               <div>
-                {
-                  this.renderLoginPanel(application)
-                }
+                {showNativeSso && !this.state.nativeSsoSuppressed ? (
+                  <NativeSsoPanel
+                    key={`native-sso-${this.state.nativeSsoRestartKey}`}
+                    application={application}
+                    restartKey={this.state.nativeSsoRestartKey}
+                    initialAgent={this.state.nativeSsoKnownAgent}
+                    onActiveChange={(active) => this.setState({nativeSsoActive: active})}
+                    onFallback={(messageText, agent) => this.handleNativeSsoFallback(messageText, agent)}
+                    onSuccess={(result) => this.handleNativeSsoSuccess(result)}
+                  />
+                ) : null}
+                {showNativeSso && this.state.nativeSsoActive ? null : this.renderLoginPanel(application)}
               </div>
             </div>
-            {
-              wechatSigninMethods?.length > 0 ? (<div style={{display: "flex", justifyContent: "center", alignItems: "center"}}>
-                <div>
-                  <h3 style={{textAlign: "center", width: 320}}>{i18next.t("provider:Please use WeChat to scan the QR code and follow the official account for sign in")}</h3>
-                  <WeChatLoginPanel application={application} loginMethod={this.state.loginMethod} />
-                </div>
+            {sidePanels.length > 0 && !(showNativeSso && this.state.nativeSsoActive) ? (
+              <div style={{display: "flex", justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 24}}>
+                {sidePanels}
               </div>
-              ) : null
-            }
+            ) : null}
           </div>
         </div>
       </React.Fragment>

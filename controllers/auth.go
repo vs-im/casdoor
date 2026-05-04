@@ -37,7 +37,6 @@ import (
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/proxy"
 	"github.com/casdoor/casdoor/util"
-	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
 
@@ -100,7 +99,8 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 	// check user's tag
 	if !user.IsGlobalAdmin() && !user.IsAdmin && len(application.Tags) > 0 {
 		// only users with the tag that is listed in the application tags can login
-		if !util.InSlice(application.Tags, user.Tag) {
+		// supports comma-separated tags in user.Tag (e.g., "default-policy,project-admin")
+		if !util.HasTagInSlice(application.Tags, user.Tag) {
 			c.ResponseError(fmt.Sprintf(c.T("auth:User's tag: %s is not listed in the application's tags"), user.Tag))
 			return
 		}
@@ -160,12 +160,26 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		nonce := c.Ctx.Input.Query("nonce")
 		challengeMethod := c.Ctx.Input.Query("code_challenge_method")
 		codeChallenge := c.Ctx.Input.Query("code_challenge")
+		resource := c.Ctx.Input.Query("resource")
 
 		if challengeMethod != "S256" && challengeMethod != "null" && challengeMethod != "" {
 			c.ResponseError(c.T("auth:Challenge method should be S256"))
 			return
 		}
-		code, err := object.GetOAuthCode(userId, clientId, form.Provider, form.SigninMethod, responseType, redirectUri, scope, state, nonce, codeChallenge, c.Ctx.Request.Host, c.GetAcceptLanguage())
+
+		consentRequired, err := object.CheckConsentRequired(user, application, scope)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		if consentRequired {
+			resp = &Response{Status: "ok", Data: map[string]bool{"required": true}}
+			resp.Data3 = user.NeedUpdatePassword
+			return
+		}
+
+		code, err := object.GetOAuthCode(userId, clientId, form.Provider, form.SigninMethod, responseType, redirectUri, scope, state, nonce, codeChallenge, resource, c.Ctx.Request.Host, c.GetAcceptLanguage())
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
 			return
@@ -183,10 +197,15 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		} else {
 			scope := c.Ctx.Input.Query("scope")
 			nonce := c.Ctx.Input.Query("nonce")
-			token, _ := object.GetTokenByUser(application, user, scope, nonce, c.Ctx.Request.Host)
-			resp = tokenToResponse(token)
+			expandedScope, valid := object.IsScopeValidAndExpand(scope, application)
+			if !valid {
+				resp = &Response{Status: "error", Msg: "error: invalid_scope", Data: ""}
+			} else {
+				token, _ := object.GetTokenByUser(application, user, expandedScope, nonce, c.Ctx.Request.Host)
+				resp = tokenToResponse(token)
 
-			resp.Data3 = user.NeedUpdatePassword
+				resp.Data3 = user.NeedUpdatePassword
+			}
 		}
 	} else if form.Type == ResponseTypeDevice {
 		authCache, ok := object.DeviceAuthMap.LoadAndDelete(form.UserCode)
@@ -196,7 +215,22 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		}
 
 		authCacheCast := authCache.(object.DeviceAuthCache)
-		if authCacheCast.RequestAt.Add(time.Second * 120).Before(time.Now()) {
+		if authCacheCast.Status == object.DeviceAuthStatusDenied {
+			if authCacheCast.UserName != "" {
+				object.DeviceAuthMap.Delete(authCacheCast.UserName)
+			}
+			c.ResponseError(c.T("auth:DeviceCode Invalid"))
+			return
+		}
+
+		expiresIn := authCacheCast.ExpiresIn
+		if expiresIn == 0 {
+			expiresIn = object.DeviceAuthExpiresIn
+		}
+		if authCacheCast.RequestAt.Add(time.Duration(expiresIn) * time.Second).Before(time.Now()) {
+			if authCacheCast.UserName != "" {
+				object.DeviceAuthMap.Delete(authCacheCast.UserName)
+			}
 			c.ResponseError(c.T("auth:UserCode Expired"))
 			return
 		}
@@ -210,6 +244,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		deviceAuthCacheDeviceCodeCast := deviceAuthCacheDeviceCode.(object.DeviceAuthCache)
 		deviceAuthCacheDeviceCodeCast.UserName = user.Name
 		deviceAuthCacheDeviceCodeCast.UserSignIn = true
+		deviceAuthCacheDeviceCodeCast.Status = object.DeviceAuthStatusApproved
 
 		object.DeviceAuthMap.Store(authCacheCast.UserName, deviceAuthCacheDeviceCodeCast)
 
@@ -261,25 +296,25 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 		c.setExpireForSession(expireInHours)
 	}
 
-	if application.EnableExclusiveSignin {
-		sessions, err := object.GetUserAppSessions(user.Owner, user.Name, application.Name)
-		if err != nil {
-			c.ResponseError(err.Error(), nil)
-			return
-		}
+	if resp.Status == "ok" {
+		if application.EnableExclusiveSignin {
+			sessions, err := object.GetUserAppSessions(user.Owner, user.Name, application.Name)
+			if err != nil {
+				c.ResponseError(err.Error(), nil)
+				return
+			}
 
-		for _, session := range sessions {
-			for _, sid := range session.SessionId {
-				err := web.GlobalSessions.GetProvider().SessionDestroy(context.Background(), sid)
-				if err != nil {
-					c.ResponseError(err.Error(), nil)
-					return
+			for _, session := range sessions {
+				for _, sid := range session.SessionId {
+					err := web.GlobalSessions.GetProvider().SessionDestroy(context.Background(), sid)
+					if err != nil {
+						c.ResponseError(err.Error(), nil)
+						return
+					}
 				}
 			}
 		}
-	}
 
-	if resp.Status == "ok" {
 		_, err = object.AddSession(&object.Session{
 			Owner:       user.Owner,
 			Name:        user.Name,
@@ -369,8 +404,8 @@ func (c *ApiController) GetApplicationLogin() {
 	}
 }
 
-func setHttpClient(idProvider idp.IdProvider, providerType string) {
-	if isProxyProviderType(providerType) {
+func setHttpClient(idProvider idp.IdProvider, provider *object.Provider) {
+	if provider.EnableProxy || isProxyProviderType(provider.Type) {
 		idProvider.SetHttpClient(proxy.ProxyHttpClient)
 	} else {
 		idProvider.SetHttpClient(proxy.DefaultHttpClient)
@@ -436,6 +471,72 @@ func checkMfaEnable(c *ApiController, user *object.User, organization *object.Or
 	return false
 }
 
+func getExistUserByBindingRule(providerItem *object.ProviderItem, application *object.Application, userInfo *idp.UserInfo) (user *object.User, err error) {
+	if providerItem.BindingRule == nil {
+		providerItem.BindingRule = &[]string{"Email", "Phone", "Name"}
+	}
+	if len(*providerItem.BindingRule) == 0 {
+		return nil, nil
+	}
+
+	for _, rule := range *providerItem.BindingRule {
+		// Find existing user with Email
+		if rule == "Email" {
+			user, err = object.GetUserByField(application.Organization, "email", userInfo.Email)
+			if err != nil {
+				return nil, err
+			}
+			if user != nil {
+				return user, nil
+			}
+		}
+
+		// Find existing user with phone number
+		if rule == "Phone" {
+			user, err = object.GetUserByField(application.Organization, "phone", userInfo.Phone)
+			if err != nil {
+				return nil, err
+			}
+			if user != nil {
+				return user, nil
+			}
+		}
+
+		// Try to find existing user by username (case-insensitive)
+		// This allows OAuth providers (e.g., Wecom) to automatically associate with
+		// existing users when usernames match, particularly useful for enterprise
+		// scenarios where signup is disabled and users already exist in Casdoor
+		if rule == "Name" {
+			user, err = object.GetUserByFields(application.Organization, userInfo.Username)
+			if err != nil {
+				return nil, err
+			}
+			if user != nil {
+				return user, nil
+			}
+		}
+	}
+
+	return user, nil
+}
+
+func getUserByProvider(organization string, provider *object.Provider, providerId string) (*object.User, error) {
+	if object.IsFlexibleCustomProvider(provider.Type) {
+		return object.GetUserByThirdPartyLink(organization, provider.Name, providerId)
+	}
+	if provider.Category == "SAML" {
+		return object.GetUserByFields(organization, providerId)
+	}
+	return object.GetUserByField(organization, provider.Type, providerId)
+}
+
+func linkUserByProvider(user *object.User, provider *object.Provider, providerId string) (bool, error) {
+	if object.IsFlexibleCustomProvider(provider.Type) {
+		return object.LinkFlexibleCustomAccount(user, provider.Name, providerId)
+	}
+	return object.LinkUserAccount(user, provider.Type, providerId)
+}
+
 // Login ...
 // @Title Login
 // @Tag Login API
@@ -466,14 +567,6 @@ func (c *ApiController) Login() {
 	if authForm.Username != "" {
 		var user *object.User
 		if authForm.SigninMethod == "Face ID" {
-			if user, err = object.GetUserByFields(authForm.Organization, authForm.Username); err != nil {
-				c.ResponseError(err.Error(), nil)
-				return
-			} else if user == nil {
-				c.ResponseError(fmt.Sprintf(c.T("general:The user: %s doesn't exist"), util.GetId(authForm.Organization, authForm.Username)))
-				return
-			}
-
 			var application *object.Application
 			application, err = object.GetApplication(fmt.Sprintf("admin/%s", authForm.Application))
 			if err != nil {
@@ -483,6 +576,14 @@ func (c *ApiController) Login() {
 
 			if application == nil {
 				c.ResponseError(fmt.Sprintf(c.T("auth:The application: %s does not exist"), authForm.Application))
+				return
+			}
+
+			if user, err = object.GetUserByFieldsForSharedApp(application, authForm.Organization, authForm.Username); err != nil {
+				c.ResponseError(err.Error(), nil)
+				return
+			} else if user == nil {
+				c.ResponseError(fmt.Sprintf(c.T("general:The user: %s doesn't exist"), util.GetId(authForm.Organization, authForm.Username)))
 				return
 			}
 
@@ -513,14 +614,6 @@ func (c *ApiController) Login() {
 				}
 			}
 		} else if authForm.Password == "" {
-			if user, err = object.GetUserByFields(authForm.Organization, authForm.Username); err != nil {
-				c.ResponseError(err.Error(), nil)
-				return
-			} else if user == nil {
-				c.ResponseError(fmt.Sprintf(c.T("general:The user: %s doesn't exist"), util.GetId(authForm.Organization, authForm.Username)))
-				return
-			}
-
 			var application *object.Application
 			application, err = object.GetApplication(fmt.Sprintf("admin/%s", authForm.Application))
 			if err != nil {
@@ -530,6 +623,14 @@ func (c *ApiController) Login() {
 
 			if application == nil {
 				c.ResponseError(fmt.Sprintf(c.T("auth:The application: %s does not exist"), authForm.Application))
+				return
+			}
+
+			if user, err = object.GetUserByFieldsForSharedApp(application, authForm.Organization, authForm.Username); err != nil {
+				c.ResponseError(err.Error(), nil)
+				return
+			} else if user == nil {
+				c.ResponseError(fmt.Sprintf(c.T("general:The user: %s doesn't exist"), util.GetId(authForm.Organization, authForm.Username)))
 				return
 			}
 
@@ -650,6 +751,19 @@ func (c *ApiController) Login() {
 			} else {
 				isPasswordWithLdapEnabled = false
 			}
+
+			if application.IsShared {
+				var resolvedUser *object.User
+				resolvedUser, err = object.GetUserByFieldsForSharedApp(application, authForm.Organization, authForm.Username)
+				if err != nil {
+					c.ResponseError(err.Error())
+					return
+				}
+				if resolvedUser != nil {
+					authForm.Organization = resolvedUser.Owner
+				}
+			}
+
 			user, err = object.CheckUserPassword(authForm.Organization, authForm.Username, password, c.GetAcceptLanguage(), enableCaptcha, isSigninViaLdap, isPasswordWithLdapEnabled)
 		}
 
@@ -737,7 +851,12 @@ func (c *ApiController) Login() {
 			}
 		} else if provider.Category == "OAuth" || provider.Category == "Web3" {
 			// OAuth
-			idpInfo := object.FromProviderToIdpInfo(c.Ctx, provider)
+			idpInfo, err := object.FromProviderToIdpInfo(c.Ctx, provider)
+			if err != nil {
+				c.ResponseError(err.Error())
+				return
+			}
+			idpInfo.CodeVerifier = authForm.CodeVerifier
 			var idProvider idp.IdProvider
 			idProvider, err = idp.GetIdProvider(idpInfo, authForm.RedirectUri)
 			if err != nil {
@@ -749,7 +868,7 @@ func (c *ApiController) Login() {
 				return
 			}
 
-			setHttpClient(idProvider, provider.Type)
+			setHttpClient(idProvider, provider)
 
 			stateApplicationName := strings.Split(authForm.State, "-org-")[0]
 			if authForm.State != conf.GetConfigString("authState") && stateApplicationName != application.Name {
@@ -782,22 +901,22 @@ func (c *ApiController) Login() {
 					return
 				}
 				if !reg.MatchString(userInfo.Email) {
-					c.ResponseError(fmt.Sprintf(c.T("check:Email is invalid")))
+					c.ResponseError(c.T("check:Email is invalid"))
 				}
 			}
 		}
 
-		if authForm.Method == "signup" {
+		if authForm.Method == "signup" || authForm.Method == "signin" {
 			user := &object.User{}
-			if provider.Category == "SAML" {
+			if provider.Category == "SAML" && !object.IsFlexibleCustomProvider(provider.Type) {
 				// The userInfo.Id is the NameID in SAML response, it could be name / email / phone
 				user, err = object.GetUserByFields(application.Organization, userInfo.Id)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
 				}
-			} else if provider.Category == "OAuth" || provider.Category == "Web3" {
-				user, err = object.GetUserByField(application.Organization, provider.Type, userInfo.Id)
+			} else if provider.Category == "OAuth" || provider.Category == "Web3" || object.IsFlexibleCustomProvider(provider.Type) {
+				user, err = getUserByProvider(application.Organization, provider, userInfo.Id)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
@@ -822,36 +941,10 @@ func (c *ApiController) Login() {
 				c.Ctx.Input.SetParam("recordUserId", user.GetId())
 			} else if provider.Category == "OAuth" || provider.Category == "Web3" || provider.Category == "SAML" {
 				// Sign up via OAuth
-				if application.EnableLinkWithEmail {
-					if userInfo.Email != "" {
-						// Find existing user with Email
-						user, err = object.GetUserByField(application.Organization, "email", userInfo.Email)
-						if err != nil {
-							c.ResponseError(err.Error())
-							return
-						}
-					}
-
-					if user == nil && userInfo.Phone != "" {
-						// Find existing user with phone number
-						user, err = object.GetUserByField(application.Organization, "phone", userInfo.Phone)
-						if err != nil {
-							c.ResponseError(err.Error())
-							return
-						}
-					}
-				}
-
-				// Try to find existing user by username (case-insensitive)
-				// This allows OAuth providers (e.g., Wecom) to automatically associate with
-				// existing users when usernames match, particularly useful for enterprise
-				// scenarios where signup is disabled and users already exist in Casdoor
-				if user == nil && userInfo.Username != "" {
-					user, err = object.GetUserByFields(application.Organization, userInfo.Username)
-					if err != nil {
-						c.ResponseError(err.Error())
-						return
-					}
+				user, err = getExistUserByBindingRule(providerItem, application, userInfo)
+				if err != nil {
+					c.ResponseError(err.Error())
+					return
 				}
 
 				if user == nil {
@@ -865,9 +958,15 @@ func (c *ApiController) Login() {
 						return
 					}
 
-					if application.IsSignupItemRequired("Invitation code") {
-						c.ResponseError(c.T("check:Invitation code cannot be blank"))
+					// Check and validate invitation code
+					invitation, msg := object.CheckInvitationCode(application, organization, &authForm, c.GetAcceptLanguage())
+					if msg != "" {
+						c.ResponseError(msg)
 						return
+					}
+					invitationName := ""
+					if invitation != nil {
+						invitationName = invitation.Name
 					}
 
 					// Handle UseEmailAsUsername for OAuth and Web3
@@ -884,14 +983,7 @@ func (c *ApiController) Login() {
 					}
 
 					if tmpUser != nil {
-						var uid uuid.UUID
-						uid, err = uuid.NewRandom()
-						if err != nil {
-							c.ResponseError(err.Error())
-							return
-						}
-
-						uidStr := strings.Split(uid.String(), "-")
+						uidStr := strings.Split(util.GenerateUUID(), "-")
 						userInfo.Username = fmt.Sprintf("%s_%s", userInfo.Username, uidStr[1])
 					}
 
@@ -935,12 +1027,19 @@ func (c *ApiController) Login() {
 						IsDeleted:         false,
 						SignupApplication: application.Name,
 						Properties:        properties,
+						Invitation:        invitationName,
+						InvitationCode:    authForm.InvitationCode,
 						RegisterType:      "Application Signup",
 						RegisterSource:    fmt.Sprintf("%s/%s", application.Organization, application.Name),
 					}
 
-					if providerItem.SignupGroup != "" {
+					// Set group from invitation code if available, otherwise use provider's signup group or application's default group
+					if invitation != nil && invitation.SignupGroup != "" {
+						user.Groups = []string{invitation.SignupGroup}
+					} else if providerItem.SignupGroup != "" {
 						user.Groups = []string{providerItem.SignupGroup}
+					} else if application.DefaultGroup != "" {
+						user.Groups = []string{application.DefaultGroup}
 					}
 
 					var affected bool
@@ -954,6 +1053,16 @@ func (c *ApiController) Login() {
 						c.ResponseError(fmt.Sprintf(c.T("auth:Failed to create user, user information is invalid: %s"), util.StructToJson(user)))
 						return
 					}
+
+					// Increment invitation usage count
+					if invitation != nil {
+						invitation.UsedCount += 1
+						_, err = object.UpdateInvitation(invitation.GetId(), invitation, c.GetAcceptLanguage())
+						if err != nil {
+							c.ResponseError(err.Error())
+							return
+						}
+					}
 				}
 
 				// sync info from 3rd-party if possible
@@ -963,7 +1072,7 @@ func (c *ApiController) Login() {
 					return
 				}
 
-				_, err = object.LinkUserAccount(user, provider.Type, userInfo.Id)
+				_, err = linkUserByProvider(user, provider, userInfo.Id)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
@@ -978,7 +1087,7 @@ func (c *ApiController) Login() {
 				resp = &Response{Status: "error", Msg: fmt.Sprintf(c.T("general:The user: %s doesn't exist"), util.GetId(application.Organization, userInfo.Id))}
 			}
 			// resp = &Response{Status: "ok", Msg: "", Data: res}
-		} else { // authForm.Method != "signup"
+		} else { // authForm.Method == "link"
 			userId := c.GetSessionUsername()
 			if userId == "" {
 				c.ResponseError(fmt.Sprintf(c.T("general:The user: %s doesn't exist"), util.GetId(application.Organization, userInfo.Id)), userInfo)
@@ -986,7 +1095,7 @@ func (c *ApiController) Login() {
 			}
 
 			var oldUser *object.User
-			oldUser, err = object.GetUserByField(application.Organization, provider.Type, userInfo.Id)
+			oldUser, err = getUserByProvider(application.Organization, provider, userInfo.Id)
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -1012,7 +1121,7 @@ func (c *ApiController) Login() {
 			}
 
 			var isLinked bool
-			isLinked, err = object.LinkUserAccount(user, provider.Type, userInfo.Id)
+			isLinked, err = linkUserByProvider(user, provider, userInfo.Id)
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -1176,10 +1285,19 @@ func (c *ApiController) HandleSamlLogin() {
 		return
 	}
 	slice := strings.Split(string(decode), "&")
+	if len(slice) < 5 {
+		c.ResponseError("invalid RelayState format")
+		return
+	}
+	redirectTarget := slice[4]
+	if !object.IsValidSamlRedirectURL(redirectTarget, c.Ctx.Request.Host) {
+		c.ResponseError("invalid redirect URL in RelayState: must point to this Casdoor instance")
+		return
+	}
 	relayState = url.QueryEscape(relayState)
 	samlResponse = url.QueryEscape(samlResponse)
 	targetUrl := fmt.Sprintf("%s?relayState=%s&samlResponse=%s",
-		slice[4], relayState, samlResponse)
+		redirectTarget, relayState, samlResponse)
 	c.Redirect(targetUrl, http.StatusSeeOther)
 }
 
@@ -1343,7 +1461,7 @@ func (c *ApiController) Callback() {
 	code := c.GetString("code")
 	state := c.GetString("state")
 
-	frontendCallbackUrl := fmt.Sprintf("/callback?code=%s&state=%s", code, state)
+	frontendCallbackUrl := fmt.Sprintf("/callback?code=%s&state=%s", url.QueryEscape(code), url.QueryEscape(state))
 	c.Ctx.Redirect(http.StatusFound, frontendCallbackUrl)
 }
 
@@ -1375,6 +1493,15 @@ func (c *ApiController) DeviceAuth() {
 		return
 	}
 
+	if !application.HasSigninMethod("Device login") {
+		c.Data["json"] = object.TokenError{
+			Error:            object.UnauthorizedClient,
+			ErrorDescription: "device login is not enabled for this application",
+		}
+		c.ServeJSON()
+		return
+	}
+
 	deviceCode := util.GenerateId()
 	userCode := util.GetRandomName()
 
@@ -1396,12 +1523,22 @@ func (c *ApiController) DeviceAuth() {
 		generateTime++
 	}
 
+	cancelToken := util.GenerateId()
+
+	expiresIn := application.CodeResendTimeout
+	if expiresIn == 0 {
+		expiresIn = object.DeviceAuthExpiresIn
+	}
+
 	deviceAuthCache := object.DeviceAuthCache{
 		UserSignIn:    false,
 		UserName:      "",
 		Scope:         scope,
 		ApplicationId: application.GetId(),
+		ClientId:      application.ClientId,
 		RequestAt:     time.Now(),
+		Status:        object.DeviceAuthStatusPending,
+		ExpiresIn:     expiresIn,
 	}
 
 	userAuthCache := object.DeviceAuthCache{
@@ -1410,11 +1547,134 @@ func (c *ApiController) DeviceAuth() {
 		Scope:         scope,
 		ApplicationId: application.GetId(),
 		RequestAt:     time.Now(),
+		Status:        object.DeviceAuthStatusPending,
+		CancelToken:   cancelToken,
+		ExpiresIn:     expiresIn,
 	}
 
 	object.DeviceAuthMap.Store(deviceCode, deviceAuthCache)
 	object.DeviceAuthMap.Store(userCode, userAuthCache)
 
-	c.Data["json"] = object.GetDeviceAuthResponse(deviceCode, userCode, c.Ctx.Request.Host)
+	c.Data["json"] = object.GetDeviceAuthResponse(deviceCode, userCode, cancelToken, c.Ctx.Request.Host, expiresIn)
+	c.ServeJSON()
+}
+
+// CancelDeviceAuth
+// @Title CancelDeviceAuth
+// @Tag Device Authorization Endpoint
+// @Description cancel a pending device authorization flow
+// @router /cancel-device-auth [post]
+func (c *ApiController) CancelDeviceAuth() {
+	userCode := c.Ctx.Input.Query("userCode")
+	cancelToken := c.Ctx.Input.Query("cancelToken")
+
+	deviceAuthCache, ok := object.DeviceAuthMap.Load(userCode)
+	if !ok {
+		c.ResponseError(c.T("auth:UserCode Invalid"))
+		return
+	}
+
+	userCodeCache := deviceAuthCache.(object.DeviceAuthCache)
+	if userCodeCache.CancelToken == "" || userCodeCache.CancelToken != cancelToken {
+		c.ResponseError(c.T("auth:UserCode Invalid"))
+		return
+	}
+
+	object.DeviceAuthMap.Delete(userCode)
+
+	if userCodeCache.UserName != "" {
+		object.DeviceAuthMap.Delete(userCodeCache.UserName)
+	}
+
+	c.ResponseOk("Canceled")
+}
+
+// DeviceAuthComplete
+// @Title DeviceAuthComplete
+// @Tag Device Authorization Endpoint
+// @Description Complete device authorization by establishing a browser session after token issuance
+// @router /device-auth-complete [post]
+func (c *ApiController) DeviceAuthComplete() {
+	deviceCode := c.Ctx.Input.Query("deviceCode")
+	if deviceCode == "" {
+		c.ResponseError(c.T("auth:DeviceCode Invalid"))
+		return
+	}
+
+	deviceAuthCacheAny, ok := object.DeviceAuthMap.Load(deviceCode)
+	if !ok {
+		c.ResponseError(c.T("auth:DeviceCode Invalid"))
+		return
+	}
+
+	deviceAuthCache := deviceAuthCacheAny.(object.DeviceAuthCache)
+	if deviceAuthCache.Status != object.DeviceAuthStatusTokenIssued {
+		c.ResponseError(c.T("auth:DeviceCode Invalid"))
+		return
+	}
+
+	if deviceAuthCache.RequestAt.Add(time.Duration(deviceAuthCache.ExpiresIn) * time.Second).Before(time.Now()) {
+		object.DeviceAuthMap.Delete(deviceCode)
+		c.ResponseError(c.T("auth:UserCode Expired"))
+		return
+	}
+
+	application, err := object.GetApplication(deviceAuthCache.ApplicationId)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	if application == nil {
+		c.ResponseError(fmt.Sprintf(c.T("auth:The application: %s does not exist"), deviceAuthCache.ApplicationId))
+		return
+	}
+
+	user, err := object.GetUserByFields(application.Organization, deviceAuthCache.UserName)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	if user == nil {
+		c.ResponseError(fmt.Sprintf(c.T("general:The user: %s doesn't exist"), deviceAuthCache.UserName))
+		return
+	}
+
+	responseType := c.Ctx.Input.Query("responseType")
+	if responseType == "" {
+		responseType = "login"
+	}
+	if responseType != "login" {
+		requestClientId := c.Ctx.Input.Query("clientId")
+		if requestClientId != application.ClientId {
+			c.ResponseError(c.T("auth:The application does not match the device authorization request"))
+			return
+		}
+
+		if deviceAuthCache.Scope != "" {
+			requestScope := c.Ctx.Input.Query("scope")
+			if requestScope != "" {
+				allowedScopes := make(map[string]bool)
+				for _, s := range strings.Fields(deviceAuthCache.Scope) {
+					allowedScopes[s] = true
+				}
+				for _, s := range strings.Fields(requestScope) {
+					if !allowedScopes[s] {
+						c.ResponseError(c.T("auth:Requested scope exceeds original device authorization scope"))
+						return
+					}
+				}
+			}
+		}
+	}
+
+	object.DeviceAuthMap.Delete(deviceCode)
+
+	authForm := form.AuthForm{
+		Type: responseType,
+	}
+	resp := c.HandleLoggedIn(application, user, &authForm)
+
+	c.Ctx.Input.SetParam("recordUserId", user.GetId())
+	c.Data["json"] = resp
 	c.ServeJSON()
 }

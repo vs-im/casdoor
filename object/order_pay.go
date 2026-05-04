@@ -16,69 +16,109 @@ package object
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/beego/beego/v2/core/logs"
 	"github.com/casdoor/casdoor/idp"
 	"github.com/casdoor/casdoor/pp"
 	"github.com/casdoor/casdoor/util"
 )
 
-func PlaceOrder(productId string, user *User, pricingName string, planName string, customPrice float64) (*Order, error) {
-	product, err := GetProduct(productId)
+func PlaceOrder(owner string, reqProductInfos []ProductInfo, user *User, couponCode string) (*Order, error) {
+	if len(reqProductInfos) == 0 {
+		return nil, fmt.Errorf("order has no products")
+	}
+
+	productNames := make([]string, 0, len(reqProductInfos))
+	for _, reqInfo := range reqProductInfos {
+		if reqInfo.Name == "" {
+			return nil, fmt.Errorf("product name cannot be empty")
+		}
+		productNames = append(productNames, reqInfo.Name)
+	}
+
+	products, err := getOrderProducts(owner, productNames)
 	if err != nil {
 		return nil, err
 	}
-	if product == nil {
-		return nil, fmt.Errorf("the product: %s does not exist", productId)
+	productMap := make(map[string]Product, len(reqProductInfos))
+	for _, product := range products {
+		productMap[product.Name] = product
 	}
 
-	if !product.IsRecharge && product.Quantity <= 0 {
-		return nil, fmt.Errorf("the product: %s is out of stock", product.Name)
+	orderCurrency := products[0].Currency
+	if orderCurrency == "" {
+		orderCurrency = "USD"
 	}
 
-	userBalanceCurrency := user.BalanceCurrency
-	if userBalanceCurrency == "" {
-		org, err := getOrganization("admin", user.Owner)
-		if err == nil && org != nil && org.BalanceCurrency != "" {
-			userBalanceCurrency = org.BalanceCurrency
+	if err := validateProductCurrencies(products, orderCurrency); err != nil {
+		return nil, err
+	}
+
+	var productInfos []ProductInfo
+	orderPrice := 0.0
+	for _, productInfo := range reqProductInfos {
+		product := productMap[productInfo.Name]
+
+		var productPrice float64
+		if product.IsRecharge {
+			productPrice = productInfo.Price
+			if productPrice <= 0 {
+				return nil, fmt.Errorf("the custom price should be greater than zero")
+			}
 		} else {
-			userBalanceCurrency = "USD"
+			productPrice = product.Price
 		}
+		productInfos = append(productInfos, ProductInfo{
+			Owner:       owner,
+			Name:        product.Name,
+			DisplayName: product.DisplayName,
+			Image:       product.Image,
+			Detail:      product.Detail,
+			Price:       productPrice,
+			Currency:    product.Currency,
+			IsRecharge:  product.IsRecharge,
+			Quantity:    productInfo.Quantity,
+			PricingName: productInfo.PricingName,
+			PlanName:    productInfo.PlanName,
+		})
+
+		orderPrice += productPrice * float64(productInfo.Quantity)
 	}
 
-	productCurrency := product.Currency
-	if productCurrency == "" {
-		productCurrency = "USD"
-	}
-
-	var productPrice float64
-	if product.IsRecharge {
-		if customPrice <= 0 {
-			return nil, fmt.Errorf("the custom price should be greater than zero")
+	// Apply coupon discount if provided
+	var couponName string
+	var couponDiscount float64
+	if couponCode != "" {
+		coupon, err := ValidateCoupon(owner, couponCode, user.Name, productNames, orderPrice, orderCurrency)
+		if err != nil {
+			return nil, err
 		}
-		productPrice = customPrice
-	} else {
-		productPrice = product.Price
+		couponDiscount = CalculateDiscount(coupon, orderPrice)
+		couponName = coupon.Name
+		orderPrice -= couponDiscount
+		if orderPrice < 0 {
+			orderPrice = 0
+		}
 	}
-	price := ConvertCurrency(productPrice, productCurrency, userBalanceCurrency)
 
 	orderName := fmt.Sprintf("order_%v", util.GenerateTimeId())
 	order := &Order{
-		Owner:       product.Owner,
-		Name:        orderName,
-		CreatedTime: util.GetCurrentTime(),
-		DisplayName: fmt.Sprintf("Order for %s", product.DisplayName),
-		ProductName: product.Name,
-		Products:    []string{product.Name},
-		PricingName: pricingName,
-		PlanName:    planName,
-		User:        user.Name,
-		Payment:     "", // Payment will be set when user pays
-		Price:       price,
-		Currency:    userBalanceCurrency,
-		State:       "Created",
-		Message:     "",
-		StartTime:   util.GetCurrentTime(),
-		EndTime:     "",
+		Owner:          owner,
+		Name:           orderName,
+		DisplayName:    orderName,
+		CreatedTime:    util.GetCurrentTime(),
+		Products:       productNames,
+		ProductInfos:   productInfos,
+		User:           user.Name,
+		Payment:        "", // Payment will be set when user pays
+		Price:          orderPrice,
+		Currency:       orderCurrency,
+		State:          "Created",
+		Message:        "",
+		UpdateTime:     "",
+		CouponName:     couponName,
+		CouponDiscount: couponDiscount,
 	}
 
 	affected, err := AddOrder(order)
@@ -92,22 +132,26 @@ func PlaceOrder(productId string, user *User, pricingName string, planName strin
 	return order, nil
 }
 
-func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Payment, attachInfo map[string]interface{}, err error) {
+func PayOrder(providerName, host, paymentEnv string, order *Order, lang string) (payment *Payment, attachInfo map[string]interface{}, err error) {
 	if order.State != "Created" {
 		return nil, nil, fmt.Errorf("cannot pay for order: %s, current state is %s", order.GetId(), order.State)
 	}
-
-	productId := util.GetId(order.Owner, order.ProductName)
-	product, err := GetProduct(productId)
+	productNames := order.Products
+	products, err := getOrderProducts(order.Owner, productNames)
 	if err != nil {
 		return nil, nil, err
 	}
-	if product == nil {
-		return nil, nil, fmt.Errorf("the product: %s does not exist", productId)
+	if len(products) == 0 {
+		return nil, nil, fmt.Errorf("order has no products")
 	}
 
-	if !product.IsRecharge && product.Quantity <= 0 {
-		return nil, nil, fmt.Errorf("the product: %s is out of stock", product.Name)
+	orderCurrency := order.Currency
+	if orderCurrency == "" {
+		orderCurrency = "USD"
+	}
+
+	if err := validateProductCurrencies(products, orderCurrency); err != nil {
+		return nil, nil, err
 	}
 
 	user, err := GetUser(util.GetId(order.Owner, order.User))
@@ -118,7 +162,9 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 		return nil, nil, fmt.Errorf("the user: %s does not exist", order.User)
 	}
 
-	provider, err := product.getProvider(providerName)
+	// For multi-product orders, the payment provider is determined by the first product
+	baseProduct := products[0]
+	provider, err := baseProduct.getProvider(providerName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -128,7 +174,7 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 		return nil, nil, err
 	}
 
-	owner := product.Owner
+	owner := baseProduct.Owner
 	payerName := fmt.Sprintf("%s | %s", user.Name, user.DisplayName)
 	paymentName := fmt.Sprintf("payment_%v", util.GenerateTimeId())
 
@@ -136,15 +182,31 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 	returnUrl := fmt.Sprintf("%s/payments/%s/%s/result", originFrontend, owner, paymentName)
 	notifyUrl := fmt.Sprintf("%s/api/notify-payment/%s/%s", originBackend, owner, paymentName)
 
+	orderProductInfos := order.ProductInfos
 	// Create a subscription when pricing and plan are provided
 	// This allows both free users and paid users to subscribe to plans
-	if order.PricingName != "" && order.PlanName != "" {
-		plan, err := GetPlan(util.GetId(owner, order.PlanName))
+	for i, productInfo := range orderProductInfos {
+		if productInfo.PricingName == "" || productInfo.PlanName == "" {
+			continue
+		}
+
+		plan, err := GetPlan(util.GetId(owner, productInfo.PlanName))
 		if err != nil {
 			return nil, nil, err
 		}
 		if plan == nil {
-			return nil, nil, fmt.Errorf("the plan: %s does not exist", order.PlanName)
+			return nil, nil, fmt.Errorf("the plan: %s does not exist", productInfo.PlanName)
+		}
+
+		// Check if plan restricts user to one subscription
+		if plan.IsExclusive {
+			hasSubscription, err := HasActiveSubscriptionForPlan(owner, user.Name, plan.Name)
+			if err != nil {
+				return nil, nil, err
+			}
+			if hasSubscription {
+				return nil, nil, fmt.Errorf("user already has an active subscription for plan: %s", plan.Name)
+			}
 		}
 
 		sub, err := NewSubscription(owner, user.Name, plan.Name, paymentName, plan.Period)
@@ -160,23 +222,35 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 			return nil, nil, fmt.Errorf("failed to add subscription: %s", sub.Name)
 		}
 
-		returnUrl = fmt.Sprintf("%s/buy-plan/%s/%s/result?subscription=%s", originFrontend, owner, order.PricingName, sub.Name)
+		if i == 0 {
+			returnUrl = fmt.Sprintf("%s/buy-plan/%s/%s/result?subscription=%s", originFrontend, owner, productInfo.PricingName, sub.Name)
+		}
 	}
 
-	if product.SuccessUrl != "" {
-		returnUrl = fmt.Sprintf("%s?transactionOwner=%s&transactionName=%s", product.SuccessUrl, owner, paymentName)
+	if baseProduct.SuccessUrl != "" {
+		returnUrl = fmt.Sprintf("%s?transactionOwner=%s&transactionName=%s", baseProduct.SuccessUrl, owner, paymentName)
 	}
+
+	displayNames := make([]string, len(products))
+	descriptions := make([]string, len(products))
+	for i, p := range products {
+		displayNames[i] = p.DisplayName
+		descriptions[i] = p.Description
+	}
+	reqProductName := strings.Join(productNames, ", ")
+	reqProductDisplayName := strings.Join(displayNames, ", ")
+	reqProductDescription := strings.Join(descriptions, ", ")
 
 	payReq := &pp.PayReq{
 		ProviderName:       providerName,
-		ProductName:        product.Name,
+		ProductName:        reqProductName,
 		PayerName:          payerName,
 		PayerId:            user.Id,
 		PayerEmail:         user.Email,
 		PaymentName:        paymentName,
-		ProductDisplayName: product.DisplayName,
-		ProductDescription: product.Description,
-		ProductImage:       product.Image,
+		ProductDisplayName: reqProductDisplayName,
+		ProductDescription: reqProductDescription,
+		ProductImage:       baseProduct.Image,
 		Price:              order.Price,
 		Currency:           order.Currency,
 		ReturnUrl:          returnUrl,
@@ -199,7 +273,7 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 	}
 
 	payment = &Payment{
-		Owner:       product.Owner,
+		Owner:       baseProduct.Owner,
 		Name:        paymentName,
 		CreatedTime: util.GetCurrentTime(),
 		DisplayName: paymentName,
@@ -207,12 +281,11 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 		Provider: provider.Name,
 		Type:     provider.Type,
 
-		ProductName:        product.Name,
-		ProductDisplayName: product.DisplayName,
-		Detail:             product.Detail,
-		Currency:           order.Currency,
-		Price:              order.Price,
-		IsRecharge:         product.IsRecharge,
+		Products:            productNames,
+		ProductsDisplayName: reqProductDisplayName,
+		Detail:              reqProductDescription,
+		Currency:            order.Currency,
+		Price:               order.Price,
 
 		User:       user.Name,
 		Order:      order.Name,
@@ -222,46 +295,8 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 		OutOrderId: payResp.OrderId,
 	}
 
-	transaction := &Transaction{
-		Owner:       payment.Owner,
-		Name:        payment.Name,
-		CreatedTime: util.GetCurrentTime(),
-		Application: user.SignupApplication,
-		Domain:      "",
-		Amount:      payment.Price,
-		Currency:    order.Currency,
-		Payment:     payment.Name,
-		Type:        provider.Category,
-		Subtype:     provider.Type,
-		Provider:    provider.Name,
-		User:        payment.User,
-		Tag:         "User",
-		State:       string(pp.PaymentStateCreated),
-	}
-
-	var rechargeTransaction *Transaction
-
-	if product.IsRecharge {
-		rechargeTransaction = &Transaction{
-			Owner:       payment.Owner,
-			CreatedTime: util.GetCurrentTime(),
-			Application: owner,
-			Amount:      payment.Price,
-			Currency:    order.Currency,
-			Payment:     payment.Name,
-			Category:    "Recharge",
-			Tag:         "User",
-			User:        payment.User,
-			State:       string(pp.PaymentStateCreated),
-		}
-	}
-
-	if provider.Type == "Dummy" || provider.Type == "Balance" {
+	if provider.Type == "Balance" {
 		payment.State = pp.PaymentStatePaid
-		transaction.State = string(pp.PaymentStatePaid)
-		if product.IsRecharge {
-			rechargeTransaction.State = string(pp.PaymentStatePaid)
-		}
 	}
 
 	affected, err := AddPayment(payment)
@@ -274,7 +309,23 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 	}
 
 	if provider.Type == "Balance" {
-		affected, err = AddInternalPaymentTransaction(transaction, "en")
+		transaction := &Transaction{
+			Owner:       payment.Owner,
+			CreatedTime: util.GetCurrentTime(),
+			Application: user.SignupApplication,
+			Amount:      -payment.Price,
+			Currency:    order.Currency,
+			Payment:     payment.Name,
+			Category:    TransactionCategoryPurchase,
+			Type:        provider.Category,
+			Subtype:     provider.Type,
+			Provider:    provider.Name,
+			Tag:         "User",
+			User:        payment.User,
+			State:       string(pp.PaymentStatePaid),
+		}
+
+		affected, err = AddInternalPaymentTransaction(transaction, lang)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -282,8 +333,33 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 			return nil, nil, fmt.Errorf("failed to add transaction: %s", util.StructToJson(transaction))
 		}
 
-		if product.IsRecharge {
-			affected, err := AddInternalPaymentTransaction(rechargeTransaction, "en")
+		hasRecharge := false
+		rechargeAmount := 0.0
+		for _, productInfo := range orderProductInfos {
+			if productInfo.IsRecharge {
+				hasRecharge = true
+				rechargeAmount += productInfo.Price * float64(productInfo.Quantity)
+			}
+		}
+
+		if hasRecharge {
+			rechargeTransaction := &Transaction{
+				Owner:       payment.Owner,
+				CreatedTime: util.GetCurrentTime(),
+				Application: user.SignupApplication,
+				Amount:      rechargeAmount,
+				Currency:    order.Currency,
+				Payment:     payment.Name,
+				Category:    TransactionCategoryRecharge,
+				Type:        provider.Category,
+				Subtype:     provider.Type,
+				Provider:    provider.Name,
+				Tag:         "User",
+				User:        payment.User,
+				State:       string(pp.PaymentStatePaid),
+			}
+
+			affected, err = AddInternalPaymentTransaction(rechargeTransaction, lang)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -294,10 +370,10 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 	}
 
 	order.Payment = payment.Name
-	if provider.Type == "Dummy" || provider.Type == "Balance" {
+	if provider.Type == "Balance" {
 		order.State = "Paid"
 		order.Message = "Payment successful"
-		order.EndTime = util.GetCurrentTime()
+		order.UpdateTime = util.GetCurrentTime()
 	}
 
 	// Update order state first to avoid inconsistency
@@ -307,10 +383,17 @@ func PayOrder(providerName, host, paymentEnv string, order *Order) (payment *Pay
 	}
 
 	// Update product stock after order state is persisted (for instant payment methods)
-	if provider.Type == "Dummy" || provider.Type == "Balance" {
-		err = UpdateProductStock(product)
+	if provider.Type == "Balance" {
+		err = UpdateProductStock(orderProductInfos)
 		if err != nil {
 			return nil, nil, err
+		}
+
+		// Record coupon usage after successful balance payment
+		if order.CouponName != "" {
+			if err = ApplyCoupon(order.Owner, order.CouponName, order.User, order.Name, order.CouponDiscount); err != nil {
+				logs.Warning(fmt.Sprintf("PayOrder: failed to record coupon usage for order %s: %v", order.Name, err))
+			}
 		}
 	}
 
@@ -324,6 +407,6 @@ func CancelOrder(order *Order) (bool, error) {
 
 	order.State = "Canceled"
 	order.Message = "Canceled by user"
-	order.EndTime = util.GetCurrentTime()
+	order.UpdateTime = util.GetCurrentTime()
 	return UpdateOrder(order.GetId(), order)
 }

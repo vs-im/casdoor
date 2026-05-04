@@ -23,24 +23,25 @@ class RegionSelect extends React.Component {
     super(props);
     this.state = {
       classes: props,
-      value: "",
     };
   }
 
   onChange(e) {
     this.props.onChange(e);
-    this.setState({value: e});
   }
 
   render() {
+    const value = this.props.value !== undefined && this.props.value !== "" ? this.props.value : (this.props.defaultValue !== undefined && this.props.defaultValue !== "" ? this.props.defaultValue : undefined);
     return (
       <Select virtual={false}
+        size={this.props.size}
         showSearch
         optionFilterProp="label"
         style={{width: "100%", fontSize: 16}}
+        value={value}
         defaultValue={this.props.defaultValue || undefined}
         placeholder="Please select country/region"
-        onChange={(value => {this.onChange(value);})}
+        onChange={(val) => {this.onChange(val);}}
         filterOption={(input, option) => (option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
         filterSort={(optionA, optionB) =>
           (optionA?.label ?? "").toLowerCase().localeCompare((optionB?.label ?? "").toLowerCase())

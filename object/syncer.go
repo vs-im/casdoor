@@ -15,6 +15,7 @@
 package object
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/casdoor/casdoor/i18n"
@@ -128,6 +129,19 @@ func GetSyncer(id string) (*Syncer, error) {
 	return getSyncer(owner, name)
 }
 
+func GetSyncerByOrganization(id string, organization string) (*Syncer, error) {
+	syncer, err := GetSyncer(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if syncer == nil || syncer.Organization != organization {
+		return nil, nil
+	}
+
+	return syncer, nil
+}
+
 func GetMaskedSyncer(syncer *Syncer, errs ...error) (*Syncer, error) {
 	if len(errs) > 0 && errs[0] != nil {
 		return nil, errs[0]
@@ -170,13 +184,13 @@ func UpdateSyncer(id string, syncer *Syncer, isGlobalAdmin bool, lang string) (b
 	} else if s == nil {
 		return false, nil
 	} else if !isGlobalAdmin && s.Organization != syncer.Organization {
-		return false, fmt.Errorf(i18n.Translate(lang, "auth:Unauthorized operation"))
+		return false, errors.New(i18n.Translate(lang, "auth:Unauthorized operation"))
 	}
 
 	// Close old syncer connections before updating
 	_ = s.Close()
 
-	session := ormer.Engine.ID(core.PK{owner, name}).AllCols()
+	session := ormer.Engine.ID(core.PK{owner, name}).Where("organization = ?", s.Organization).AllCols()
 	if syncer.Password == "***" {
 		syncer.Password = s.Password
 	}
@@ -205,7 +219,11 @@ func updateSyncerErrorText(syncer *Syncer, line string) (bool, error) {
 		return false, nil
 	}
 
+	const maxErrorTextLen = 65536
 	s.ErrorText = s.ErrorText + line
+	if len(s.ErrorText) > maxErrorTextLen {
+		s.ErrorText = s.ErrorText[len(s.ErrorText)-maxErrorTextLen:]
+	}
 
 	affected, err := ormer.Engine.ID(core.PK{s.Owner, s.Name}).Cols("error_text").Update(s)
 	if err != nil {

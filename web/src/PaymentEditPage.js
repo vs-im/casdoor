@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React from "react";
+import Loading from "./common/Loading";
 import {Button, Card, Col, Descriptions, Input, Modal, Row, Select} from "antd";
 import {InfoCircleTwoTone} from "@ant-design/icons";
 import * as PaymentBackend from "./backend/PaymentBackend";
@@ -58,8 +59,7 @@ class PaymentEditPage extends React.Component {
   goToViewOrder() {
     const payment = this.state.payment;
     if (payment && payment.order) {
-      const viewUrl = `/orders/${payment.owner}/${payment.order}/pay?view=true`;
-      this.props.history.push(viewUrl);
+      this.props.history.push(`/orders/${payment.owner}/${payment.order}/pay`);
     } else {
       Setting.showMessage("error", i18next.t("order:Order not found"));
     }
@@ -217,7 +217,7 @@ class PaymentEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("provider:Type"), i18next.t("payment:Type - Tooltip"))} :
+            {Setting.getLabel(i18next.t("general:Type"), i18next.t("general:Type - Tooltip"))} :
           </Col>
           <Col span={22} >
             <Input disabled={true} value={this.state.payment.type} onChange={e => {
@@ -227,17 +227,7 @@ class PaymentEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("payment:Product"), i18next.t("payment:Product - Tooltip"))} :
-          </Col>
-          <Col span={22} >
-            <Input disabled={true} value={this.state.payment.productName} onChange={e => {
-              // this.updatePaymentField('productName', e.target.value);
-            }} />
-          </Col>
-        </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("product:Price"), i18next.t("product:Price - Tooltip"))} :
+            {Setting.getLabel(i18next.t("order:Price"), i18next.t("plan:Price - Tooltip"))} :
           </Col>
           <Col span={22} >
             <Input disabled={true} value={this.state.payment.price} onChange={e => {
@@ -428,7 +418,7 @@ class PaymentEditPage extends React.Component {
     }
 
     if (!Setting.isValidEmail(this.state.payment.personEmail)) {
-      return i18next.t("signup:The input is not valid Email!");
+      return i18next.t("login:The input is not valid Email!");
     }
 
     if (!Setting.isValidPhone(this.state.payment.personPhone)) {
@@ -509,7 +499,7 @@ class PaymentEditPage extends React.Component {
     return (
       <div>
         {
-          this.state.payment !== null ? this.renderPayment() : null
+          this.state.payment !== null ? this.renderPayment() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
         {
           this.renderModal()

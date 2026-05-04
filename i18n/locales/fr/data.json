@@ -2,7 +2,6 @@
   "account": {
     "Failed to add user": "Échec d'ajout d'utilisateur",
     "Get init score failed, error: %w": "Obtention du score initiale échouée, erreur : %w",
-    "Please sign out first": "Veuillez vous déconnecter en premier",
     "The application does not allow to sign up new account": "L'application ne permet pas de créer un nouveau compte"
   },
   "auth": {
@@ -23,6 +22,7 @@
     "The login method: login with email is not enabled for the application": "La méthode de connexion : connexion par e-mail n'est pas activée pour l'application",
     "The login method: login with face is not enabled for the application": "La méthode de connexion : connexion par visage n'est pas activée pour l'application",
     "The login method: login with password is not enabled for the application": "La méthode de connexion : connexion avec mot de passe n'est pas activée pour l'application",
+    "The order: %s does not exist": "La commande : %s n'existe pas",
     "The organization: %s does not exist": "L'organisation : %s n'existe pas",
     "The organization: %s has disabled users to signin": "L'organisation: %s a désactivé la connexion des utilisateurs",
     "The plan: %s does not exist": "Le plan : %s n'existe pas",
@@ -35,7 +35,7 @@
     "User's tag: %s is not listed in the application's tags": "Le tag de l'utilisateur : %s n'est pas répertorié dans les tags de l'application",
     "UserCode Expired": "Code utilisateur expiré",
     "UserCode Invalid": "Code utilisateur invalide",
-    "paid-user %s does not have active or pending subscription and the application: %s does not have default pricing": "L'utilisateur payant %s n'a pas d'abonnement actif ou en attente et l'application : %s n'a pas de tarification par défaut",
+    "paid-user %s does not have active or pending subscription and the application: %s does not have default pricing": "L'utilisateur payant %s n'a pas d'abonnement actif ou en attente et l'application %s n'a pas de tarification par défaut",
     "the application for user %s is not found": "L'application pour l'utilisateur %s est introuvable",
     "the organization: %s is not found": "L'organisation : %s est introuvable"
   },
@@ -44,9 +44,9 @@
   },
   "check": {
     "%s does not meet the CIDR format requirements: %s": "%s ne respecte pas les exigences du format CIDR : %s",
-    "Affiliation cannot be blank": "Affiliation ne peut pas être vide",
+    "Affiliation cannot be blank": "L'affiliation ne peut pas être vide",
     "CIDR for IP: %s should not be empty": "Le CIDR pour l'IP : %s ne doit pas être vide",
-    "Default code does not match the code's matching rules": "Le code par défaut ne correspond pas aux règles de correspondance du code",
+    "Default code does not match the code's matching rules": "Le code par défaut ne respecte pas les règles de validation du code",
     "DisplayName cannot be blank": "Le nom d'affichage ne peut pas être vide",
     "DisplayName is not valid real name": "DisplayName n'est pas un nom réel valide",
     "Email already exists": "E-mail déjà existant",
@@ -57,11 +57,11 @@
     "Face data mismatch": "Données faciales incorrectes",
     "Failed to parse client IP: %s": "Échec de l'analyse de l'IP client : %s",
     "FirstName cannot be blank": "Le prénom ne peut pas être laissé vide",
+    "Guest users must upgrade their account by setting a username and password before they can sign in directly": "Les utilisateurs invités doivent mettre à niveau leur compte en définissant un nom d'utilisateur et un mot de passe avant de pouvoir se connecter directement",
     "Invitation code cannot be blank": "Le code d'invitation ne peut pas être vide",
     "Invitation code exhausted": "Code d'invitation épuisé",
     "Invitation code is invalid": "Code d'invitation invalide",
     "Invitation code suspended": "Code d'invitation suspendu",
-    "LDAP user name or password incorrect": "Nom d'utilisateur ou mot de passe LDAP incorrect",
     "LastName cannot be blank": "Le nom de famille ne peut pas être vide",
     "Multiple accounts with same uid, please check your ldap server": "Plusieurs comptes avec le même identifiant d'utilisateur, veuillez vérifier votre serveur LDAP",
     "Organization does not exist": "L'organisation n'existe pas",
@@ -83,8 +83,8 @@
     "The user is forbidden to sign in, please contact the administrator": "L'utilisateur est interdit de se connecter, veuillez contacter l'administrateur",
     "The user: %s doesn't exist in LDAP server": "L'utilisateur : %s n'existe pas sur le serveur LDAP",
     "The username may only contain alphanumeric characters, underlines or hyphens, cannot have consecutive hyphens or underlines, and cannot begin or end with a hyphen or underline.": "Le nom d'utilisateur ne peut contenir que des caractères alphanumériques, des traits soulignés ou des tirets, ne peut pas avoir de tirets ou de traits soulignés consécutifs et ne peut pas commencer ou se terminer par un tiret ou un trait souligné.",
-    "The value \\\"%s\\\" for account field \\\"%s\\\" doesn't match the account item regex": "La valeur \\\"%s\\\" pour le champ de compte \\\"%s\\\" ne correspond pas à l'expression régulière de l'élément de compte",
-    "The value \\\"%s\\\" for signup field \\\"%s\\\" doesn't match the signup item regex of the application \\\"%s\\\"": "La valeur \\\"%s\\\" pour le champ d'inscription \\\"%s\\\" ne correspond pas à l'expression régulière de l'élément d'inscription de l'application \\\"%s\\\"",
+    "The value \"%s\" for account field \"%s\" doesn't match the account item regex": "La valeur \"%s\" pour le champ de compte \"%s\" ne correspond pas à l'expression régulière de l'élément de compte",
+    "The value \"%s\" for signup field \"%s\" doesn't match the signup item regex of the application \"%s\"": "La valeur \"%s\" pour le champ d'inscription \"%s\" ne correspond pas à l'expression régulière de l'élément d'inscription de l'application \"%s\"",
     "Username already exists": "Nom d'utilisateur existe déjà",
     "Username cannot be an email address": "Nom d'utilisateur ne peut pas être une adresse e-mail",
     "Username cannot contain white spaces": "Nom d'utilisateur ne peut pas contenir d'espaces blancs",
@@ -94,7 +94,7 @@
     "Username supports email format. Also The username may only contain alphanumeric characters, underlines or hyphens, cannot have consecutive hyphens or underlines, and cannot begin or end with a hyphen or underline. Also pay attention to the email format.": "Le nom d'utilisateur prend en charge le format e-mail. De plus, il ne peut contenir que des caractères alphanumériques, des tirets bas ou des traits d'union, ne peut pas avoir de traits d'union ou de tirets bas consécutifs, et ne peut pas commencer ou se terminer par un trait d'union ou un tiret bas. Faites également attention au format de l'e-mail.",
     "You have entered the wrong password or code too many times, please wait for %d minutes and try again": "Vous avez entré le mauvais mot de passe ou code plusieurs fois, veuillez attendre %d minutes et réessayer",
     "Your IP address: %s has been banned according to the configuration of: ": "Votre adresse IP : %s a été bannie selon la configuration de : ",
-    "Your password has expired. Please reset your password by clicking \\\"Forgot password\\\"": "Votre mot de passe a expiré. Veuillez le réinitialiser en cliquant sur \\\"Mot de passe oublié\\\"",
+    "Your password has expired. Please reset your password by clicking \"Forgot password\"": "Votre mot de passe a expiré. Veuillez le réinitialiser en cliquant sur \"Mot de passe oublié\"",
     "Your region is not allow to signup by phone": "Votre région n'est pas autorisée à s'inscrire par téléphone",
     "password or code is incorrect": "mot de passe ou code incorrect",
     "password or code is incorrect, you have %s remaining chances": "Le mot de passe ou le code est incorrect, il vous reste %s chances",
@@ -106,11 +106,17 @@
   "general": {
     "Failed to import groups": "Échec de l'importation des groupes",
     "Failed to import users": "Échec de l'importation des utilisateurs",
+    "Insufficient balance: new balance %v would be below credit limit %v": "Solde insuffisant : le nouveau solde %v serait inférieur à la limite de crédit %v",
+    "Insufficient balance: new organization balance %v would be below credit limit %v": "Solde insuffisant : le nouveau solde de l'organisation %v serait inférieur à la limite de crédit %v",
     "Missing parameter": "Paramètre manquant",
     "Only admin user can specify user": "Seul un administrateur peut désigner un utilisateur",
     "Please login first": "Veuillez d'abord vous connecter",
+    "The LDAP: %s does not exist": "Le LDAP : %s n'existe pas",
     "The organization: %s should have one application at least": "L'organisation : %s doit avoir au moins une application",
+    "The syncer: %s does not exist": "Le synchroniseur : %s n'existe pas",
     "The user: %s doesn't exist": "L'utilisateur : %s n'existe pas",
+    "The user: %s is not found": "L'utilisateur : %s est introuvable",
+    "User is required for User category transaction": "L'utilisateur est requis pour la transaction de catégorie Utilisateur",
     "Wrong userId": "ID utilisateur incorrect",
     "don't support captchaProvider: ": "ne prend pas en charge captchaProvider: ",
     "this operation is not allowed in demo mode": "cette opération n'est pas autorisée en mode démo",
@@ -137,10 +143,16 @@
     "adding a new user to the 'built-in' organization is currently disabled. Please note: all users in the 'built-in' organization are global administrators in Casdoor. Refer to the docs: https://casdoor.org/docs/basic/core-concepts#how-does-casdoor-manage-itself. If you still wish to create a user for the 'built-in' organization, go to the organization's settings page and enable the 'Has privilege consent' option.": "L'ajout d'un nouvel utilisateur à l'organisation « built-in » (intégrée) est actuellement désactivé. Veuillez noter : Tous les utilisateurs de l'organisation « built-in » sont des administrateurs globaux dans Casdoor. Consulter la documentation : https://casdoor.org/docs/basic/core-concepts#how-does-casdoor-manage-itself. Si vous souhaitez encore créer un utilisateur pour l'organisation « built-in », accédez à la page des paramètres de l'organisation et activez l'option « A le consentement aux privilèges »."
   },
   "permission": {
-    "The permission: \\\"%s\\\" doesn't exist": "La permission : \\\"%s\\\" n'existe pas"
+    "The permission: \"%s\" doesn't exist": "La permission : \"%s\" n'existe pas"
+  },
+  "product": {
+    "Product list cannot be empty": "La liste des produits ne peut pas être vide"
   },
   "provider": {
+    "Failed to initialize ID Verification provider": "Échec de l'initialisation du fournisseur de vérification d'identité",
     "Invalid application id": "Identifiant d'application invalide",
+    "No ID Verification provider configured": "Aucun fournisseur de vérification d'identité configuré",
+    "Provider is not an ID Verification provider": "Le fournisseur n'est pas un fournisseur de vérification d'identité",
     "the provider: %s does not exist": "Le fournisseur : %s n'existe pas"
   },
   "resource": {
@@ -158,12 +170,18 @@
     "Invalid Email receivers: %s": "Destinataires d'e-mail invalides : %s",
     "Invalid phone receivers: %s": "Destinataires de téléphone invalide : %s"
   },
+  "session": {
+    "session id %s is the current session and cannot be deleted": "session id %s is the current session and cannot be deleted"
+  },
   "storage": {
     "The objectKey: %s is not allowed": "La clé d'objet : %s n'est pas autorisée",
     "The provider type: %s is not supported": "Le type de fournisseur : %s n'est pas pris en charge"
   },
   "subscription": {
     "Error": "Erreur"
+  },
+  "ticket": {
+    "Ticket not found": "Ticket introuvable"
   },
   "token": {
     "Grant_type: %s is not supported in this application": "Type_de_subvention : %s n'est pas pris en charge dans cette application",
@@ -174,10 +192,14 @@
   },
   "user": {
     "Display name cannot be empty": "Le nom d'affichage ne peut pas être vide",
+    "ID card information and real name are required": "Les informations de la carte d'identité et le nom réel sont requis",
+    "Identity verification failed": "Échec de la vérification d'identité",
     "MFA email is enabled but email is empty": "L'authentification MFA par e-mail est activée mais l'e-mail est vide",
     "MFA phone is enabled but phone number is empty": "L'authentification MFA par téléphone est activée mais le numéro de téléphone est vide",
     "New password cannot contain blank space.": "Le nouveau mot de passe ne peut pas contenir d'espace.",
+    "No application found for user": "Aucune application trouvée pour l'utilisateur",
     "The new password must be different from your current password": "Le nouveau mot de passe doit être différent de votre mot de passe actuel",
+    "User is already verified": "L'utilisateur est déjà vérifié",
     "the user's owner and name should not be empty": "le propriétaire et le nom de l'utilisateur ne doivent pas être vides"
   },
   "util": {
@@ -188,6 +210,7 @@
   "verification": {
     "Invalid captcha provider.": "Fournisseur de captcha invalide.",
     "Phone number is invalid in your region %s": "Le numéro de téléphone n'est pas valide dans votre région %s",
+    "The forgot password feature is disabled": "La fonction de mot de passe oublié est désactivée",
     "The verification code has already been used!": "Le code de vérification a déjà été utilisé !",
     "The verification code has not been sent yet!": "Le code de vérification n'a pas encore été envoyé !",
     "Turing test failed.": "Le test de Turing a échoué.",
@@ -196,8 +219,8 @@
     "Unknown type": "Type inconnu",
     "Wrong verification code!": "Mauvais code de vérification !",
     "You should verify your code in %d min!": "Vous devriez vérifier votre code en %d min !",
-    "please add a SMS provider to the \\\"Providers\\\" list for the application: %s": "veuillez ajouter un fournisseur SMS à la liste \\\"Providers\\\" pour l'application : %s",
-    "please add an Email provider to the \\\"Providers\\\" list for the application: %s": "veuillez ajouter un fournisseur d'e-mail à la liste \\\"Providers\\\" pour l'application : %s",
+    "please add a SMS provider to the \"Providers\" list for the application: %s": "veuillez ajouter un fournisseur SMS à la liste \"Providers\" pour l'application : %s",
+    "please add an Email provider to the \"Providers\" list for the application: %s": "veuillez ajouter un fournisseur d'e-mail à la liste \"Providers\" pour l'application : %s",
     "the user does not exist, please sign up first": "L'utilisateur n'existe pas, veuillez vous inscrire d'abord"
   },
   "webauthn": {

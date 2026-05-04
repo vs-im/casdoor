@@ -17,8 +17,8 @@ package object
 import (
 	"fmt"
 
+	"github.com/beego/beego/v2/core/logs"
 	"github.com/casdoor/casdoor/pp"
-
 	"github.com/casdoor/casdoor/util"
 	"github.com/xorm-io/core"
 )
@@ -32,12 +32,13 @@ type Payment struct {
 	Provider string `xorm:"varchar(100)" json:"provider"`
 	Type     string `xorm:"varchar(100)" json:"type"`
 	// Product Info
-	ProductName        string  `xorm:"varchar(100)" json:"productName"`
-	ProductDisplayName string  `xorm:"varchar(100)" json:"productDisplayName"`
-	Detail             string  `xorm:"varchar(255)" json:"detail"`
-	Currency           string  `xorm:"varchar(100)" json:"currency"`
-	Price              float64 `json:"price"`
-	IsRecharge         bool    `xorm:"bool" json:"isRecharge"`
+	Products            []string `xorm:"varchar(1000)" json:"products"`
+	ProductsDisplayName string   `xorm:"varchar(1000)" json:"productsDisplayName"`
+	ProductName         string   `xorm:"varchar(1000)" json:"productName"`
+	ProductDisplayName  string   `xorm:"varchar(1000)" json:"productDisplayName"`
+	Detail              string   `xorm:"varchar(255)" json:"detail"`
+	Currency            string   `xorm:"varchar(100)" json:"currency"`
+	Price               float64  `json:"price"`
 
 	// Payer Info
 	User         string `xorm:"varchar(100)" json:"user"`
@@ -52,7 +53,8 @@ type Payment struct {
 	InvoiceRemark string `xorm:"varchar(100)" json:"invoiceRemark"`
 	InvoiceUrl    string `xorm:"varchar(255)" json:"invoiceUrl"`
 	// Order Info
-	Order      string          `xorm:"varchar(100)" json:"order"`      // Internal order name
+	Order      string          `xorm:"varchar(100)" json:"order"` // Internal order name
+	OrderObj   *Order          `xorm:"-" json:"orderObj,omitempty"`
 	OutOrderId string          `xorm:"varchar(100)" json:"outOrderId"` // External payment provider's order ID
 	PayUrl     string          `xorm:"varchar(2000)" json:"payUrl"`
 	SuccessUrl string          `xorm:"varchar(2000)" json:"successUrl"` // `successUrl` is redirected from `payUrl` after pay success
@@ -72,12 +74,22 @@ func GetPayments(owner string) ([]*Payment, error) {
 		return nil, err
 	}
 
+	err = ExtendPaymentWithOrder(payments)
+	if err != nil {
+		return nil, err
+	}
+
 	return payments, nil
 }
 
 func GetUserPayments(owner, user string) ([]*Payment, error) {
 	payments := []*Payment{}
 	err := ormer.Engine.Desc("created_time").Find(&payments, &Payment{Owner: owner, User: user})
+	if err != nil {
+		return nil, err
+	}
+
+	err = ExtendPaymentWithOrder(payments)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +105,47 @@ func GetPaginationPayments(owner string, offset, limit int, field, value, sortFi
 		return nil, err
 	}
 
+	err = ExtendPaymentWithOrder(payments)
+	if err != nil {
+		return nil, err
+	}
+
 	return payments, nil
+}
+
+func ExtendPaymentWithOrder(payments []*Payment) error {
+	ownerOrdersMap := make(map[string][]string)
+	for _, payment := range payments {
+		if payment.Order != "" {
+			ownerOrdersMap[payment.Owner] = append(ownerOrdersMap[payment.Owner], payment.Order)
+		}
+	}
+
+	ordersMap := make(map[string]*Order)
+	for owner, orderNames := range ownerOrdersMap {
+		if len(orderNames) == 0 {
+			continue
+		}
+		var orders []*Order
+		err := ormer.Engine.In("name", orderNames).Find(&orders, &Order{Owner: owner})
+		if err != nil {
+			return err
+		}
+
+		for _, order := range orders {
+			ordersMap[util.GetId(order.Owner, order.Name)] = order
+		}
+	}
+
+	for _, payment := range payments {
+		if payment.Order != "" {
+			orderId := util.GetId(payment.Owner, payment.Order)
+			if order, ok := ordersMap[orderId]; ok {
+				payment.OrderObj = order
+			}
+		}
+	}
+	return nil
 }
 
 func getPayment(owner string, name string) (*Payment, error) {
@@ -178,12 +230,9 @@ func notifyPayment(body []byte, owner string, paymentName string) (*Payment, *pp
 		return nil, nil, err
 	}
 
-	product, err := getProduct(owner, payment.ProductName)
+	// Check if the order products exist
+	_, err = getOrderProducts(owner, payment.Products)
 	if err != nil {
-		return nil, nil, err
-	}
-	if product == nil {
-		err = fmt.Errorf("the product: %s does not exist", payment.ProductName)
 		return nil, nil, err
 	}
 
@@ -195,103 +244,189 @@ func notifyPayment(body []byte, owner string, paymentName string) (*Payment, *pp
 		return payment, notifyResult, nil
 	}
 	// Only check paid payment
-	if notifyResult.ProductDisplayName != "" && notifyResult.ProductDisplayName != product.DisplayName {
-		err = fmt.Errorf("the payment's product name: %s doesn't equal to the expected product name: %s", notifyResult.ProductDisplayName, product.DisplayName)
+	if notifyResult.ProductDisplayName != "" && notifyResult.ProductDisplayName != payment.ProductsDisplayName {
+		err = fmt.Errorf("the payment's product name: %s doesn't equal to the expected product name: %s", notifyResult.ProductDisplayName, payment.ProductsDisplayName)
 		return payment, nil, err
 	}
 
-	if notifyResult.Price != product.Price && !product.IsRecharge {
-		err = fmt.Errorf("the payment's price: %f doesn't equal to the expected price: %f", notifyResult.Price, product.Price)
+	if notifyResult.Price != payment.Price {
+		err = fmt.Errorf("the payment's price: %f doesn't equal to the expected price: %f", notifyResult.Price, payment.Price)
 		return payment, nil, err
-	}
-
-	if payment.IsRecharge {
-		currency := payment.Currency
-		if currency == "" {
-			currency = "USD"
-		}
-		err = UpdateUserBalance(payment.Owner, payment.User, payment.Price, currency, "en")
-		return payment, notifyResult, err
 	}
 
 	return payment, notifyResult, nil
 }
 
-func NotifyPayment(body []byte, owner string, paymentName string) (*Payment, error) {
+func NotifyPayment(body []byte, owner string, paymentName string, lang string) (*Payment, error) {
 	payment, notifyResult, err := notifyPayment(body, owner, paymentName)
-	if payment != nil {
+	if payment == nil {
+		return nil, fmt.Errorf("the payment: %s does not exist", paymentName)
+	}
+
+	// Check if payment is already in a terminal state to prevent duplicate processing
+	if pp.IsTerminalState(payment.State) {
+		return payment, nil
+	}
+
+	// Determine the new payment state
+	var newState pp.PaymentState
+	var newMessage string
+	if err != nil {
+		newState = pp.PaymentStateError
+		newMessage = err.Error()
+	} else {
+		newState = notifyResult.PaymentStatus
+		newMessage = notifyResult.NotifyMessage
+	}
+
+	// Check if the payment state would actually change
+	// This prevents duplicate webhook events when providers send redundant notifications
+	if payment.State == newState {
+		return payment, nil
+	}
+
+	payment.State = newState
+	payment.Message = newMessage
+	_, err = UpdatePayment(payment.GetId(), payment)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update order state based on payment status
+	order, err := getOrder(payment.Owner, payment.Order)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, fmt.Errorf("the order: %s does not exist", payment.Order)
+	}
+
+	if payment.State == pp.PaymentStatePaid {
+		order.State = "Paid"
+		order.Message = "Payment successful"
+		order.UpdateTime = util.GetCurrentTime()
+	} else if payment.State == pp.PaymentStateError {
+		order.State = "Failed"
+		order.Message = payment.Message
+		order.UpdateTime = util.GetCurrentTime()
+	} else if payment.State == pp.PaymentStateCanceled {
+		order.State = "Canceled"
+		order.Message = "Payment was cancelled"
+		order.UpdateTime = util.GetCurrentTime()
+	} else if payment.State == pp.PaymentStateTimeout {
+		order.State = "Timeout"
+		order.Message = "Payment timed out"
+		order.UpdateTime = util.GetCurrentTime()
+	}
+	_, err = UpdateOrder(order.GetId(), order)
+	if err != nil {
+		return nil, err
+	}
+
+	if payment.State == pp.PaymentStatePaid {
+		// Get provider, product and user for transaction creation
+		provider, err := getProvider(payment.Owner, payment.Provider)
 		if err != nil {
-			payment.State = pp.PaymentStateError
-			payment.Message = err.Error()
-		} else {
-			payment.State = notifyResult.PaymentStatus
-			payment.Message = notifyResult.NotifyMessage
+			return nil, err
 		}
-		_, err = UpdatePayment(payment.GetId(), payment)
+		if provider == nil {
+			return nil, fmt.Errorf("the provider: %s does not exist", payment.Provider)
+		}
+
+		products, err := getOrderProducts(payment.Owner, order.Products)
+		if err != nil {
+			return nil, err
+		}
+		if len(products) == 0 {
+			return nil, fmt.Errorf("order has no products")
+		}
+		for _, product := range products {
+			if !product.IsRecharge && product.Quantity <= 0 {
+				return nil, fmt.Errorf("the product: %s is out of stock", product.Name)
+			}
+		}
+
+		user, err := getUser(payment.Owner, payment.User)
+		if err != nil {
+			return nil, err
+		}
+		if user == nil {
+			return nil, fmt.Errorf("the user: %s does not exist", payment.User)
+		}
+
+		transaction := &Transaction{
+			Owner:       payment.Owner,
+			CreatedTime: util.GetCurrentTime(),
+			Application: user.SignupApplication,
+			Amount:      -payment.Price,
+			Currency:    order.Currency,
+			Payment:     payment.Name,
+			Category:    TransactionCategoryPurchase,
+			Type:        provider.Category,
+			Subtype:     provider.Type,
+			Provider:    provider.Name,
+			Tag:         "User",
+			User:        payment.User,
+			State:       string(pp.PaymentStatePaid),
+		}
+
+		var affected bool
+		affected, err = AddExternalPaymentTransaction(transaction, lang)
+		if err != nil {
+			return nil, err
+		}
+		if !affected {
+			return nil, fmt.Errorf("failed to add transaction: %s", util.StructToJson(transaction))
+		}
+
+		hasRecharge := false
+		rechargeAmount := 0.0
+		orderProductInfos := order.ProductInfos
+		for _, productInfo := range orderProductInfos {
+			if productInfo.IsRecharge {
+				hasRecharge = true
+				rechargeAmount += productInfo.Price * float64(productInfo.Quantity)
+			}
+		}
+
+		if hasRecharge {
+			rechargeTransaction := &Transaction{
+				Owner:       payment.Owner,
+				CreatedTime: util.GetCurrentTime(),
+				Application: user.SignupApplication,
+				Amount:      payment.Price,
+				Currency:    order.Currency,
+				Payment:     payment.Name,
+				Category:    TransactionCategoryRecharge,
+				Type:        provider.Category,
+				Subtype:     provider.Type,
+				Provider:    provider.Name,
+				Tag:         "User",
+				User:        payment.User,
+				State:       string(pp.PaymentStatePaid),
+			}
+
+			affected, err = AddExternalPaymentTransaction(rechargeTransaction, lang)
+			if err != nil {
+				return nil, err
+			}
+			if !affected {
+				return nil, fmt.Errorf("failed to add recharge transaction: %s", util.StructToJson(rechargeTransaction))
+			}
+		}
+
+		err = UpdateProductStock(orderProductInfos)
 		if err != nil {
 			return nil, err
 		}
 
-		transaction, err := GetTransaction(payment.GetId())
-		if err != nil {
-			return nil, err
-		}
-
-		if transaction != nil {
-			transaction.State = string(payment.State)
-			_, err = UpdateTransaction(transaction.GetId(), transaction, "en")
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		// Update order state based on payment status
-		if payment.Order != "" {
-			order, err := getOrder(payment.Owner, payment.Order)
-			if err != nil {
-				return nil, err
-			}
-			if order == nil {
-				return nil, fmt.Errorf("the order: %s does not exist", payment.Order)
-			}
-
-			if payment.State == pp.PaymentStatePaid {
-				order.State = "Paid"
-				order.Message = "Payment successful"
-				order.EndTime = util.GetCurrentTime()
-			} else if payment.State == pp.PaymentStateError {
-				order.State = "PaymentFailed"
-				order.Message = payment.Message
-			} else if payment.State == pp.PaymentStateCanceled {
-				order.State = "Canceled"
-				order.Message = "Payment was cancelled"
-			} else if payment.State == pp.PaymentStateTimeout {
-				order.State = "Timeout"
-				order.Message = "Payment timed out"
-			}
-			_, err = UpdateOrder(order.GetId(), order)
-			if err != nil {
-				return nil, err
-			}
-
-			// Update product stock after order state is persisted
-			if payment.State == pp.PaymentStatePaid {
-				product, err := getProduct(payment.Owner, payment.ProductName)
-				if err != nil {
-					return nil, err
-				}
-				if product == nil {
-					return nil, fmt.Errorf("the product: %s does not exist", payment.ProductName)
-				}
-
-				err = UpdateProductStock(product)
-				if err != nil {
-					return nil, err
-				}
+		// Record coupon usage after successful external payment
+		if order.CouponName != "" {
+			if err = ApplyCoupon(order.Owner, order.CouponName, order.User, order.Name, order.CouponDiscount); err != nil {
+				logs.Warning(fmt.Sprintf("NotifyPayment: failed to record coupon usage for order %s: %v", order.Name, err))
 			}
 		}
 	}
-
 	return payment, nil
 }
 

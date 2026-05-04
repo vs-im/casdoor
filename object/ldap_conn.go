@@ -26,9 +26,34 @@ import (
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/util"
 	goldap "github.com/go-ldap/ldap/v3"
+	"github.com/nyaruka/phonenumbers"
 	"github.com/thanhpk/randstr"
 	"golang.org/x/text/encoding/unicode"
 )
+
+// formatUserPhone processes phone number for a user based on their CountryCode
+func formatUserPhone(u *User) {
+	if u.Phone == "" {
+		return
+	}
+
+	// 1. Normalize hint (e.g., "China" -> "CN") for the parser
+	countryHint := u.CountryCode
+	if strings.EqualFold(countryHint, "China") {
+		countryHint = "CN"
+	}
+	if len(countryHint) != 2 {
+		countryHint = "" // Only 2-letter codes are valid hints
+	}
+
+	// 2. Try parsing (Strictly using countryHint from LDAP)
+	num, err := phonenumbers.Parse(u.Phone, countryHint)
+
+	if err == nil && num != nil && phonenumbers.IsValidNumber(num) {
+		// Store a clean national number (digits only, without country prefix)
+		u.Phone = fmt.Sprint(num.GetNationalNumber())
+	}
+}
 
 type LdapConn struct {
 	Conn *goldap.Conn
@@ -62,8 +87,17 @@ type LdapUser struct {
 
 	GroupId    string            `json:"groupId"`
 	Address    string            `json:"address"`
-	MemberOf   string            `json:"memberOf"`
+	MemberOf   []string          `json:"memberOf"`
 	Attributes map[string]string `json:"attributes"`
+}
+
+type LdapGroup struct {
+	Dn          string   `json:"dn"`
+	Cn          string   `json:"cn"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Member      []string `json:"member"`
+	ParentDn    string   `json:"parentDn"`
 }
 
 func (ldap *Ldap) GetLdapConn() (c *LdapConn, err error) {
@@ -154,7 +188,7 @@ func (l *LdapConn) GetLdapUsers(ldapServer *Ldap) ([]LdapUser, error) {
 	SearchAttributes := []string{
 		"uidNumber", "cn", "sn", "gidNumber", "entryUUID", "displayName", "mail", "email",
 		"emailAddress", "telephoneNumber", "mobile", "mobileTelephoneNumber", "registeredAddress", "postalAddress",
-		"c", "co",
+		"c", "co", "memberOf",
 	}
 	if l.IsAD {
 		SearchAttributes = append(SearchAttributes, "sAMAccountName")
@@ -166,16 +200,25 @@ func (l *LdapConn) GetLdapUsers(ldapServer *Ldap) ([]LdapUser, error) {
 		SearchAttributes = append(SearchAttributes, attribute)
 	}
 
+	// Some LDAP servers/configs use "{}" as a placeholder (e.g. "(uid={})").
+	// Casdoor doesn't interpolate it. For listing users, interpret it as a wildcard.
+	filter := strings.TrimSpace(ldapServer.Filter)
+	if filter == "" {
+		filter = "(objectClass=*)"
+	} else if strings.Contains(filter, "{}") {
+		filter = strings.ReplaceAll(filter, "{}", "*")
+	}
+
 	searchReq := goldap.NewSearchRequest(ldapServer.BaseDn, goldap.ScopeWholeSubtree, goldap.NeverDerefAliases,
 		0, 0, false,
-		ldapServer.Filter, SearchAttributes, nil)
+		filter, SearchAttributes, nil)
 	searchResult, err := l.Conn.SearchWithPaging(searchReq, 100)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(searchResult.Entries) == 0 {
-		return nil, errors.New("no result")
+		return []LdapUser{}, nil
 	}
 
 	var ldapUsers []LdapUser
@@ -222,7 +265,7 @@ func (l *LdapConn) GetLdapUsers(ldapServer *Ldap) ([]LdapUser, error) {
 			case "co":
 				user.CountryName = attribute.Values[0]
 			case "memberOf":
-				user.MemberOf = attribute.Values[0]
+				user.MemberOf = attribute.Values
 			default:
 				if propName, ok := ldapServer.CustomAttributes[attribute.Name]; ok {
 					if user.Attributes == nil {
@@ -238,42 +281,135 @@ func (l *LdapConn) GetLdapUsers(ldapServer *Ldap) ([]LdapUser, error) {
 	return ldapUsers, nil
 }
 
-// FIXME: The Base DN does not necessarily contain the Group
-//
-//	func (l *ldapConn) GetLdapGroups(baseDn string) (map[string]ldapGroup, error) {
-//		SearchFilter := "(objectClass=posixGroup)"
-//		SearchAttributes := []string{"cn", "gidNumber"}
-//		groupMap := make(map[string]ldapGroup)
-//
-//		searchReq := goldap.NewSearchRequest(baseDn,
-//			goldap.ScopeWholeSubtree, goldap.NeverDerefAliases, 0, 0, false,
-//			SearchFilter, SearchAttributes, nil)
-//		searchResult, err := l.Conn.Search(searchReq)
-//		if err != nil {
-//			return nil, err
-//		}
-//
-//		if len(searchResult.Entries) == 0 {
-//			return nil, errors.New("no result")
-//		}
-//
-//		for _, entry := range searchResult.Entries {
-//			var ldapGroupItem ldapGroup
-//			for _, attribute := range entry.Attributes {
-//				switch attribute.Name {
-//				case "gidNumber":
-//					ldapGroupItem.GidNumber = attribute.Values[0]
-//					break
-//				case "cn":
-//					ldapGroupItem.Cn = attribute.Values[0]
-//					break
-//				}
-//			}
-//			groupMap[ldapGroupItem.GidNumber] = ldapGroupItem
-//		}
-//
-//		return groupMap, nil
-//	}
+// GetLdapGroups fetches LDAP groups and organizational units
+func (l *LdapConn) GetLdapGroups(ldapServer *Ldap) ([]LdapGroup, error) {
+	var allGroups []LdapGroup
+
+	// Search for LDAP groups (groupOfNames, groupOfUniqueNames, posixGroup)
+	groupFilters := []string{
+		"(objectClass=groupOfNames)",
+		"(objectClass=groupOfUniqueNames)",
+		"(objectClass=posixGroup)",
+	}
+
+	// Add Active Directory group filter
+	if l.IsAD {
+		groupFilters = append(groupFilters, "(objectClass=group)")
+	}
+
+	// Build combined filter
+	var filterBuilder strings.Builder
+	filterBuilder.WriteString("(|")
+	for _, filter := range groupFilters {
+		filterBuilder.WriteString(filter)
+	}
+	filterBuilder.WriteString(")")
+
+	SearchAttributes := []string{"cn", "name", "description", "member", "uniqueMember", "memberUid"}
+	searchReq := goldap.NewSearchRequest(ldapServer.BaseDn,
+		goldap.ScopeWholeSubtree, goldap.NeverDerefAliases, 0, 0, false,
+		filterBuilder.String(), SearchAttributes, nil)
+
+	searchResult, err := l.Conn.SearchWithPaging(searchReq, 100)
+	if err != nil {
+		// Groups might not exist, which is okay
+		return allGroups, nil
+	}
+
+	for _, entry := range searchResult.Entries {
+		group := LdapGroup{
+			Dn: entry.DN,
+		}
+
+		for _, attribute := range entry.Attributes {
+			switch attribute.Name {
+			case "cn":
+				group.Cn = attribute.Values[0]
+			case "name":
+				group.Name = attribute.Values[0]
+			case "description":
+				if len(attribute.Values) > 0 {
+					group.Description = attribute.Values[0]
+				}
+			case "member", "uniqueMember", "memberUid":
+				group.Member = append(group.Member, attribute.Values...)
+			}
+		}
+
+		// Use cn as name if name is not set
+		if group.Name == "" {
+			group.Name = group.Cn
+		}
+
+		// Parse parent DN from the entry DN
+		group.ParentDn = getParentDn(entry.DN)
+
+		allGroups = append(allGroups, group)
+	}
+
+	// Also fetch organizational units as groups
+	ouFilter := "(objectClass=organizationalUnit)"
+	ouSearchReq := goldap.NewSearchRequest(ldapServer.BaseDn,
+		goldap.ScopeWholeSubtree, goldap.NeverDerefAliases, 0, 0, false,
+		ouFilter, []string{"ou", "description"}, nil)
+
+	ouSearchResult, err := l.Conn.SearchWithPaging(ouSearchReq, 100)
+	if err == nil {
+		for _, entry := range ouSearchResult.Entries {
+			ou := LdapGroup{
+				Dn: entry.DN,
+			}
+
+			for _, attribute := range entry.Attributes {
+				switch attribute.Name {
+				case "ou":
+					ou.Name = attribute.Values[0]
+					ou.Cn = attribute.Values[0]
+				case "description":
+					if len(attribute.Values) > 0 {
+						ou.Description = attribute.Values[0]
+					}
+				}
+			}
+
+			// Parse parent DN from the entry DN
+			ou.ParentDn = getParentDn(entry.DN)
+
+			allGroups = append(allGroups, ou)
+		}
+	}
+
+	return allGroups, nil
+}
+
+// getParentDn extracts the parent DN from a full DN
+func getParentDn(dn string) string {
+	// Split DN by comma
+	parts := strings.Split(dn, ",")
+	if len(parts) <= 1 {
+		return ""
+	}
+
+	// Remove the first component (the current node) and rejoin
+	return strings.Join(parts[1:], ",")
+}
+
+// parseDnToGroupName converts a DN to a group name
+func parseDnToGroupName(dn string) string {
+	// Extract the CN or OU from the DN
+	parts := strings.Split(dn, ",")
+	if len(parts) == 0 {
+		return ""
+	}
+
+	firstPart := parts[0]
+	// Extract value after = sign
+	if idx := strings.Index(firstPart, "="); idx != -1 {
+		return firstPart[idx+1:]
+	}
+
+	return firstPart
+}
 
 func AutoAdjustLdapUser(users []LdapUser) []LdapUser {
 	res := make([]LdapUser, len(users))
@@ -289,6 +425,8 @@ func AutoAdjustLdapUser(users []LdapUser) []LdapUser {
 			Mobile:      util.ReturnAnyNotEmpty(user.Mobile, user.MobileTelephoneNumber, user.TelephoneNumber),
 			Address:     util.ReturnAnyNotEmpty(user.Address, user.PostalAddress, user.RegisteredAddress),
 			Country:     util.ReturnAnyNotEmpty(user.Country, user.CountryName),
+			CountryName: user.CountryName,
+			MemberOf:    user.MemberOf,
 			Attributes:  user.Attributes,
 		}
 	}
@@ -324,20 +462,20 @@ func SyncLdapUsers(owner string, syncUsers []LdapUser, ldapId string) (existUser
 	}
 	tag := strings.Join(ou, ".")
 
-	for _, syncUser := range syncUsers {
-		existUuids, err := GetExistUuids(owner, uuids)
-		if err != nil {
-			return nil, nil, err
-		}
+	existUuids, err := GetExistUuids(owner, uuids)
+	if err != nil {
+		return nil, nil, err
+	}
 
-		found := false
-		if len(existUuids) > 0 {
-			for _, existUuid := range existUuids {
-				if syncUser.Uuid == existUuid {
-					existUsers = append(existUsers, syncUser)
-					found = true
-				}
-			}
+	existUuidSet := make(map[string]struct{}, len(existUuids))
+	for _, uuid := range existUuids {
+		existUuidSet[uuid] = struct{}{}
+	}
+
+	for _, syncUser := range syncUsers {
+		_, found := existUuidSet[syncUser.Uuid]
+		if found {
+			existUsers = append(existUsers, syncUser)
 		}
 
 		if !found {
@@ -361,6 +499,7 @@ func SyncLdapUsers(owner string, syncUsers []LdapUser, ldapId string) (existUser
 				Avatar:            organization.DefaultAvatar,
 				Email:             syncUser.Email,
 				Phone:             syncUser.Mobile,
+				CountryCode:       syncUser.Country,
 				Address:           []string{syncUser.Address},
 				Region:            util.ReturnAnyNotEmpty(syncUser.Country, syncUser.CountryName),
 				Affiliation:       affiliation,
@@ -369,9 +508,26 @@ func SyncLdapUsers(owner string, syncUsers []LdapUser, ldapId string) (existUser
 				Ldap:              syncUser.Uuid,
 				Properties:        syncUser.Attributes,
 			}
+			formatUserPhone(newUser)
 
-			if ldap.DefaultGroup != "" {
-				newUser.Groups = []string{ldap.DefaultGroup}
+			// Assign user to groups based on memberOf attribute
+			userGroups := []string{}
+			if len(ldap.DefaultGroups) > 0 {
+				userGroups = append(userGroups, ldap.DefaultGroups...)
+			} else if ldap.DefaultGroup != "" {
+				userGroups = append(userGroups, ldap.DefaultGroup)
+			}
+
+			// Extract group names from memberOf DNs
+			for _, memberDn := range syncUser.MemberOf {
+				groupName := dnToGroupName(owner, memberDn)
+				if groupName != "" {
+					userGroups = append(userGroups, groupName)
+				}
+			}
+
+			if len(userGroups) > 0 {
+				newUser.Groups = userGroups
 			}
 
 			affected, err := AddUser(newUser, "en")
@@ -392,14 +548,199 @@ func SyncLdapUsers(owner string, syncUsers []LdapUser, ldapId string) (existUser
 	return existUsers, failedUsers, err
 }
 
+// SyncLdapGroups syncs LDAP groups/OUs to Casdoor groups with hierarchy
+func SyncLdapGroups(owner string, ldapGroups []LdapGroup, ldapId string) (newGroups int, updatedGroups int, err error) {
+	if len(ldapGroups) == 0 {
+		return 0, 0, nil
+	}
+
+	// Create a map of DN to group for quick lookup
+	dnToGroup := make(map[string]*LdapGroup)
+	for i := range ldapGroups {
+		dnToGroup[ldapGroups[i].Dn] = &ldapGroups[i]
+	}
+
+	// Get existing groups for this organization
+	existingGroups, err := GetGroups(owner)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	existingGroupMap := make(map[string]*Group)
+	for _, group := range existingGroups {
+		existingGroupMap[group.Name] = group
+	}
+
+	ldap, err := GetLdap(ldapId)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Process groups in hierarchical order (parents before children)
+	processedGroups := make(map[string]bool)
+	var processGroup func(ldapGroup *LdapGroup) error
+
+	processGroup = func(ldapGroup *LdapGroup) error {
+		if processedGroups[ldapGroup.Dn] {
+			return nil
+		}
+
+		// Generate group name from DN
+		groupName := dnToGroupName(owner, ldapGroup.Dn)
+		if groupName == "" {
+			return nil
+		}
+
+		// Determine parent
+		var parentId string
+		var isTopGroup bool
+
+		if ldapGroup.ParentDn == "" || ldapGroup.ParentDn == ldap.BaseDn {
+			isTopGroup = true
+			parentId = ""
+		} else {
+			// Process parent first
+			if parentGroup, exists := dnToGroup[ldapGroup.ParentDn]; exists {
+				err := processGroup(parentGroup)
+				if err != nil {
+					return err
+				}
+				parentId = dnToGroupName(owner, ldapGroup.ParentDn)
+			} else {
+				isTopGroup = true
+			}
+		}
+
+		// Check if group already exists
+		if existingGroup, exists := existingGroupMap[groupName]; exists {
+			// Update existing group
+			existingGroup.DisplayName = ldapGroup.Name
+			existingGroup.ParentId = parentId
+			existingGroup.IsTopGroup = isTopGroup
+			existingGroup.Type = "ldap-synced"
+			existingGroup.UpdatedTime = util.GetCurrentTime()
+
+			_, err := UpdateGroup(existingGroup.GetId(), existingGroup, true, "")
+			if err == nil {
+				updatedGroups++
+			}
+		} else {
+			// Create new group
+			newGroup := &Group{
+				Owner:       owner,
+				Name:        groupName,
+				CreatedTime: util.GetCurrentTime(),
+				UpdatedTime: util.GetCurrentTime(),
+				DisplayName: ldapGroup.Name,
+				ParentId:    parentId,
+				IsTopGroup:  isTopGroup,
+				Type:        "ldap-synced",
+				IsEnabled:   true,
+			}
+
+			_, err := AddGroup(newGroup)
+			if err == nil {
+				newGroups++
+				existingGroupMap[groupName] = newGroup
+			}
+		}
+
+		processedGroups[ldapGroup.Dn] = true
+		return nil
+	}
+
+	// Process all groups
+	for i := range ldapGroups {
+		err := processGroup(&ldapGroups[i])
+		if err != nil {
+			// Log error but continue processing other groups
+			continue
+		}
+	}
+
+	return newGroups, updatedGroups, nil
+}
+
+// dnToGroupName converts an LDAP DN to a Casdoor group name
+func dnToGroupName(owner, dn string) string {
+	if dn == "" {
+		return ""
+	}
+
+	// Parse DN to extract meaningful components
+	parts := strings.Split(dn, ",")
+
+	// Build a hierarchical name from DN components (excluding DC parts)
+	var nameComponents []string
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		lowerPart := strings.ToLower(part)
+
+		// Skip DC (domain component) parts
+		if strings.HasPrefix(lowerPart, "dc=") {
+			continue
+		}
+
+		// Extract value after = sign
+		if idx := strings.Index(part, "="); idx != -1 {
+			value := part[idx+1:]
+			nameComponents = append(nameComponents, value)
+		}
+	}
+
+	if len(nameComponents) == 0 {
+		return ""
+	}
+
+	// Reverse to get top-down hierarchy
+	for i, j := 0, len(nameComponents)-1; i < j; i, j = i+1, j-1 {
+		nameComponents[i], nameComponents[j] = nameComponents[j], nameComponents[i]
+	}
+
+	// Join with underscore to create a unique group name
+	groupName := strings.Join(nameComponents, "_")
+
+	// Sanitize group name - replace invalid characters with underscores
+	// Keep only alphanumeric characters, underscores, and hyphens
+	var sanitized strings.Builder
+	for _, r := range groupName {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			sanitized.WriteRune(r)
+		} else {
+			sanitized.WriteRune('_')
+		}
+	}
+	groupName = sanitized.String()
+
+	// Remove consecutive underscores and trim
+	for strings.Contains(groupName, "__") {
+		groupName = strings.ReplaceAll(groupName, "__", "_")
+	}
+	groupName = strings.Trim(groupName, "_")
+
+	return groupName
+}
+
 func GetExistUuids(owner string, uuids []string) ([]string, error) {
 	var existUuids []string
 
+	// PostgreSQL only supports up to 65535 parameters per query, so we batch the uuids
+	const batchSize = 100
 	tableNamePrefix := conf.GetConfigString("tableNamePrefix")
-	err := ormer.Engine.Table(tableNamePrefix+"user").Where("owner = ?", owner).Cols("ldap").
-		In("ldap", uuids).Select("DISTINCT ldap").Find(&existUuids)
-	if err != nil {
-		return existUuids, err
+	for i := 0; i < len(uuids); i += batchSize {
+		end := i + batchSize
+		if end > len(uuids) {
+			end = len(uuids)
+		}
+		batch := uuids[i:end]
+
+		var batchUuids []string
+		err := ormer.Engine.Table(tableNamePrefix+"user").Where("owner = ?", owner).Cols("ldap").
+			In("ldap", batch).Select("DISTINCT ldap").Find(&batchUuids)
+		if err != nil {
+			return existUuids, err
+		}
+		existUuids = append(existUuids, batchUuids...)
 	}
 
 	return existUuids, nil
@@ -432,7 +773,7 @@ func ResetLdapPassword(user *User, oldPassword string, newPassword string, lang 
 		}
 		if len(searchResult.Entries) > 1 {
 			conn.Close()
-			return fmt.Errorf(i18n.Translate(lang, "check:Multiple accounts with same uid, please check your ldap server"))
+			return errors.New(i18n.Translate(lang, "check:Multiple accounts with same uid, please check your ldap server"))
 		}
 
 		userDn := searchResult.Entries[0].DN
@@ -529,13 +870,22 @@ func (ldapUser *LdapUser) GetLdapUuid() string {
 }
 
 func (ldap *Ldap) buildAuthFilterString(user *User) string {
-	if len(ldap.FilterFields) == 0 {
-		return fmt.Sprintf("(&%s(uid=%s))", ldap.Filter, user.Name)
+	// Tolerate configs that use "{}" as a placeholder, e.g. "(uid={})".
+	// Casdoor doesn't interpolate it; treat it as wildcard so the base filter remains valid.
+	baseFilter := strings.TrimSpace(ldap.Filter)
+	if baseFilter == "" {
+		baseFilter = "(objectClass=*)"
+	} else if strings.Contains(baseFilter, "{}") {
+		baseFilter = strings.ReplaceAll(baseFilter, "{}", "*")
 	}
 
-	filter := fmt.Sprintf("(&%s(|", ldap.Filter)
+	if len(ldap.FilterFields) == 0 {
+		return fmt.Sprintf("(&%s(uid=%s))", baseFilter, goldap.EscapeFilter(user.Name))
+	}
+
+	filter := fmt.Sprintf("(&%s(|", baseFilter)
 	for _, field := range ldap.FilterFields {
-		filter = fmt.Sprintf("%s(%s=%s)", filter, field, user.getFieldFromLdapAttribute(field))
+		filter = fmt.Sprintf("%s(%s=%s)", filter, field, goldap.EscapeFilter(user.getFieldFromLdapAttribute(field)))
 	}
 	filter = fmt.Sprintf("%s))", filter)
 

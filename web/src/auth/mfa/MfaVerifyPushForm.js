@@ -8,7 +8,7 @@ export const MfaVerifyPushForm = ({mfaProps, application, onFinish, method, user
   return (
     <Form
       form={form}
-      style={{width: "300px"}}
+      style={{width: "300px", margin: "0 auto"}}
       onFinish={onFinish}
       initialValues={{
         enableMfaRemember: false,
@@ -29,11 +29,11 @@ export const MfaVerifyPushForm = ({mfaProps, application, onFinish, method, user
       <Form.Item
         name="passcode"
         noStyle
-        rules={[{required: true, message: i18next.t("login:Please input your verification code!")}]}
+        rules={[{required: true, message: i18next.t("code:Please input your verification code!")}]}
       >
         <Input
           style={{width: "100%", marginTop: 12}}
-          placeholder={i18next.t("mfa:Verification code")}
+          placeholder={i18next.t("login:Verification code")}
         />
       </Form.Item>
       <Form.Item

@@ -90,10 +90,7 @@ class ProviderTable extends React.Component {
                 }
               }} >
               {
-                Setting.getDeduplicatedArray(this.props.providers, table, "name").filter(provider => provider.category !== "Captcha" || !table.some(tableItem => {
-                  const existingProvider = Setting.getArrayItem(this.props.providers, "name", tableItem.name);
-                  return existingProvider && existingProvider.category === "Captcha";
-                })).map((provider, index) => (
+                Setting.getDeduplicatedArray(this.props.providers, table, "name").map((provider, index) => (
                   <Option key={index} value={provider.name} label={`${provider.name} ${provider.displayName || ""}`}>
                     <div style={{display: "flex", alignItems: "center", gap: "8px"}}>
                       <img width={20} height={20} src={Setting.getProviderLogoURL(provider)} alt={provider.type} />
@@ -107,23 +104,43 @@ class ProviderTable extends React.Component {
         },
       },
       {
-        title: i18next.t("provider:Category"),
+        title: i18next.t("general:Category"),
         dataIndex: "category",
         key: "category",
         width: "100px",
         render: (text, record, index) => {
           const provider = Setting.getArrayItem(this.props.providers, "name", record.name);
-          return provider?.category;
+          const owner = provider?.owner || this.getUserOrganization()?.name;
+          const editUrl = provider && owner && provider.name ? `/providers/${owner}/${provider.name}` : null;
+          const categoryText = provider?.category;
+          if (editUrl && categoryText) {
+            return (
+              <a href={editUrl} target="_blank" rel="noopener noreferrer">
+                {categoryText}
+              </a>
+            );
+          }
+          return categoryText;
         },
       },
       {
-        title: i18next.t("provider:Type"),
+        title: i18next.t("general:Type"),
         dataIndex: "type",
         key: "type",
         width: "80px",
         render: (text, record, index) => {
           const provider = Setting.getArrayItem(this.props.providers, "name", record.name);
-          return Provider.getProviderLogoWidget(provider);
+          const owner = provider?.owner || this.getUserOrganization()?.name;
+          const editUrl = provider && owner && provider.name ? `/providers/${owner}/${provider.name}` : null;
+          const typeWidget = Provider.getProviderLogoWidget(provider, {disableLink: !!editUrl});
+          if (editUrl && typeWidget) {
+            return (
+              <a href={editUrl} target="_blank" rel="noopener noreferrer">
+                {typeWidget}
+              </a>
+            );
+          }
+          return typeWidget;
         },
       },
       {
@@ -198,6 +215,31 @@ class ProviderTable extends React.Component {
             <Switch checked={text} onChange={checked => {
               this.updateField(table, index, "canUnlink", checked);
             }} />
+          );
+        },
+      },
+      {
+        title: i18next.t("provider:Binding rule"),
+        dataIndex: "bindingRule",
+        key: "bindingRule",
+        width: "120px",
+        render: (text, record, index) => {
+          if (!["OAuth", "Web3", "SAML"].includes(record.provider?.category)) {
+            return null;
+          }
+
+          return (
+            <Select virtual={false} style={{width: "100%"}}
+              value={text || ["Email", "Phone", "Name"]}
+              mode={"multiple"}
+              onChange={value => {
+                text = Array.isArray(text) ? text : [];
+                this.updateField(table, index, "bindingRule", value);
+              }} >
+              <Option key="Email" value="Email">{i18next.t("general:Email")}</Option>
+              <Option key="Name" value="Name">{i18next.t("general:Name")}</Option>
+              <Option key="Phone" value="Phone">{i18next.t("general:Phone")}</Option>
+            </Select>
           );
         },
       },

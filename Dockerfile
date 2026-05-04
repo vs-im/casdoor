@@ -1,13 +1,27 @@
 FROM --platform=$BUILDPLATFORM node:20-alpine AS FRONT
 WORKDIR /web
+
+# Copy only dependency files first for better caching
+COPY ./web/package.json ./web/yarn.lock ./
+RUN yarn install --frozen-lockfile --network-timeout 1000000
+
+# Copy source files and build
 COPY ./web .
-RUN yarn install --frozen-lockfile --network-timeout 1000000 && NODE_OPTIONS="--max-old-space-size=4096" yarn run build
+RUN NODE_OPTIONS="--max-old-space-size=4096" yarn run build
 
 
 FROM --platform=$BUILDPLATFORM golang:latest AS BACK
 WORKDIR /go/src/casdoor
+
+# Copy only go.mod and go.sum first for dependency caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source files
 COPY . .
-RUN ./build.sh && go test -v -run TestGetVersionInfo ./util/system_test.go ./util/system.go > version_info.txt
+
+RUN go test -v -run TestGetVersionInfo ./util/system_test.go ./util/system.go ./util/variable.go
+RUN ./build.sh
 
 FROM alpine:latest AS STANDARD
 LABEL MAINTAINER="https://maxs.pro/"
@@ -25,7 +39,6 @@ WORKDIR /
 COPY --from=BACK --chown=$USER:$USER /go/src/casdoor/server_${BUILDX_ARCH} ./server
 COPY --from=BACK --chown=$USER:$USER /go/src/casdoor/swagger ./swagger
 COPY --from=BACK --chown=$USER:$USER /go/src/casdoor/conf/app.conf ./conf/app.conf
-COPY --from=BACK --chown=$USER:$USER /go/src/casdoor/version_info.txt ./go/src/casdoor/version_info.txt
 COPY --from=FRONT --chown=$USER:$USER /web/build ./web/build
 
 ENTRYPOINT ["/server"]

@@ -31,11 +31,17 @@ import (
 	"github.com/casdoor/casdoor/util"
 )
 
+var orgOwnerObject = []string{
+	"-organization",
+	"-syncer",
+	"-webhook",
+	"-application",
+	"-token",
+}
+
 type Object struct {
-	Owner        string `json:"owner"`
-	Name         string `json:"name"`
-	AccessKey    string `json:"accessKey"`
-	AccessSecret string `json:"accessSecret"`
+	Owner string `json:"owner"`
+	Name  string `json:"name"`
 }
 
 type ObjectWithOrg struct {
@@ -43,14 +49,32 @@ type ObjectWithOrg struct {
 	Organization string `json:"organization"`
 }
 
+// ownerNameFromForm parses form or multipart body for authorization checks when the
+// request is not JSON (e.g. MFA APIs use FormData). RequestBodyFilter caches the raw
+// body but leaves Request.Body restorable for ParseForm/ParseMultipartForm.
+func ownerNameFromForm(ctx *context.Context) (string, string) {
+	ct := ctx.Request.Header.Get("Content-Type")
+	if strings.Contains(ct, "multipart/form-data") {
+		_ = ctx.Request.ParseMultipartForm(32 << 20)
+	} else {
+		_ = ctx.Request.ParseForm()
+	}
+	return ctx.Request.Form.Get("owner"), ctx.Request.Form.Get("name")
+}
+
+func checkIsOrgOwnerObject(urlPath string) bool {
+	for _, suffix := range orgOwnerObject {
+		if strings.HasSuffix(urlPath, suffix) || strings.Contains(urlPath, suffix+"s") {
+			return true
+		}
+	}
+	return false
+}
+
 func getUsername(ctx *context.Context) (username string) {
 	username, ok := ctx.Input.Session("username").(string)
 	if !ok || username == "" {
 		username, _ = getUsernameByClientIdSecret(ctx)
-	}
-
-	if username == "" {
-		username, _ = getUsernameByKeys(ctx)
 	}
 
 	session := ctx.Input.Session("SessionData")
@@ -100,6 +124,15 @@ func getObject(ctx *context.Context) (string, string, error) {
 	method := ctx.Request.Method
 	path := ctx.Request.URL.Path
 
+	// Special handling for MCP requests
+	if path == "/api/mcp" && method == http.MethodPost {
+		return getMcpObject(ctx)
+	}
+
+	if strings.HasPrefix(path, "/api/server/") {
+		return ctx.Input.Param(":owner"), ctx.Input.Param(":name"), nil
+	}
+
 	if method == http.MethodGet {
 		if ctx.Request.URL.Path == "/api/get-policies" {
 			if ctx.Input.Query("id") == "/" {
@@ -116,15 +149,31 @@ func getObject(ctx *context.Context) (string, string, error) {
 			}
 		}
 
+		organization := ctx.Input.Query("organization")
+
 		if !(strings.HasPrefix(ctx.Request.URL.Path, "/api/get-") && strings.HasSuffix(ctx.Request.URL.Path, "s")) {
 			// query == "?id=built-in/admin"
 			id := ctx.Input.Query("id")
 			if id != "" {
-				return util.GetOwnerAndNameFromIdWithError(id)
+				owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+				if err != nil {
+					return owner, name, err
+				}
+				if organization != "" {
+					return organization, name, nil
+				}
+
+				if strings.HasSuffix(ctx.Request.URL.Path, "organization") {
+					return name, name, nil
+				}
+				return owner, name, nil
 			}
 		}
 
 		owner := ctx.Input.Query("owner")
+		if organization != "" {
+			return organization, "", nil
+		}
 		if owner != "" {
 			return owner, "", nil
 		}
@@ -138,6 +187,21 @@ func getObject(ctx *context.Context) (string, string, error) {
 			}
 		}
 
+		isOwnerObjPath := checkIsOrgOwnerObject(path)
+
+		// For non-GET requests, if the `id` query param is present it is the
+		// authoritative identifier of the object being operated on.  Use it
+		// instead of the request body so that an attacker cannot spoof the
+		// object owner by injecting "owner":"admin" (or any other value) into
+		// the request body while pointing the URL at a different organization's
+		// resource.
+		if id := ctx.Input.Query("id"); id != "" && (!isOwnerObjPath || strings.HasSuffix(path, "update-organization")) {
+			owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+			if err == nil {
+				return owner, name, nil
+			}
+		}
+
 		body := ctx.Input.RequestBody
 		if len(body) == 0 {
 			return ctx.Request.Form.Get("owner"), ctx.Request.Form.Get("name"), nil
@@ -145,20 +209,21 @@ func getObject(ctx *context.Context) (string, string, error) {
 
 		var obj Object
 
-		if strings.HasSuffix(path, "-application") || strings.HasSuffix(path, "-token") ||
-			strings.HasSuffix(path, "-syncer") || strings.HasSuffix(path, "-webhook") {
+		if isOwnerObjPath && !strings.HasSuffix(path, "-organization") {
 			var objWithOrg ObjectWithOrg
 			err := json.Unmarshal(body, &objWithOrg)
 			if err != nil {
-				return "", "", nil
+				o, n := ownerNameFromForm(ctx)
+				return o, n, nil
 			}
 			return objWithOrg.Organization, objWithOrg.Name, nil
 		}
 
 		err := json.Unmarshal(body, &obj)
 		if err != nil {
-			// this is not error
-			return "", "", nil
+			// Form-urlencoded, multipart, or other non-JSON body (common for web FormData).
+			o, n := ownerNameFromForm(ctx)
+			return o, n, nil
 		}
 
 		if strings.HasSuffix(path, "-organization") {
@@ -176,30 +241,6 @@ func getObject(ctx *context.Context) (string, string, error) {
 	}
 }
 
-func getKeys(ctx *context.Context) (string, string) {
-	method := ctx.Request.Method
-
-	if method == http.MethodGet {
-		accessKey := ctx.Input.Query("accessKey")
-		accessSecret := ctx.Input.Query("accessSecret")
-		return accessKey, accessSecret
-	} else {
-		body := ctx.Input.RequestBody
-
-		if len(body) == 0 {
-			return ctx.Request.Form.Get("accessKey"), ctx.Request.Form.Get("accessSecret")
-		}
-
-		var obj Object
-		err := json.Unmarshal(body, &obj)
-		if err != nil {
-			return "", ""
-		}
-
-		return obj.AccessKey, obj.AccessSecret
-	}
-}
-
 func willLog(subOwner string, subName string, method string, urlPath string, objOwner string, objName string) bool {
 	if subOwner == "anonymous" && subName == "anonymous" && method == "GET" && (urlPath == "/api/get-account" || urlPath == "/api/get-app-login") && objOwner == "" && objName == "" {
 		return false
@@ -207,7 +248,9 @@ func willLog(subOwner string, subName string, method string, urlPath string, obj
 	return true
 }
 
-func getUrlPath(urlPath string) string {
+func getUrlPath(ctx *context.Context) string {
+	urlPath := ctx.Request.URL.Path
+
 	if strings.HasPrefix(urlPath, "/cas") && (strings.HasSuffix(urlPath, "/serviceValidate") || strings.HasSuffix(urlPath, "/proxy") || strings.HasSuffix(urlPath, "/proxyValidate") || strings.HasSuffix(urlPath, "/validate") || strings.HasSuffix(urlPath, "/p3/serviceValidate") || strings.HasSuffix(urlPath, "/p3/proxyValidate") || strings.HasSuffix(urlPath, "/samlValidate")) {
 		return "/cas"
 	}
@@ -231,10 +274,64 @@ func getUrlPath(urlPath string) string {
 	return urlPath
 }
 
+func getExtraInfo(ctx *context.Context, urlPath string) map[string]interface{} {
+	var extra map[string]interface{}
+	if urlPath == "/api/mcp" {
+		var m map[string]interface{}
+		if err := json.Unmarshal(ctx.Input.RequestBody, &m); err != nil {
+			return nil
+		}
+
+		method, ok := m["method"].(string)
+		if !ok {
+			return nil
+		}
+
+		return map[string]interface{}{
+			"detailPathUrl": method,
+		}
+	}
+	return extra
+}
+
+func getImpersonateUser(ctx *context.Context, subOwner, subName, username string) (string, string, string) {
+	impersonateUser, ok := ctx.Input.Session("impersonateUser").(string)
+	impersonateUserCookie := ctx.GetCookie("impersonateUser")
+	if ok && impersonateUser != "" && impersonateUserCookie != "" {
+		user, err := object.GetUser(util.GetId(subOwner, subName))
+		if err != nil {
+			panic(err)
+		}
+
+		if user != nil {
+			impUserOwner, impUserName, err := util.GetOwnerAndNameFromIdWithError(impersonateUser)
+			if err != nil {
+				panic(err)
+			}
+
+			if user.IsAdmin && impUserOwner == user.Owner {
+				ctx.Input.SetData("impersonating", true)
+				return impUserOwner, impUserName, impersonateUser
+			}
+		}
+	}
+
+	return subOwner, subName, username
+}
+
 func ApiFilter(ctx *context.Context) {
 	subOwner, subName := getSubject(ctx)
+	// stash current user info into request context for controllers
+	username := ""
+	if !(subOwner == "anonymous" && subName == "anonymous") {
+		username = fmt.Sprintf("%s/%s", subOwner, subName)
+		subOwner, subName, username = getImpersonateUser(ctx, subOwner, subName, username)
+	}
+	ctx.Input.SetData("currentUserId", username)
+
 	method := ctx.Request.Method
-	urlPath := getUrlPath(ctx.Request.URL.Path)
+	urlPath := getUrlPath(ctx)
+	extraInfo := getExtraInfo(ctx, urlPath)
 
 	objOwner, objName := "", ""
 	if urlPath != "/api/get-app-login" && urlPath != "/api/get-resource" {
@@ -250,7 +347,17 @@ func ApiFilter(ctx *context.Context) {
 		urlPath = "/api/notify-payment"
 	}
 
-	isAllowed := authz.IsAllowed(subOwner, subName, method, urlPath, objOwner, objName)
+	isAllowed, err := authz.IsAllowed(subOwner, subName, method, urlPath, objOwner, objName, extraInfo)
+	if err != nil {
+		responseError(ctx, err.Error())
+		return
+	}
+
+	if method != "GET" && !strings.HasSuffix(urlPath, "-entry") {
+		util.SafeGoroutine(func() {
+			writePermissionLog(objOwner, subOwner, subName, method, urlPath, isAllowed)
+		})
+	}
 
 	result := "deny"
 	if isAllowed {
@@ -260,12 +367,20 @@ func ApiFilter(ctx *context.Context) {
 	if willLog(subOwner, subName, method, urlPath, objOwner, objName) {
 		logLine := fmt.Sprintf("subOwner = %s, subName = %s, method = %s, urlPath = %s, obj.Owner = %s, obj.Name = %s, result = %s",
 			subOwner, subName, method, urlPath, objOwner, objName, result)
+		extra := formatExtraInfo(extraInfo)
+		if extra != "" {
+			logLine += fmt.Sprintf(", extraInfo = %s", extra)
+		}
 		fmt.Println(logLine)
 		util.LogInfo(ctx, logLine)
 	}
 
 	if !isAllowed {
-		denyRequest(ctx)
+		if urlPath == "/api/mcp" || strings.HasPrefix(urlPath, "/api/server/") {
+			denyMcpRequest(ctx)
+		} else {
+			denyRequest(ctx)
+		}
 		record, err := object.NewRecord(ctx)
 		if err != nil {
 			return
@@ -279,4 +394,43 @@ func ApiFilter(ctx *context.Context) {
 			object.AddRecord(record)
 		})
 	}
+}
+
+func writePermissionLog(objOwner, subOwner, subName, method, urlPath string, allowed bool) {
+	providers, err := object.GetProvidersByCategory(objOwner, "Log")
+	if err != nil {
+		return
+	}
+
+	severity := "info"
+	if !allowed {
+		severity = "warning"
+	}
+	message := fmt.Sprintf("sub=%s/%s method=%s url=%s objOwner=%s allowed=%v", subOwner, subName, method, urlPath, objOwner, allowed)
+
+	for _, provider := range providers {
+		// System Log is a pull-based collector; it does not accept Write calls.
+		if provider.Type == "System Log" {
+			continue
+		}
+		if provider.State == "Disabled" {
+			continue
+		}
+		logProvider, err := object.GetLogProviderFromProvider(provider)
+		if err != nil {
+			continue
+		}
+		_ = logProvider.Write(severity, message)
+	}
+}
+
+func formatExtraInfo(extra map[string]interface{}) string {
+	if extra == nil {
+		return ""
+	}
+	b, err := json.Marshal(extra)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }

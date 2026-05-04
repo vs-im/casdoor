@@ -212,7 +212,7 @@ func (c *ApiController) GetUser() {
 		if !organization.IsProfilePublic {
 			requestUserId := c.GetSessionUsername()
 			var hasPermission bool
-			hasPermission, err = object.CheckUserPermission(requestUserId, user.GetId(), false, c.GetAcceptLanguage())
+			hasPermission, err = object.CheckUserPermission(requestUserId, user.GetId(), true, c.GetAcceptLanguage())
 			if !hasPermission {
 				c.ResponseError(err.Error())
 				return
@@ -230,7 +230,10 @@ func (c *ApiController) GetUser() {
 		return
 	}
 
-	isAdminOrSelf := c.IsAdminOrSelf(user)
+	requestUserId := c.GetSessionUsername()
+	isApplicationRequest := object.IsAppUser(requestUserId)
+	isAdmin := c.IsAdmin() || isApplicationRequest
+	isAdminOrSelf := c.IsAdminOrSelf(user) || isApplicationRequest
 	user, err = object.GetMaskedUser(user, isAdminOrSelf)
 	if err != nil {
 		c.ResponseError(err.Error())
@@ -238,7 +241,7 @@ func (c *ApiController) GetUser() {
 	}
 
 	if organization != nil && user != nil {
-		user, err = object.GetFilteredUser(user, c.IsAdmin(), c.IsAdminOrSelf(user), organization.AccountItems)
+		user, err = object.GetFilteredUser(user, isAdmin, isAdminOrSelf, organization.AccountItems)
 		if err != nil {
 			c.ResponseError(err.Error())
 			return
@@ -310,7 +313,21 @@ func (c *ApiController) UpdateUser() {
 		return
 	}
 
+	if columnsStr != "" {
+		mergedUser := *oldUser
+		if err = json.Unmarshal(c.Ctx.Input.RequestBody, &mergedUser); err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		user = mergedUser
+	}
+
 	if oldUser.Owner == "built-in" && oldUser.Name == "admin" && (user.Owner != "built-in" || user.Name != "admin") {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return
+	}
+
+	if !c.IsGlobalAdmin() && user.Owner != oldUser.Owner {
 		c.ResponseError(c.T("auth:Unauthorized operation"))
 		return
 	}
@@ -344,7 +361,9 @@ func (c *ApiController) UpdateUser() {
 
 	columns := []string{}
 	if columnsStr != "" {
-		columns = strings.Split(columnsStr, ",")
+		for _, col := range strings.Split(columnsStr, ",") {
+			columns = append(columns, util.CamelToSnakeCase(col))
+		}
 	}
 
 	affected, err := object.UpdateUser(id, &user, columns, isAdmin)
@@ -566,8 +585,6 @@ func (c *ApiController) SetPassword() {
 			c.ResponseError(c.T("general:Wrong userId"))
 			return
 		}
-		c.SetSession("verifiedCode", "")
-		c.SetSession("verifiedUserId", "")
 	}
 
 	targetUser, err := object.GetUser(userId)
@@ -630,6 +647,11 @@ func (c *ApiController) SetPassword() {
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
+	}
+
+	if code != "" {
+		c.SetSession("verifiedCode", "")
+		c.SetSession("verifiedUserId", "")
 	}
 
 	targetUser.Password = newPassword
@@ -730,29 +752,6 @@ func (c *ApiController) GetUserCount() {
 	c.ResponseOk(count)
 }
 
-// AddUserKeys
-// @Title AddUserKeys
-// @router /add-user-keys [post]
-// @Tag User API
-// @Success 200 {object} object.Userinfo The Response object
-func (c *ApiController) AddUserKeys() {
-	var user object.User
-	err := json.Unmarshal(c.Ctx.Input.RequestBody, &user)
-	if err != nil {
-		c.ResponseError(err.Error())
-		return
-	}
-
-	isAdmin := c.IsAdmin()
-	affected, err := object.AddUserKeys(&user, isAdmin)
-	if err != nil {
-		c.ResponseError(err.Error())
-		return
-	}
-
-	c.ResponseOk(affected)
-}
-
 func (c *ApiController) RemoveUserFromGroup() {
 	owner := c.Ctx.Request.Form.Get("owner")
 	name := c.Ctx.Request.Form.Get("name")
@@ -776,6 +775,78 @@ func (c *ApiController) RemoveUserFromGroup() {
 	}
 
 	c.ResponseOk(affected)
+}
+
+// ImpersonateUser
+// @Title ImpersonateUser
+// @Tag User API
+// @Description set impersonation user for current admin session
+// @Param   username    formData   string  true        "The username to impersonate (owner/name)"
+// @Success 200 {object} controllers.Response The Response object
+// @router /impersonation-user [post]
+func (c *ApiController) ImpersonateUser() {
+	org, ok := c.RequireAdmin()
+	if !ok {
+		return
+	}
+
+	username := c.Ctx.Request.Form.Get("username")
+	if username == "" {
+		c.ResponseError(c.T("general:Missing parameter"))
+		return
+	}
+
+	owner, _, err := util.GetOwnerAndNameFromIdWithError(username)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	if !(owner == org || org == "") {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return
+	}
+
+	targetUser, err := object.GetUser(username)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	if targetUser == nil {
+		c.ResponseError(fmt.Sprintf(c.T("general:The user: %s doesn't exist"), username))
+		return
+	}
+
+	err = c.SetSession("impersonateUser", username)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	c.Ctx.SetCookie("impersonateUser", username, 0, "/")
+	c.ResponseOk()
+}
+
+// ExitImpersonateUser
+// @Title ExitImpersonateUser
+// @Tag User API
+// @Description clear impersonation info for current session
+// @Success 200 {object} controllers.Response The Response object
+// @router /exit-impersonation-user [post]
+func (c *ApiController) ExitImpersonateUser() {
+	_, ok := c.Ctx.Input.GetData("impersonating").(bool)
+	if !ok {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return
+	}
+
+	err := c.SetSession("impersonateUser", "")
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	c.Ctx.SetCookie("impersonateUser", "", -1, "/")
+	c.ResponseOk()
 }
 
 // VerifyIdentification
@@ -870,7 +941,7 @@ func (c *ApiController) VerifyIdentification() {
 		}
 
 		if provider == nil {
-			c.ResponseError(fmt.Sprintf(c.T("provider:The provider: %s does not exist"), providerName))
+			c.ResponseError(fmt.Sprintf(c.T("auth:The provider: %s does not exist"), providerName))
 			return
 		}
 

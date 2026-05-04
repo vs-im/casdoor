@@ -29,16 +29,17 @@ func init() {
 func getCronMap(name string) *cron.Cron {
 	m, ok := cronMap[name]
 	if !ok {
-		m = cron.New()
+		m = cron.New(cron.WithChain(cron.SkipIfStillRunning(cron.DefaultLogger)))
 		cronMap[name] = m
 	}
 	return m
 }
 
 func clearCron(name string) {
-	cron, ok := cronMap[name]
+	c, ok := cronMap[name]
 	if ok {
-		cron.Stop()
+		ctx := c.Stop()
+		<-ctx.Done()
 		delete(cronMap, name)
 	}
 }
@@ -60,9 +61,19 @@ func addSyncerJob(syncer *Syncer) error {
 		return err
 	}
 
+	// Sync groups as well
+	err = syncer.syncGroups()
+	if err != nil {
+		// Log error but don't fail the entire sync
+		fmt.Printf("Warning: syncGroups() error: %s\n", err.Error())
+	}
+
 	schedule := fmt.Sprintf("@every %ds", syncer.SyncInterval)
 	cron := getCronMap(syncer.Name)
-	_, err = cron.AddFunc(schedule, syncer.syncUsersNoError)
+	_, err = cron.AddFunc(schedule, func() {
+		syncer.syncUsersNoError()
+		syncer.syncGroupsNoError()
+	})
 	if err != nil {
 		return err
 	}

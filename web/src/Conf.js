@@ -12,28 +12,80 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export const DefaultApplication = "hasura";
+import * as Cookie from "cookie";
 
-export const CasvisorUrl = "";
+export let DefaultApplication = "hasura";
 
-export const ShowGithubCorner = false;
-export const IsDemoMode = false;
+export let ShowGithubCorner = false;
+export let IsDemoMode = false;
 
-export const ForceLanguage = "";
-export const DefaultLanguage = "en";
+export let ForceLanguage = "";
+export let DefaultLanguage = "en";
+
+export let StaticBaseUrl = "https://cdn.casbin.org";
 
 export const InitThemeAlgorithm = true;
 export const ThemeDefault = {
   themeType: "default",
-  colorPrimary: "#5734d3",
-  borderRadius: 6,
+  colorPrimary: "#262626",
+  borderRadius: 10,
   isCompact: false,
 };
 
 export const CustomFooter = null;
 
 // Blank or null to hide Ai Assistant button
-export const AiAssistantUrl = "https://ai.casbin.com";
+export let AiAssistantUrl = "https://ai.casbin.com";
 
 // Maximum number of navbar items before switching from flat to grouped menu
-export const MaxItemsForFlatMenu = 7;
+export let MaxItemsForFlatMenu = 7;
+
+// setConfig updates the frontend configuration from backend
+export function setConfig(config) {
+  if (!config) {
+    return;
+  }
+  if (config.showGithubCorner !== undefined) {
+    ShowGithubCorner = config.showGithubCorner;
+  }
+  if (config.isDemoMode !== undefined) {
+    IsDemoMode = config.isDemoMode;
+  }
+  if (config.forceLanguage !== undefined) {
+    ForceLanguage = config.forceLanguage;
+  }
+  if (config.defaultLanguage !== undefined) {
+    DefaultLanguage = config.defaultLanguage;
+  }
+  if (config.staticBaseUrl !== undefined) {
+    StaticBaseUrl = config.staticBaseUrl;
+  }
+  if (config.aiAssistantUrl !== undefined) {
+    AiAssistantUrl = config.aiAssistantUrl;
+  }
+  if (config.defaultApplication !== undefined) {
+    DefaultApplication = config.defaultApplication;
+  }
+  if (config.maxItemsForFlatMenu !== undefined) {
+    MaxItemsForFlatMenu = config.maxItemsForFlatMenu;
+  }
+}
+
+export function initConfigFromCookie() {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  try {
+    const curCookie = Cookie.parse(document.cookie);
+    const raw = curCookie["jsonWebConfig"];
+    if (!raw || raw === "null") {
+      return;
+    }
+
+    const config = JSON.parse(raw);
+    setConfig(config);
+  } catch {
+    // Ignore malformed cookie and keep compile-time defaults.
+  }
+}

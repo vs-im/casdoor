@@ -40,6 +40,10 @@ func InitApi() {
 		ruleText := `
 p, built-in, *, *, *, *, *
 p, app, *, *, *, *, *
+p, app-dcr, *, *, /api/login/oauth/*, *, *
+p, app-dcr, *, *, /api/get-oauth-token, *, *
+p, app-dcr, *, *, /api/userinfo, *, *
+p, app-dcr, *, *, /api/get-application, *, *
 p, *, *, POST, /api/signup, *, *
 p, *, *, GET, /api/get-email-and-phone, *, *
 p, *, *, POST, /api/login, *, *
@@ -50,6 +54,9 @@ p, *, *, POST, /api/sso-logout, *, *
 p, *, *, GET, /api/sso-logout, *, *
 p, *, *, POST, /api/callback, *, *
 p, *, *, POST, /api/device-auth, *, *
+p, *, *, POST, /api/cancel-device-auth, *, *
+p, *, *, POST, /api/device-auth-complete, *, *
+p, *, *, POST, /api/native-sso-complete, *, *
 p, *, *, GET, /api/get-account, *, *
 p, *, *, GET, /api/userinfo, *, *
 p, *, *, GET, /api/user, *, *
@@ -59,6 +66,7 @@ p, *, *, GET, /api/get-qrcode, *, *
 p, *, *, GET, /api/get-webhook-event, *, *
 p, *, *, GET, /api/get-captcha-status, *, *
 p, *, *, *, /api/login/oauth, *, *
+p, *, *, POST, /api/oauth/register, *, *
 p, *, *, GET, /api/get-application, *, *
 p, *, *, GET, /api/get-organization-applications, *, *
 p, *, *, GET, /api/get-user, *, *
@@ -67,22 +75,37 @@ p, *, *, POST, /api/upload-users, *, *
 p, *, *, GET, /api/get-resources, *, *
 p, *, *, GET, /api/get-records, *, *
 p, *, *, GET, /api/get-product, *, *
+p, *, *, GET, /api/get-products, *, *
+p, *, *, POST, /api/buy-product, *, *
+p, *, *, GET, /api/get-order, *, *
+p, *, *, GET, /api/get-orders, *, *
+p, *, *, GET, /api/get-user-orders, *, *
 p, *, *, GET, /api/get-payment, *, *
-p, *, *, POST, /api/update-payment, *, *
 p, *, *, POST, /api/invoice-payment, *, *
 p, *, *, POST, /api/notify-payment, *, *
+p, *, *, POST, /api/place-order, *, *
+p, *, *, POST, /api/cancel-order, *, *
+p, *, *, POST, /api/pay-order, *, *
+p, *, *, POST, /api/validate-coupon, *, *
 p, *, *, POST, /api/unlink, *, *
 p, *, *, POST, /api/set-password, *, *
 p, *, *, POST, /api/send-verification-code, *, *
 p, *, *, GET, /api/get-captcha, *, *
 p, *, *, POST, /api/verify-captcha, *, *
 p, *, *, POST, /api/verify-code, *, *
+p, *, *, POST, /api/v1/traces, *, *
+p, *, *, POST, /api/v1/metrics, *, *
+p, *, *, POST, /api/v1/logs, *, *
 p, *, *, POST, /api/reset-email-or-phone, *, *
 p, *, *, POST, /api/upload-resource, *, *
 p, *, *, GET, /.well-known/openid-configuration, *, *
+p, *, *, GET, /.well-known/oauth-authorization-server, *, *
+p, *, *, GET, /.well-known/oauth-protected-resource, *, *
 p, *, *, GET, /.well-known/webfinger, *, *
 p, *, *, *, /.well-known/jwks, *, *
 p, *, *, GET, /.well-known/:application/openid-configuration, *, *
+p, *, *, GET, /.well-known/:application/oauth-authorization-server, *, *
+p, *, *, GET, /.well-known/:application/oauth-protected-resource, *, *
 p, *, *, GET, /.well-known/:application/webfinger, *, *
 p, *, *, *, /.well-known/:application/jwks, *, *
 p, *, *, GET, /api/get-saml-login, *, *
@@ -103,6 +126,7 @@ p, *, *, GET, /api/get-transactions, *, *
 p, *, *, GET, /api/get-transaction, *, *
 p, *, *, GET, /api/get-provider, *, *
 p, *, *, GET, /api/get-organization-names, *, *
+p, *, *, GET, /api/get-organizations, *, *
 p, *, *, GET, /api/get-all-objects, *, *
 p, *, *, GET, /api/get-all-actions, *, *
 p, *, *, GET, /api/get-all-roles, *, *
@@ -110,6 +134,7 @@ p, *, *, GET, /api/run-casbin-command, *, *
 p, *, *, POST, /api/refresh-engines, *, *
 p, *, *, GET, /api/get-invitation-info, *, *
 p, *, *, GET, /api/faceid-signin-begin, *, *
+p, *, *, GET, /api/kerberos-login, *, *
 `
 
 		sa := stringadapter.NewAdapter(ruleText)
@@ -129,49 +154,57 @@ p, *, *, GET, /api/faceid-signin-begin, *, *
 	}
 }
 
-func IsAllowed(subOwner string, subName string, method string, urlPath string, objOwner string, objName string) bool {
+func IsAllowed(subOwner string, subName string, method string, urlPath string, objOwner string, objName string, extraInfo map[string]interface{}) (bool, error) {
+	if urlPath == "/api/mcp" {
+		if detailPath, ok := extraInfo["detailPathUrl"].(string); ok {
+			if detailPath == "initialize" || detailPath == "notifications/initialized" || detailPath == "ping" || detailPath == "tools/list" {
+				return true, nil
+			}
+		}
+	}
+
 	if conf.IsDemoMode() {
 		if !isAllowedInDemoMode(subOwner, subName, method, urlPath, objOwner, objName) {
-			return false
+			return false, nil
 		}
+	}
+
+	if subOwner == "app" {
+		return true, nil
 	}
 
 	user, err := object.GetUser(util.GetId(subOwner, subName))
 	if err != nil {
-		panic(err)
-	}
-
-	if subOwner == "app" {
-		return true
+		return false, err
 	}
 
 	if user != nil {
 		if user.IsDeleted {
-			return false
+			return false, nil
 		}
 
 		if user.IsGlobalAdmin() {
-			return true
+			return true, nil
 		}
 
-		if user.IsAdmin && (subOwner == objOwner || (objOwner == "admin")) {
-			return true
+		if user.IsAdmin && subOwner == objOwner {
+			return true, nil
 		}
 	}
 
 	res, err := Enforcer.Enforce(subOwner, subName, method, urlPath, objOwner, objName)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 
 	if !res {
 		res, err = object.CheckApiPermission(util.GetId(subOwner, subName), objOwner, urlPath, method)
 		if err != nil {
-			panic(err)
+			return false, err
 		}
 	}
 
-	return res
+	return res, nil
 }
 
 func isAllowedInDemoMode(subOwner string, subName string, method string, urlPath string, objOwner string, objName string) bool {

@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Button, Input} from "antd";
+import {Button, Input, Space} from "antd";
 import React from "react";
 import i18next from "i18next";
 import * as UserBackend from "../backend/UserBackend";
+import * as AuthBackend from "../auth/AuthBackend";
 import * as Setting from "../Setting";
 import {SafetyOutlined} from "@ant-design/icons";
 import {CaptchaModal} from "./modal/CaptchaModal";
-
-const {Search} = Input;
 
 export const SendCodeInput = ({value, disabled, captchaValue, useInlineCaptcha, textBefore, onChange, onButtonClickArgs, application, method, countryCode, refreshCaptcha}) => {
   const [visible, setVisible] = React.useState(false);
@@ -71,37 +70,82 @@ export const SendCodeInput = ({value, disabled, captchaValue, useInlineCaptcha, 
   };
 
   const handleSearch = () => {
-    if (!useInlineCaptcha) {
-      setVisible(true);
+    const sendCodeWithoutCaptcha = () => {
+      handleOk("none", "", "");
+    };
+
+    const sendCodeWithCaptcha = () => {
+      if (!useInlineCaptcha) {
+        setVisible(true);
+        return;
+      }
+
+      // client secret is validated in backend
+      if (!captchaValue?.captchaType || !captchaValue?.captchaToken) {
+        Setting.showMessage("error", i18next.t("general:Please complete the captcha correctly"));
+        return;
+      }
+
+      handleOk(captchaValue.captchaType, captchaValue.captchaToken, captchaValue.clientSecret);
+    };
+
+    const checkCaptchaStatusAndSend = () => {
+      const values = {
+        organization: application?.organization,
+        username: onButtonClickArgs?.[3] || onButtonClickArgs?.[0],
+        application: application?.name,
+      };
+
+      AuthBackend.getCaptchaStatus(values)
+        .then((res) => {
+          if (res.status === "ok" && res.data) {
+            sendCodeWithCaptcha();
+            return;
+          }
+
+          sendCodeWithoutCaptcha();
+        })
+        .catch(() => {
+          sendCodeWithoutCaptcha();
+        });
+    };
+
+    const captchaRule = Setting.getCaptchaRule(application);
+    if (captchaRule === Setting.CaptchaRule.Never) {
+      sendCodeWithoutCaptcha();
       return;
     }
 
-    // client secret is validated in backend 
-    if (!captchaValue?.captchaType || !captchaValue?.captchaToken) {
-      Setting.showMessage("error", i18next.t("general:Please complete the captcha correctly"));
+    if (captchaRule === Setting.CaptchaRule.Always) {
+      sendCodeWithCaptcha();
       return;
     }
-    handleOk(captchaValue.captchaType, captchaValue.captchaToken, captchaValue.clientSecret);
+
+    if (captchaRule === Setting.CaptchaRule.Dynamic || captchaRule === Setting.CaptchaRule.InternetOnly) {
+      checkCaptchaStatusAndSend();
+      return;
+    }
+
+    sendCodeWithoutCaptcha();
   };
 
   return (
     <React.Fragment>
-      <Search
-        addonBefore={textBefore}
-        disabled={disabled}
-        value={value}
-        prefix={<SafetyOutlined />}
-        placeholder={i18next.t("code:Enter your code")}
-        className="verification-code-input"
-        onChange={e => onChange(e.target.value)}
-        enterButton={
-          <Button style={{fontSize: 14}} type={"primary"} disabled={disabled || buttonLeftTime > 0} loading={buttonLoading}>
-            {buttonLeftTime > 0 ? `${buttonLeftTime} s` : buttonLoading ? i18next.t("code:Sending") : i18next.t("code:Send Code")}
-          </Button>
-        }
-        onSearch={handleSearch}
-        autoComplete="one-time-code"
-      />
+      <Space.Compact style={{width: "100%"}}>
+        <Input
+          addonBefore={textBefore}
+          disabled={disabled}
+          value={value}
+          prefix={<SafetyOutlined />}
+          placeholder={i18next.t("code:Enter your code")}
+          className="verification-code-input"
+          onChange={e => onChange(e.target.value)}
+          autoComplete="one-time-code"
+        />
+        <Button style={{fontSize: 14}} type={"primary"} disabled={disabled || buttonLeftTime > 0} loading={buttonLoading} onClick={handleSearch}>
+          {buttonLeftTime > 0 ? `${buttonLeftTime} s` : buttonLoading ? i18next.t("code:Sending") : i18next.t("code:Send Code")}
+        </Button>
+      </Space.Compact>
       {
         useInlineCaptcha ? null : (
           <CaptchaModal

@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/casdoor/casdoor/util"
@@ -126,12 +127,11 @@ func (p *AzureAdSyncerProvider) getAzureAdAccessToken() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "POST", tokenUrl, nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenUrl, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", err
 	}
 
-	req.URL.RawQuery = data.Encode()
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -273,4 +273,16 @@ func (p *AzureAdSyncerProvider) getAzureAdOriginalUsers() ([]*OriginalUser, erro
 	}
 
 	return originalUsers, nil
+}
+
+// GetOriginalGroups retrieves all groups from Azure AD (not implemented yet)
+func (p *AzureAdSyncerProvider) GetOriginalGroups() ([]*OriginalGroup, error) {
+	// TODO: Implement Azure AD group sync
+	return []*OriginalGroup{}, nil
+}
+
+// GetOriginalUserGroups retrieves the group IDs that a user belongs to (not implemented yet)
+func (p *AzureAdSyncerProvider) GetOriginalUserGroups(userId string) ([]string, error) {
+	// TODO: Implement Azure AD user group membership sync
+	return []string{}, nil
 }

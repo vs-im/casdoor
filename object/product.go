@@ -98,31 +98,33 @@ func GetProduct(id string) (*Product, error) {
 	return getProduct(owner, name)
 }
 
-func UpdateProductStock(product *Product) error {
+func UpdateProductStock(productInfos []ProductInfo) error {
 	var (
 		affected int64
 		err      error
 	)
-	if product.IsRecharge {
-		affected, err = ormer.Engine.ID(core.PK{product.Owner, product.Name}).
-			Incr("sold", 1).
-			Update(&Product{})
-	} else {
-		affected, err = ormer.Engine.ID(core.PK{product.Owner, product.Name}).
-			Where("quantity > 0").
-			Decr("quantity", 1).
-			Incr("sold", 1).
-			Update(&Product{})
-	}
-
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
+	for _, product := range productInfos {
 		if product.IsRecharge {
-			return fmt.Errorf("failed to update stock for product: %s", product.Name)
+			affected, err = ormer.Engine.ID(core.PK{product.Owner, product.Name}).
+				Incr("sold", product.Quantity).
+				Update(&Product{})
+		} else {
+			affected, err = ormer.Engine.ID(core.PK{product.Owner, product.Name}).
+				Where("quantity >= ?", product.Quantity).
+				Decr("quantity", product.Quantity).
+				Incr("sold", product.Quantity).
+				Update(&Product{})
 		}
-		return fmt.Errorf("insufficient stock for product: %s", product.Name)
+
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			if product.IsRecharge {
+				return fmt.Errorf("failed to update stock for product: %s", product.Name)
+			}
+			return fmt.Errorf("insufficient stock for product: %s", product.Name)
+		}
 	}
 	return nil
 }
@@ -137,6 +139,12 @@ func UpdateProduct(id string, product *Product) (bool, error) {
 	} else if p == nil {
 		return false, nil
 	}
+
+	err = checkProduct(product)
+	if err != nil {
+		return false, err
+	}
+
 	affected, err := ormer.Engine.ID(core.PK{owner, name}).AllCols().Update(product)
 	if err != nil {
 		return false, err
@@ -146,12 +154,58 @@ func UpdateProduct(id string, product *Product) (bool, error) {
 }
 
 func AddProduct(product *Product) (bool, error) {
+	err := checkProduct(product)
+	if err != nil {
+		return false, err
+	}
+
 	affected, err := ormer.Engine.Insert(product)
 	if err != nil {
 		return false, err
 	}
 
 	return affected != 0, nil
+}
+
+func checkProduct(product *Product) error {
+	if product == nil {
+		return fmt.Errorf("the product not exist")
+	}
+
+	if product.Currency == "" {
+		return fmt.Errorf("currency cannot be empty")
+	}
+
+	if len(product.Providers) == 0 {
+		providers, err := GetProvidersByCategory(product.Owner, "Payment")
+		if err != nil {
+			return err
+		}
+		if len(providers) == 0 {
+			return fmt.Errorf("no payment provider available")
+		}
+
+		for _, provider := range providers {
+			if provider.Type != "Alipay" || product.Currency == "CNY" {
+				product.Providers = append(product.Providers, provider.Name)
+			}
+		}
+
+		if len(product.Providers) == 0 {
+			return fmt.Errorf("no compatible payment provider available for currency: %s", product.Currency)
+		}
+	} else {
+		for _, providerName := range product.Providers {
+			provider, err := getProvider(product.Owner, providerName)
+			if err != nil {
+				return err
+			}
+			if provider != nil && provider.Type == "Alipay" && product.Currency != "CNY" {
+				return fmt.Errorf("alipay provider only supports CNY, got: %s", product.Currency)
+			}
+		}
+	}
+	return nil
 }
 
 func DeleteProduct(product *Product) (bool, error) {
@@ -167,13 +221,23 @@ func (product *Product) GetId() string {
 	return fmt.Sprintf("%s/%s", product.Owner, product.Name)
 }
 
-func (product *Product) isValidProvider(provider *Provider) bool {
+func (product *Product) isValidProvider(provider *Provider) error {
+	if provider.Type == "Alipay" && product.Currency != "CNY" {
+		return fmt.Errorf("alipay provider only supports CNY, got: %s", product.Currency)
+	}
+
+	providerMatched := false
 	for _, providerName := range product.Providers {
 		if providerName == provider.Name {
-			return true
+			providerMatched = true
+			break
 		}
 	}
-	return false
+	if !providerMatched {
+		return fmt.Errorf("the payment provider: %s is not valid for the product: %s", provider.Name, product.Name)
+	}
+
+	return nil
 }
 
 func (product *Product) getProvider(providerName string) (*Provider, error) {
@@ -186,11 +250,31 @@ func (product *Product) getProvider(providerName string) (*Provider, error) {
 		return nil, fmt.Errorf("the payment provider: %s does not exist", providerName)
 	}
 
-	if !product.isValidProvider(provider) {
-		return nil, fmt.Errorf("the payment provider: %s is not valid for the product: %s", providerName, product.Name)
+	if err := product.isValidProvider(provider); err != nil {
+		return nil, err
 	}
 
 	return provider, nil
+}
+
+func BuyProduct(id string, user *User, providerName, pricingName, planName, host, paymentEnv string, customPrice float64, lang string, couponCode string) (payment *Payment, attachInfo map[string]interface{}, err error) {
+	owner, productName, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	order, err := PlaceOrder(owner, []ProductInfo{{
+		Name:        productName,
+		Price:       customPrice,
+		Quantity:    1,
+		PricingName: pricingName,
+		PlanName:    planName,
+	}}, user, couponCode)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return PayOrder(providerName, host, paymentEnv, order, lang)
 }
 
 func ExtendProductWithProviders(product *Product) error {
@@ -248,4 +332,50 @@ func UpdateProductForPlan(plan *Plan, product *Product) {
 	product.Price = plan.Price
 	product.Currency = plan.Currency
 	product.Providers = plan.PaymentProviders
+}
+
+func getOrderProducts(owner string, productNames []string) ([]Product, error) {
+	if len(productNames) == 0 {
+		return []Product{}, nil
+	}
+
+	var products []Product
+	err := ormer.Engine.
+		Where("owner = ?", owner).
+		In("name", productNames).
+		Find(&products)
+	if err != nil {
+		return nil, err
+	}
+
+	productMap := make(map[string]Product, len(products))
+	for _, product := range products {
+		productMap[product.Name] = product
+	}
+
+	orderedProducts := make([]Product, 0, len(productNames))
+	for _, productName := range productNames {
+		product, ok := productMap[productName]
+		if !ok {
+			return nil, fmt.Errorf("the product: %s does not exist", productName)
+		}
+		orderedProducts = append(orderedProducts, product)
+	}
+	return orderedProducts, nil
+}
+
+func validateProductCurrencies(products []Product, orderCurrency string) error {
+	for _, product := range products {
+		productCurrency := product.Currency
+		if productCurrency == "" {
+			productCurrency = "USD"
+		}
+		if productCurrency != orderCurrency {
+			return fmt.Errorf("products have different currencies, expected: %s, got: %s (product: %s)", orderCurrency, productCurrency, product.Name)
+		}
+		if !product.IsRecharge && product.Quantity <= 0 {
+			return fmt.Errorf("the product: %s is out of stock", product.Name)
+		}
+	}
+	return nil
 }

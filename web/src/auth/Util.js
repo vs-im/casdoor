@@ -31,7 +31,7 @@ export function renderMessage(msg) {
           type="error"
           action={
             <Button size="small" type="primary" danger>
-              {i18next.t("product:Detail")}
+              {i18next.t("general:Detail")}
             </Button>
           }
         />
@@ -130,10 +130,6 @@ export function getOAuthGetParameters(params) {
   }
 
   let state = getRefinedValue(queries.get("state"));
-  if (state.startsWith("/auth/oauth2/login.php?wantsurl=")) {
-    // state contains URL param encoding for Moodle, URLSearchParams automatically decoded it, so here encode it again
-    state = encodeURIComponent(state);
-  }
   if (redirectUri.includes("#") && state === "") {
     state = getRawGetParameter("state");
   }
@@ -145,6 +141,7 @@ export function getOAuthGetParameters(params) {
   const samlRequest = getRefinedValue(lowercaseQueries["samlRequest".toLowerCase()]);
   const relayState = getRefinedValue(lowercaseQueries["RelayState".toLowerCase()]);
   const noRedirect = getRefinedValue(lowercaseQueries["noRedirect".toLowerCase()]);
+  const resource = getRefinedValue(queries.get("resource"));
   const action = getRefinedValue(queries.get("action"));
 
   if (clientId === "" && samlRequest === "") {
@@ -165,6 +162,7 @@ export function getOAuthGetParameters(params) {
       samlRequest: samlRequest,
       relayState: relayState,
       noRedirect: noRedirect,
+      resource: resource,
       type: "code",
       action: action,
     };
@@ -215,17 +213,19 @@ export async function WechatOfficialAccountModal(application, provider, method) 
       }
 
       const t1 = setInterval(await getEvent, 1000, application, provider, res.data2, method);
-      {Modal.info({
-        title: i18next.t("provider:Please use WeChat to scan the QR code and follow the official account for sign in"),
-        content: (
-          <div style={{marginRight: "34px"}}>
-            <QRCode style={{padding: "20px", margin: "auto"}} bordered={false} value={res.data} size={230} />
-          </div>
-        ),
-        onOk() {
-          window.clearInterval(t1);
-        },
-      });}
+      {
+        Modal.info({
+          title: i18next.t("provider:Please use WeChat to scan the QR code and follow the official account for sign in"),
+          content: (
+            <div style={{marginRight: "34px"}}>
+              <QRCode style={{padding: "20px", margin: "auto"}} bordered={false} value={res.data} size={230} />
+            </div>
+          ),
+          onOk() {
+            window.clearInterval(t1);
+          },
+        });
+      }
     }
   );
 }

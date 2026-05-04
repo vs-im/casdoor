@@ -13,11 +13,12 @@
 // limitations under the License.
 
 import React from "react";
+import Loading from "./common/Loading";
 import {Button, Card, Col, Input, InputNumber, Row, Select, Switch} from "antd";
+import PaginateSelect from "./common/PaginateSelect";
 import * as OrganizationBackend from "./backend/OrganizationBackend";
 import * as RoleBackend from "./backend/RoleBackend";
 import * as PlanBackend from "./backend/PlanBackend";
-import * as UserBackend from "./backend/UserBackend";
 import * as ProviderBackend from "./backend/ProviderBackend";
 import * as Setting from "./Setting";
 import i18next from "i18next";
@@ -57,37 +58,7 @@ class PlanEditPage extends React.Component {
           plan: res.data,
         });
 
-        this.getUsers(this.state.organizationName);
-        this.getRoles(this.state.organizationName);
         this.getPaymentProviders(this.state.organizationName);
-      });
-  }
-
-  getRoles(organizationName) {
-    RoleBackend.getRoles(organizationName)
-      .then((res) => {
-        if (res.status === "error") {
-          Setting.showMessage("error", res.msg);
-          return;
-        }
-
-        this.setState({
-          roles: res.data,
-        });
-      });
-  }
-
-  getUsers(organizationName) {
-    UserBackend.getUsers(organizationName)
-      .then((res) => {
-        if (res.status === "error") {
-          Setting.showMessage("error", res.msg);
-          return;
-        }
-
-        this.setState({
-          users: res.data,
-        });
       });
   }
 
@@ -151,8 +122,6 @@ class PlanEditPage extends React.Component {
           <Col span={22} >
             <Select virtual={false} style={{width: "100%"}} value={this.state.plan.owner} disabled={isViewMode} onChange={(owner => {
               this.updatePlanField("owner", owner);
-              this.getUsers(owner);
-              this.getRoles(owner);
               this.getPaymentProviders(owner);
             })}
             options={this.state.organizations.map((organization) => Setting.getOption(organization.name, organization.name))
@@ -184,9 +153,22 @@ class PlanEditPage extends React.Component {
             {Setting.getLabel(i18next.t("general:Role"), i18next.t("general:Role - Tooltip"))} :
           </Col>
           <Col span={22} >
-            <Select virtual={false} style={{width: "100%"}} value={this.state.plan.role} disabled={isViewMode} onChange={(value => {this.updatePlanField("role", value);})}
-              options={this.state.roles.map((role) => Setting.getOption(role.name, role.name))
-              } />
+            <PaginateSelect
+              virtual
+              style={{width: "100%"}}
+              value={this.state.plan.role}
+              disabled={isViewMode}
+              allowClear
+              fetchPage={RoleBackend.getRoles}
+              buildFetchArgs={({page, pageSize, searchText}) => {
+                const field = searchText ? "name" : "";
+                return [this.state.plan.owner, page, pageSize, field, searchText, "", ""];
+              }}
+              reloadKey={this.state.plan.owner}
+              optionMapper={(role) => Setting.getOption(role.name, role.name)}
+              filterOption={false}
+              onChange={(value => {this.updatePlanField("role", value || "");})}
+            />
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >
@@ -201,7 +183,7 @@ class PlanEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("plan:Price"), i18next.t("plan:Price - Tooltip"))} :
+            {Setting.getLabel(i18next.t("order:Price"), i18next.t("plan:Price - Tooltip"))} :
           </Col>
           <Col span={22} >
             <InputNumber value={this.state.plan.price} disabled={isViewMode} onChange={value => {
@@ -260,6 +242,16 @@ class PlanEditPage extends React.Component {
             }} />
           </Col>
         </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+            {Setting.getLabel(i18next.t("plan:Is exclusive"), i18next.t("plan:Is exclusive - Tooltip"))} :
+          </Col>
+          <Col span={1} >
+            <Switch checked={this.state.plan.isExclusive} disabled={isViewMode} onChange={checked => {
+              this.updatePlanField("isExclusive", checked);
+            }} />
+          </Col>
+        </Row>
       </Card>
     );
   }
@@ -307,7 +299,7 @@ class PlanEditPage extends React.Component {
     return (
       <div>
         {
-          this.state.plan !== null ? this.renderPlan() : null
+          this.state.plan !== null ? this.renderPlan() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
         {this.state.mode !== "view" && (
           <div style={{marginTop: "20px", marginLeft: "40px"}}>

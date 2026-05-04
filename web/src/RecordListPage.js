@@ -72,7 +72,7 @@ class RecordListPage extends BaseListPage {
         title: i18next.t("general:Organization"),
         dataIndex: "organization",
         key: "organization",
-        width: "110px",
+        width: "140px",
         sorter: true,
         ...this.getColumnSearchProps("organization"),
         render: (text, record, index) => {
@@ -102,7 +102,7 @@ class RecordListPage extends BaseListPage {
         title: i18next.t("general:Method"),
         dataIndex: "method",
         key: "method",
-        width: "100px",
+        width: "110px",
         sorter: true,
         filterMultiple: false,
         filters: [
@@ -129,15 +129,15 @@ class RecordListPage extends BaseListPage {
         title: i18next.t("user:Language"),
         dataIndex: "language",
         key: "language",
-        width: "90px",
+        width: "120px",
         sorter: true,
         ...this.getColumnSearchProps("language"),
       },
       {
-        title: i18next.t("record:Status code"),
+        title: i18next.t("rule:Status code"),
         dataIndex: "statusCode",
         key: "statusCode",
-        width: "120px",
+        width: "140px",
         sorter: true,
         ...this.getColumnSearchProps("statusCode"),
       },
@@ -204,13 +204,13 @@ class RecordListPage extends BaseListPage {
         sorter: true,
         fixed: "right",
         render: (text, record, index) => (
-          <Button type="link" onClick={() => {
+          <Button onClick={() => {
             this.setState({
               detailRecord: record,
               detailShow: true,
             });
           }}>
-            {i18next.t("general:Detail")}
+            {i18next.t("general:View")}
           </Button>
         ),
       },
@@ -236,7 +236,7 @@ class RecordListPage extends BaseListPage {
               {i18next.t("general:Records")}&nbsp;&nbsp;&nbsp;&nbsp;
             </div>
           )}
-          loading={this.state.loading}
+          loading={this.getTableLoading()}
           onChange={this.handleTableChange}
         />
         {/* TODO: Should be packaged as a component after confirm it run correctly.*/}
@@ -265,7 +265,7 @@ class RecordListPage extends BaseListPage {
             <Descriptions.Item label={i18next.t("general:Method")}>{this.getDetailField("method")}</Descriptions.Item>
             <Descriptions.Item label={i18next.t("general:Request URI")}>{this.getDetailField("requestUri")}</Descriptions.Item>
             <Descriptions.Item label={i18next.t("user:Language")}>{this.getDetailField("language")}</Descriptions.Item>
-            <Descriptions.Item label={i18next.t("record:Status code")}>{this.getDetailField("statusCode")}</Descriptions.Item>
+            <Descriptions.Item label={i18next.t("rule:Status code")}>{this.getDetailField("statusCode")}</Descriptions.Item>
             <Descriptions.Item label={i18next.t("general:Action")}>{this.getDetailField("action")}</Descriptions.Item>
             <Descriptions.Item label={i18next.t("record:Response")}>
               <Editor

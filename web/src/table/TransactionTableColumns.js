@@ -97,7 +97,7 @@ export function getTransactionTableColumns(options = {}) {
 
   if (includeTag) {
     columns.push({
-      title: i18next.t("user:Tag"),
+      title: i18next.t("general:Tag"),
       dataIndex: "tag",
       key: "tag",
       width: "120px",
@@ -168,7 +168,7 @@ export function getTransactionTableColumns(options = {}) {
   });
 
   columns.push({
-    title: i18next.t("provider:Category"),
+    title: i18next.t("general:Category"),
     dataIndex: "category",
     key: "category",
     width: "120px",
@@ -177,7 +177,7 @@ export function getTransactionTableColumns(options = {}) {
   });
 
   columns.push({
-    title: i18next.t("provider:Type"),
+    title: i18next.t("general:Type"),
     dataIndex: "type",
     key: "type",
     width: "140px",
@@ -272,25 +272,15 @@ export function getTransactionTableColumns(options = {}) {
   });
 
   columns.push({
-    title: i18next.t("transaction:Amount"),
+    title: i18next.t("product:Amount"),
     dataIndex: "amount",
     key: "amount",
-    width: "120px",
+    width: "180px",
     sorter: getSorter("amount"),
     ...(getColumnSearchProps ? getColumnSearchProps("amount") : {}),
     fixed: (Setting.isMobile()) ? "false" : "right",
-  });
-
-  columns.push({
-    title: i18next.t("payment:Currency"),
-    dataIndex: "currency",
-    key: "currency",
-    width: "120px",
-    sorter: getSorter("currency"),
-    ...(getColumnSearchProps ? getColumnSearchProps("currency") : {}),
-    fixed: (Setting.isMobile()) ? "false" : "right",
     render: (text, record, index) => {
-      return Setting.getCurrencyWithFlag(text);
+      return Setting.getPriceDisplay(record.amount, record.currency);
     },
   });
 

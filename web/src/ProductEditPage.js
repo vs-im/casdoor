@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React from "react";
+import Loading from "./common/Loading";
 import {Button, Card, Col, Input, InputNumber, Row, Select, Switch} from "antd";
 import * as ProductBackend from "./backend/ProductBackend";
 import * as Setting from "./Setting";
@@ -172,7 +173,7 @@ class ProductEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("user:Tag"), i18next.t("product:Tag - Tooltip"))} :
+            {Setting.getLabel(i18next.t("general:Tag"), i18next.t("product:Tag - Tooltip"))} :
           </Col>
           <Col span={22} >
             <Input value={this.state.product.tag} disabled={isViewMode || isCreatedByPlan} onChange={e => {
@@ -182,7 +183,7 @@ class ProductEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("product:Detail"), i18next.t("product:Detail - Tooltip"))} :
+            {Setting.getLabel(i18next.t("general:Detail"), i18next.t("product:Detail - Tooltip"))} :
           </Col>
           <Col span={22} >
             <Input value={this.state.product.detail} disabled={isViewMode} onChange={e => {
@@ -266,7 +267,7 @@ class ProductEditPage extends React.Component {
           ) : (
             <Row style={{marginTop: "20px"}} >
               <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-                {Setting.getLabel(i18next.t("product:Price"), i18next.t("product:Price - Tooltip"))} :
+                {Setting.getLabel(i18next.t("order:Price"), i18next.t("plan:Price - Tooltip"))} :
               </Col>
               <Col span={22} >
                 <InputNumber value={this.state.product.price} disabled={isViewMode || isCreatedByPlan} onChange={value => {
@@ -305,16 +306,6 @@ class ProductEditPage extends React.Component {
                 this.state.providers.map((provider, index) => <Option key={index} value={provider.name}>{provider.name}</Option>)
               }
             </Select>
-          </Col>
-        </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("product:Return URL"), i18next.t("product:Return URL - Tooltip"))} :
-          </Col>
-          <Col span={22} >
-            <Input prefix={<LinkOutlined />} value={this.state.product.returnUrl} disabled={isViewMode} onChange={e => {
-              this.updateProductField("returnUrl", e.target.value);
-            }} />
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >
@@ -374,6 +365,14 @@ class ProductEditPage extends React.Component {
 
   submitProductEdit(exitAfterSave) {
     const product = Setting.deepCopy(this.state.product);
+    if (!product.currency) {
+      Setting.showMessage("error", i18next.t("product:Please select a currency"));
+      return;
+    }
+    if (!product.isCreatedByPlan && (!product.providers || product.providers.length === 0)) {
+      Setting.showMessage("error", i18next.t("product:Please select at least one payment provider"));
+      return;
+    }
     if (product.isRecharge && product.disableCustomRecharge && (!product.rechargeOptions || product.rechargeOptions.length === 0)) {
       Setting.showMessage("error", i18next.t("product:Please add at least one recharge option when custom amount is disabled"));
       return;
@@ -420,7 +419,7 @@ class ProductEditPage extends React.Component {
     return (
       <div>
         {
-          this.state.product !== null ? this.renderProduct() : null
+          this.state.product !== null ? this.renderProduct() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
         {this.state.mode !== "view" && (
           <div style={{marginTop: "20px", marginLeft: "40px"}}>

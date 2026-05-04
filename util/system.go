@@ -15,28 +15,30 @@
 package util
 
 import (
-	"bufio"
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"runtime"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/mem"
-	"github.com/shirou/gopsutil/process"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/disk"
+	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 type SystemInfo struct {
-	CpuUsage    []float64 `json:"cpuUsage"`
-	MemoryUsed  uint64    `json:"memoryUsed"`
-	MemoryTotal uint64    `json:"memoryTotal"`
+	CpuUsage     []float64 `json:"cpuUsage"`
+	MemoryUsed   uint64    `json:"memoryUsed"`
+	MemoryTotal  uint64    `json:"memoryTotal"`
+	DiskUsed     uint64    `json:"diskUsed"`
+	DiskTotal    uint64    `json:"diskTotal"`
+	NetworkSent  uint64    `json:"networkSent"`
+	NetworkRecv  uint64    `json:"networkRecv"`
+	NetworkTotal uint64    `json:"networkTotal"`
 }
 
 type VersionInfo struct {
@@ -74,6 +76,56 @@ func getMemoryUsage() (uint64, uint64, error) {
 	return memInfo.RSS, virtualMem.Total, nil
 }
 
+// getDiskUsage gets disk usage for Casdoor's data directory
+func getDiskUsage() (uint64, uint64, error) {
+	_, filename, _, _ := runtime.Caller(0)
+	rootPath := path.Dir(path.Dir(filename))
+	dataPath := filepath.Join(rootPath, "data")
+
+	var size uint64
+	err := filepath.Walk(dataPath, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() {
+			size += uint64(info.Size())
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+
+	diskStat, err := disk.Usage(dataPath)
+	if err != nil {
+		diskStat, err = disk.Usage("/")
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+
+	return size, diskStat.Total, nil
+}
+
+// getNetworkUsage gets Casdoor process's own I/O usage
+func getNetworkUsage() (uint64, uint64, uint64, error) {
+	proc, err := process.NewProcess(int32(os.Getpid()))
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	ioCounters, err := proc.IOCounters()
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	bytesSent := ioCounters.WriteBytes
+	bytesRecv := ioCounters.ReadBytes
+	bytesTotal := bytesSent + bytesRecv
+
+	return bytesSent, bytesRecv, bytesTotal, nil
+}
+
 func GetSystemInfo() (*SystemInfo, error) {
 	cpuUsage, err := getCpuUsage()
 	if err != nil {
@@ -85,10 +137,25 @@ func GetSystemInfo() (*SystemInfo, error) {
 		return nil, err
 	}
 
+	diskUsed, diskTotal, err := getDiskUsage()
+	if err != nil {
+		return nil, err
+	}
+
+	networkSent, networkRecv, networkTotal, err := getNetworkUsage()
+	if err != nil {
+		return nil, err
+	}
+
 	res := &SystemInfo{
-		CpuUsage:    cpuUsage,
-		MemoryUsed:  memoryUsed,
-		MemoryTotal: memoryTotal,
+		CpuUsage:     cpuUsage,
+		MemoryUsed:   memoryUsed,
+		MemoryTotal:  memoryTotal,
+		DiskUsed:     diskUsed,
+		DiskTotal:    diskTotal,
+		NetworkSent:  networkSent,
+		NetworkRecv:  networkRecv,
+		NetworkTotal: networkTotal,
 	}
 	return res, nil
 }
@@ -161,46 +228,10 @@ func GetVersionInfo() (*VersionInfo, error) {
 	return res, nil
 }
 
-func GetVersionInfoFromFile() (*VersionInfo, error) {
-	res := &VersionInfo{
-		Version:      "",
-		CommitId:     "",
-		CommitOffset: -1,
+func GetBuiltInVersionInfo() *VersionInfo {
+	return &VersionInfo{
+		Version:      Version,
+		CommitId:     CommitId,
+		CommitOffset: CommitOffset,
 	}
-
-	_, filename, _, _ := runtime.Caller(0)
-	rootPath := path.Dir(path.Dir(filename))
-	file, err := os.Open(filepath.Clean(path.Join(rootPath, "version_info.txt")))
-	if err != nil {
-		return res, err
-	}
-	defer file.Close()
-
-	// Read file contents line by line
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		// Use regular expressions to match strings
-		re := regexp.MustCompile(`\{([^{}]+)\}`)
-		versionInfo := scanner.Text()
-		matches := re.FindStringSubmatch(versionInfo)
-		if len(matches) > 1 {
-			split := strings.Split(matches[1], " ")
-			version := split[0]
-			commitId := split[1]
-			commitOffset, _ := strconv.Atoi(split[2])
-			res = &VersionInfo{
-				Version:      version,
-				CommitId:     commitId,
-				CommitOffset: commitOffset,
-			}
-			break
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return res, err
-	}
-
-	return res, nil
 }

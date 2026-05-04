@@ -45,7 +45,7 @@ img {
   justify-content: center;
   border-radius: 5px;
   width: 45px;
-  height: 64px;
+  height: 52px;
   float: right;
   cursor: pointer;
 
@@ -54,14 +54,34 @@ img {
   }
 }
 
+.saas-hosting-btn {
+  font-weight: bold;
+  background-color: rgb(87 52 211 / 40%);
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  height: 40px;
+  border-radius: 5px;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    background-color: rgb(87 52 211 / 65%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgb(87 52 211 / 35%);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+}
+
 .org-select {
   display: flex;
   position: relative;
-  transform: translateY(50%);
   margin: 0 10px !important;
-  float: right;
-  min-width: 120px;
-  max-width: 180px;
+  min-width: 200px;
+  max-width: 360px;
 }
 
 .language-select-box {
@@ -86,6 +106,8 @@ img {
   box-shadow: 0 1px 5px 0 rgb(51 51 51 / 14%);
   flex: 1;
   align-items: stretch;
+  margin: 0 3px 3px !important;
+  border-radius: 4px !important;
 }
 
 .side-image {
@@ -209,4 +231,13 @@ span.ant-select-selection-item {
 
 .ant-menu-horizontal {
   border-bottom: none !important;
+}
+
+.ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+}
+
+.ant-menu-inline {
+  flex: 1;
 }

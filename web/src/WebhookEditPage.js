@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React from "react";
+import Loading from "./common/Loading";
 import {Button, Card, Col, Input, Row, Select, Switch} from "antd";
 import {LinkOutlined} from "@ant-design/icons";
 import * as WebhookBackend from "./backend/WebhookBackend";
@@ -119,7 +120,7 @@ class WebhookEditPage extends React.Component {
   }
 
   getWebhook() {
-    WebhookBackend.getWebhook("admin", this.state.webhookName)
+    WebhookBackend.getWebhook("admin", this.state.webhookName, this.props.account.owner)
       .then((res) => {
         if (res.data === null) {
           this.props.history.push("/404");
@@ -220,7 +221,7 @@ class WebhookEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("general:Method"), i18next.t("webhook:Method - Tooltip"))} :
+            {Setting.getLabel(i18next.t("general:Method"), i18next.t("provider:Method - Tooltip"))} :
           </Col>
           <Col span={22} >
             <Select virtual={false} style={{width: "100%"}} value={this.state.webhook.method} onChange={(value => {this.updateWebhookField("method", value);})}>
@@ -273,13 +274,11 @@ class WebhookEditPage extends React.Component {
                 this.updateWebhookField("events", value);
               }} >
               {
-                (
-                  ["signup", "login", "logout", "new-user"].concat(Setting.getApiPaths()).map((option, index) => {
-                    return (
-                      <Option key={option} value={option}>{option}</Option>
-                    );
-                  })
-                )
+                Setting.getApiPaths().map((option, index) => {
+                  return (
+                    <Option key={option} value={option}>{option}</Option>
+                  );
+                })
               }
             </Select>
           </Col>
@@ -396,7 +395,7 @@ class WebhookEditPage extends React.Component {
     return (
       <div>
         {
-          this.state.webhook !== null ? this.renderWebhook() : null
+          this.state.webhook !== null ? this.renderWebhook() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
         <div style={{marginTop: "20px", marginLeft: "40px"}}>
           <Button size="large" onClick={() => this.submitWebhookEdit(false)}>{i18next.t("general:Save")}</Button>

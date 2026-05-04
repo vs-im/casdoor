@@ -16,9 +16,12 @@ package object
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/casdoor/casdoor/certificate"
 	"github.com/casdoor/casdoor/util"
 	"github.com/xorm-io/core"
+	"golang.org/x/net/publicsuffix"
 )
 
 type Cert struct {
@@ -32,6 +35,13 @@ type Cert struct {
 	CryptoAlgorithm string `xorm:"varchar(100)" json:"cryptoAlgorithm"`
 	BitSize         int    `json:"bitSize"`
 	ExpireInYears   int    `json:"expireInYears"`
+
+	ExpireTime       string `xorm:"varchar(100)" json:"expireTime"`
+	DomainExpireTime string `xorm:"varchar(100)" json:"domainExpireTime"`
+	Provider         string `xorm:"varchar(100)" json:"provider"`
+	Account          string `xorm:"varchar(100)" json:"account"`
+	AccessKey        string `xorm:"varchar(100)" json:"accessKey"`
+	AccessSecret     string `xorm:"varchar(100)" json:"accessSecret"`
 
 	Certificate string `xorm:"mediumtext" json:"certificate"`
 	PrivateKey  string `xorm:"mediumtext" json:"privateKey"`
@@ -224,6 +234,20 @@ func (p *Cert) populateContent() error {
 		return nil
 	}
 
+	if p.Type == "SSL" {
+		if p.Certificate != "" {
+			expireTime, err := util.GetCertExpireTime(p.Certificate)
+			if err != nil {
+				return err
+			}
+
+			p.ExpireTime = expireTime
+		} else {
+			p.ExpireTime = ""
+		}
+		return nil
+	}
+
 	if len(p.CryptoAlgorithm) < 3 {
 		err := fmt.Errorf("populateContent() error, unsupported crypto algorithm: %s", p.CryptoAlgorithm)
 		return err
@@ -258,6 +282,42 @@ func (p *Cert) populateContent() error {
 	return nil
 }
 
+func RenewCert(cert *Cert) (bool, error) {
+	useProxy := false
+	if cert.Provider == "GoDaddy" {
+		useProxy = true
+	}
+
+	client, err := GetAcmeClient(useProxy)
+	if err != nil {
+		return false, err
+	}
+
+	var certStr, privateKey string
+	if cert.Provider == "Aliyun" {
+		certStr, privateKey, err = certificate.ObtainCertificateAli(client, cert.Name, cert.AccessKey, cert.AccessSecret)
+	} else if cert.Provider == "GoDaddy" {
+		certStr, privateKey, err = certificate.ObtainCertificateGoDaddy(client, cert.Name, cert.AccessKey, cert.AccessSecret)
+	} else {
+		return false, fmt.Errorf("unknown provider: %s", cert.Provider)
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	expireTime, err := util.GetCertExpireTime(certStr)
+	if err != nil {
+		return false, err
+	}
+
+	cert.ExpireTime = expireTime
+	cert.Certificate = certStr
+	cert.PrivateKey = privateKey
+
+	return UpdateCert(cert.GetId(), cert)
+}
+
 func getCertByApplication(application *Application) (*Cert, error) {
 	if application.Cert != "" {
 		return getCertByName(application.Cert)
@@ -287,4 +347,65 @@ func certChangeTrigger(oldName string, newName string) error {
 	}
 
 	return session.Commit()
+}
+
+func getBaseDomain(domain string) (string, error) {
+	// abc.com -> abc.com
+	// abc.com.it -> abc.com.it
+	// subdomain.abc.io -> abc.io
+	// subdomain.abc.org.us -> abc.org.us
+	return publicsuffix.EffectiveTLDPlusOne(domain)
+}
+
+func GetCertByDomain(domain string) (*Cert, error) {
+	if domain == "" {
+		return nil, fmt.Errorf("GetCertByDomain() error: domain should not be empty")
+	}
+
+	cert, ok := certMap[domain]
+	if ok {
+		return cert, nil
+	}
+
+	baseDomain, err := getBaseDomain(domain)
+	if err != nil {
+		return nil, err
+	}
+
+	cert, ok = certMap[baseDomain]
+	if ok {
+		return cert, nil
+	}
+
+	return nil, nil
+}
+
+func getCertMap() (map[string]*Cert, error) {
+	certs, err := GetGlobalCerts()
+	if err != nil {
+		return nil, err
+	}
+
+	res := map[string]*Cert{}
+	for _, cert := range certs {
+		res[cert.Name] = cert
+	}
+	return res, nil
+}
+
+func (p *Cert) isCertNearExpire() (bool, error) {
+	if p.ExpireTime == "" {
+		return true, nil
+	}
+
+	expireTime, err := time.Parse(time.RFC3339, p.ExpireTime)
+	if err != nil {
+		return false, err
+	}
+
+	now := time.Now()
+	duration := expireTime.Sub(now)
+	res := duration <= 7*24*time.Hour
+
+	return res, nil
 }

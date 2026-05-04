@@ -14,13 +14,14 @@
 
 import React from "react";
 import {Link} from "react-router-dom";
-import {Button, Table} from "antd";
+import {Button, Col, List, Row, Table, Tooltip} from "antd";
 import moment from "moment";
 import * as Setting from "./Setting";
 import * as OrderBackend from "./backend/OrderBackend";
 import i18next from "i18next";
 import BaseListPage from "./BaseListPage";
 import PopconfirmModal from "./common/modal/PopconfirmModal";
+import {EditOutlined} from "@ant-design/icons";
 
 class OrderListPage extends BaseListPage {
   newOrder() {
@@ -31,13 +32,11 @@ class OrderListPage extends BaseListPage {
       name: `order_${randomName}`,
       createdTime: moment().format(),
       displayName: `New Order - ${randomName}`,
-      productName: "",
+      products: [],
       user: "",
       payment: "",
       state: "Created",
       message: "",
-      startTime: moment().format(),
-      endTime: "",
     };
   }
 
@@ -138,46 +137,77 @@ class OrderListPage extends BaseListPage {
         },
       },
       {
-        title: i18next.t("general:Display name"),
-        dataIndex: "displayName",
-        key: "displayName",
-        width: "170px",
-        sorter: true,
-        ...this.getColumnSearchProps("displayName"),
-      },
-      {
-        title: i18next.t("order:Product"),
-        dataIndex: "productName",
-        key: "productName",
-        width: "170px",
-        sorter: true,
-        ...this.getColumnSearchProps("productName"),
+        title: i18next.t("general:Products"),
+        dataIndex: "products",
+        key: "products",
+        ...this.getColumnSearchProps("products"),
         render: (text, record, index) => {
-          if (text === "") {
-            return "(empty)";
+          const productInfos = record?.productInfos || [];
+          if (productInfos.length === 0) {
+            return `(${i18next.t("general:empty")})`;
           }
           return (
-            <Link to={`/products/${record.owner}/${text}`}>
-              {text}
-            </Link>
+            <div>
+              <List
+                size="small"
+                locale={{emptyText: " "}}
+                dataSource={productInfos}
+                style={{
+                  paddingTop: 8,
+                  paddingBottom: 8,
+                }}
+                renderItem={(productInfo, i) => {
+                  const price = productInfo.price || 0;
+                  const number = productInfo.quantity || 1;
+                  const currency = record.currency || "USD";
+                  const productName = productInfo.displayName || productInfo.name;
+                  return (
+                    <List.Item>
+                      <Row style={{width: "100%"}} wrap={false} gutter={[12, 0]}>
+                        <Col flex="auto" style={{minWidth: 0}}>
+                          <div style={{display: "flex", alignItems: "center", minWidth: 0}}>
+                            <Tooltip placement="topLeft" title={i18next.t("general:Edit")}>
+                              <Button style={{marginRight: "5px"}} icon={<EditOutlined />} size="small" onClick={() => Setting.goToLinkSoft(this, `/products/${record.owner}/${productInfo.name}`)} />
+                            </Tooltip>
+                            <Tooltip placement="topLeft" title={productName}>
+                              <Link to={`/products/${record.owner}/${productInfo.name}`} style={{display: "inline-block", maxWidth: "100%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+                                {productName}
+                              </Link>
+                            </Tooltip>
+                          </div>
+                        </Col>
+                        <Col flex="none" style={{whiteSpace: "nowrap"}}>
+                          <span style={{color: "#666"}}>
+                            {Setting.getCurrencySymbol(currency)}{price} ({Setting.getCurrencyText(currency)}) × {number}
+                          </span>
+                        </Col>
+                      </Row>
+                    </List.Item>
+                  );
+                }}
+              />
+            </div>
           );
         },
       },
       {
-        title: i18next.t("order:Payment"),
-        dataIndex: "payment",
-        key: "payment",
-        width: "140px",
+        title: i18next.t("order:Price"),
+        dataIndex: "price",
+        key: "price",
+        width: "160px",
         sorter: true,
-        ...this.getColumnSearchProps("payment"),
+        ...this.getColumnSearchProps("price"),
         render: (text, record, index) => {
-          if (text === "") {
-            return "(empty)";
-          }
-          return (
-            <Link to={`/payments/${record.owner}/${text}`}>
-              {text}
+          const price = (record.price || 0).toFixed(2);
+          const currency = record.currency || "USD";
+          const priceDisplay = Setting.getPriceDisplay(price, currency);
+
+          return record.payment ? (
+            <Link to={`/payments/${record.owner}/${record.payment}`}>
+              {priceDisplay}
             </Link>
+          ) : (
+            <span>{priceDisplay}</span>
           );
         },
       },
@@ -206,53 +236,38 @@ class OrderListPage extends BaseListPage {
         width: "120px",
         sorter: true,
         ...this.getColumnSearchProps("state"),
-      },
-      {
-        title: i18next.t("order:Start time"),
-        dataIndex: "startTime",
-        key: "startTime",
-        width: "160px",
-        sorter: true,
         render: (text, record, index) => {
-          return Setting.getFormattedDate(text);
-        },
-      },
-      {
-        title: i18next.t("order:End time"),
-        dataIndex: "endTime",
-        key: "endTime",
-        width: "160px",
-        sorter: true,
-        render: (text, record, index) => {
-          if (text === "") {
-            return "(empty)";
-          }
-          return Setting.getFormattedDate(text);
+          return (
+            <Tooltip title={record.message || ""}>
+              <span>{text}</span>
+            </Tooltip>
+          );
         },
       },
       {
         title: i18next.t("general:Action"),
         dataIndex: "",
         key: "op",
-        width: "240px",
+        width: "320px",
         fixed: (Setting.isMobile()) ? "false" : "right",
         render: (text, record, index) => {
           const isAdmin = Setting.isLocalAdminUser(this.props.account);
           return (
             <div style={{display: "flex", flexWrap: "wrap", gap: "8px"}}>
-              <Button onClick={() => this.props.history.push(`/orders/${record.owner}/${record.name}/pay`)} disabled={record.state !== "Created"}>
-                {i18next.t("order:Pay")}
+              <Button onClick={() => this.props.history.push(`/orders/${record.owner}/${record.name}/pay`)}>
+                {(record.state === "Created" || record.state === "Failed") ? i18next.t("order:Pay") : i18next.t("general:Detail")}
               </Button>
               <Button danger onClick={() => this.cancelOrder(record)} disabled={record.state !== "Created" || !isAdmin}>
                 {i18next.t("general:Cancel")}
               </Button>
               <Button type="primary" onClick={() => this.props.history.push({pathname: `/orders/${record.owner}/${record.name}`, mode: isAdmin ? "edit" : "view"})}>{isAdmin ? i18next.t("general:Edit") : i18next.t("general:View")}</Button>
-              <PopconfirmModal
-                disabled={!isAdmin}
-                title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
-                onConfirm={() => this.deleteOrder(index)}
-              >
-              </PopconfirmModal>
+              {isAdmin && (
+                <PopconfirmModal
+                  title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
+                  onConfirm={() => this.deleteOrder(index)}
+                >
+                </PopconfirmModal>
+              )}
             </div>
           );
         },
@@ -278,7 +293,7 @@ class OrderListPage extends BaseListPage {
               </div>
             );
           }}
-          loading={this.state.loading}
+          loading={this.getTableLoading()}
           onChange={this.handleTableChange}
         />
       </div>
@@ -289,7 +304,7 @@ class OrderListPage extends BaseListPage {
     const field = params.searchedColumn, value = params.searchText;
     const sortField = params.sortField, sortOrder = params.sortOrder;
     this.setState({loading: true});
-    OrderBackend.getOrders(Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
+    OrderBackend.getOrders(Setting.isDefaultOrganizationSelected(this.props.account) ? "" : Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
       .then((res) => {
         this.setState({
           loading: false,

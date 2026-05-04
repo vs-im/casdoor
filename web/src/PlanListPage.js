@@ -130,22 +130,14 @@ class PlanListPage extends BaseListPage {
         ...this.getColumnSearchProps("displayName"),
       },
       {
-        title: i18next.t("payment:Currency"),
-        dataIndex: "currency",
-        key: "currency",
-        width: "120px",
-        sorter: true,
-        ...this.getColumnSearchProps("currency"),
-        render: (text, record, index) => {
-          return Setting.getCurrencyWithFlag(text);
-        },
-      },
-      {
-        title: i18next.t("plan:Price"),
+        title: i18next.t("order:Price"),
         dataIndex: "price",
         key: "price",
-        width: "130px",
+        width: "160px",
         ...this.getColumnSearchProps("price"),
+        render: (text, record, index) => {
+          return Setting.getPriceDisplay(record.price, record.currency);
+        },
       },
       {
         title: i18next.t("plan:Period"),
@@ -162,7 +154,7 @@ class PlanListPage extends BaseListPage {
         ...this.getColumnSearchProps("role"),
         render: (text, record, index) => {
           return (
-            <Link to={`/roles/${record.owner}/${text}`}>
+            <Link to={`/roles/${text}`}>
               {text}
             </Link>
           );
@@ -236,7 +228,7 @@ class PlanListPage extends BaseListPage {
               </div>
             );
           }}
-          loading={this.state.loading}
+          loading={this.getTableLoading()}
           onChange={this.handleTableChange}
         />
       </div>

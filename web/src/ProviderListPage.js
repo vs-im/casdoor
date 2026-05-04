@@ -51,24 +51,13 @@ class ProviderListPage extends BaseListPage {
       enableSignUp: true,
       host: "",
       port: 0,
-      providerUrl: "https://github.com/organizations/xxx/settings/applications/1234567",
+      providerUrl: "",
     };
   }
 
   addProvider() {
     const newProvider = this.newProvider();
-    ProviderBackend.addProvider(newProvider)
-      .then((res) => {
-        if (res.status === "ok") {
-          this.props.history.push({pathname: `/providers/${newProvider.owner}/${newProvider.name}`, mode: "add"});
-          Setting.showMessage("success", i18next.t("general:Successfully added"));
-        } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to add")}: ${res.msg}`);
-        }
-      })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
-      });
+    this.props.history.push({pathname: `/providers/${newProvider.owner}/${newProvider.name}`, mode: "add", provider: newProvider});
   }
 
   deleteProvider(i) {
@@ -139,17 +128,22 @@ class ProviderListPage extends BaseListPage {
         ...this.getColumnSearchProps("displayName"),
       },
       {
-        title: i18next.t("provider:Category"),
+        title: i18next.t("general:Category"),
         dataIndex: "category",
         key: "category",
         filterMultiple: false,
         filters: [
           {text: "Captcha", value: "Captcha"},
           {text: "Email", value: "Email"},
+          {text: "Face ID", value: "Face ID"},
+          {text: "ID Verification", value: "ID Verification"},
+          {text: "Log", value: "Log"},
+          {text: "MFA", value: "MFA"},
           {text: "Notification", value: "Notification"},
           {text: "OAuth", value: "OAuth"},
           {text: "Payment", value: "Payment"},
           {text: "SAML", value: "SAML"},
+          {text: "Scan", value: "Scan"},
           {text: "SMS", value: "SMS"},
           {text: "Storage", value: "Storage"},
           {text: "Web3", value: "Web3"},
@@ -158,7 +152,7 @@ class ProviderListPage extends BaseListPage {
         sorter: true,
       },
       {
-        title: i18next.t("provider:Type"),
+        title: i18next.t("general:Type"),
         dataIndex: "type",
         key: "type",
         width: "110px",
@@ -167,10 +161,15 @@ class ProviderListPage extends BaseListPage {
         filters: [
           {text: "Captcha", value: "Captcha", children: Setting.getProviderTypeOptions("Captcha").map((o) => {return {text: o.id, value: o.name};})},
           {text: "Email", value: "Email", children: Setting.getProviderTypeOptions("Email").map((o) => {return {text: o.id, value: o.name};})},
+          {text: "Face ID", value: "Face ID", children: Setting.getProviderTypeOptions("Face ID").map((o) => {return {text: o.id, value: o.name};})},
+          {text: "ID Verification", value: "ID Verification", children: Setting.getProviderTypeOptions("ID Verification").map((o) => {return {text: o.id, value: o.name};})},
+          {text: "Log", value: "Log", children: Setting.getProviderTypeOptions("Log").map((o) => {return {text: o.id, value: o.name};})},
+          {text: "MFA", value: "MFA", children: Setting.getProviderTypeOptions("MFA").map((o) => {return {text: o.id, value: o.name};})},
           {text: "Notification", value: "Notification", children: Setting.getProviderTypeOptions("Notification").map((o) => {return {text: o.id, value: o.name};})},
           {text: "OAuth", value: "OAuth", children: Setting.getProviderTypeOptions("OAuth").map((o) => {return {text: o.id, value: o.name};})},
           {text: "Payment", value: "Payment", children: Setting.getProviderTypeOptions("Payment").map((o) => {return {text: o.id, value: o.name};})},
           {text: "SAML", value: "SAML", children: Setting.getProviderTypeOptions("SAML").map((o) => {return {text: o.id, value: o.name};})},
+          {text: "Scan", value: "Scan", children: Setting.getProviderTypeOptions("Scan").map((o) => {return {text: o.id, value: o.name};})},
           {text: "SMS", value: "SMS", children: Setting.getProviderTypeOptions("SMS").map((o) => {return {text: o.id, value: o.name};})},
           {text: "Storage", value: "Storage", children: Setting.getProviderTypeOptions("Storage").map((o) => {return {text: o.id, value: o.name};})},
           {text: "Web3", value: "Web3", children: Setting.getProviderTypeOptions("Web3").map((o) => {return {text: o.id, value: o.name};})},
@@ -243,11 +242,11 @@ class ProviderListPage extends BaseListPage {
         <Table scroll={{x: "max-content"}} columns={filteredColumns} dataSource={providers} rowKey={(record) => `${record.owner}/${record.name}`} size="middle" bordered pagination={paginationProps}
           title={() => (
             <div>
-              {i18next.t("general:Providers")}&nbsp;&nbsp;&nbsp;&nbsp;
+              {i18next.t("application:Providers")}&nbsp;&nbsp;&nbsp;&nbsp;
               <Button id="add-button" type="primary" size="small" onClick={this.addProvider.bind(this)}>{i18next.t("general:Add")}</Button>
             </div>
           )}
-          loading={this.state.loading}
+          loading={this.getTableLoading()}
           onChange={this.handleTableChange}
         />
       </div>

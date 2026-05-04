@@ -21,16 +21,31 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/url"
-	"regexp"
-	"strings"
-
-	"github.com/casdoor/casdoor/idp"
-	"github.com/mitchellh/mapstructure"
 
 	"github.com/casdoor/casdoor/i18n"
+	"github.com/casdoor/casdoor/idp"
+	"github.com/mitchellh/mapstructure"
 	saml2 "github.com/russellhaering/gosaml2"
 	dsig "github.com/russellhaering/goxmldsig"
 )
+
+// IsValidSamlRedirectURL checks that the redirect URL in the SAML RelayState
+// points to the same origin as this Casdoor instance, preventing open redirect attacks.
+func IsValidSamlRedirectURL(redirectURL, host string) bool {
+	if redirectURL == "" {
+		return false
+	}
+	parsed, err := url.Parse(redirectURL)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	_, origin := getOriginFromHost(host)
+	originParsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return parsed.Host == originParsed.Host
+}
 
 func ParseSamlResponse(samlResponse string, provider *Provider, host string) (*idp.UserInfo, error) {
 	samlResponse, _ = url.QueryUnescape(samlResponse)
@@ -113,7 +128,7 @@ func GenerateSamlRequest(id, relayState, host, lang string) (auth string, method
 func buildSp(provider *Provider, samlResponse string, host string) (*saml2.SAMLServiceProvider, error) {
 	_, origin := getOriginFromHost(host)
 
-	certStore, err := buildSpCertificateStore(provider, samlResponse)
+	certStore, err := buildSpCertificateStore(provider)
 	if err != nil {
 		return nil, err
 	}
@@ -152,15 +167,10 @@ func buildSpKeyStore() (dsig.X509KeyStore, error) {
 	}, nil
 }
 
-func buildSpCertificateStore(provider *Provider, samlResponse string) (certStore dsig.MemoryX509CertificateStore, err error) {
-	certEncodedData := ""
-	if samlResponse != "" {
-		certEncodedData, err = getCertificateFromSamlResponse(samlResponse, provider.Type)
-		if err != nil {
-			return
-		}
-	} else if provider.IdP != "" {
-		certEncodedData = provider.IdP
+func buildSpCertificateStore(provider *Provider) (certStore dsig.MemoryX509CertificateStore, err error) {
+	certEncodedData := provider.IdP
+	if certEncodedData == "" {
+		return dsig.MemoryX509CertificateStore{}, fmt.Errorf("the IdP certificate of provider: %s is empty", provider.Name)
 	}
 
 	var certData []byte
@@ -185,31 +195,4 @@ func buildSpCertificateStore(provider *Provider, samlResponse string) (certStore
 		Roots: []*x509.Certificate{idpCert},
 	}
 	return certStore, nil
-}
-
-func getCertificateFromSamlResponse(samlResponse string, providerType string) (string, error) {
-	de, err := base64.StdEncoding.DecodeString(samlResponse)
-	if err != nil {
-		return "", err
-	}
-	var (
-		expression string
-		deStr      = strings.Replace(string(de), "\n", "", -1)
-		tagMap     = map[string]string{
-			"Aliyun IDaaS": "ds",
-			"Keycloak":     "dsig",
-		}
-	)
-	tag := tagMap[providerType]
-	if tag == "" {
-		// <ds:X509Certificate>...</ds:X509Certificate>
-		// <dsig:X509Certificate>...</dsig:X509Certificate>
-		// <X509Certificate>...</X509Certificate>
-		// ...
-		expression = "<[^>]*:?X509Certificate>([\\s\\S]*?)<[^>]*:?X509Certificate>"
-	} else {
-		expression = fmt.Sprintf("<%s:X509Certificate>([\\s\\S]*?)</%s:X509Certificate>", tag, tag)
-	}
-	res := regexp.MustCompile(expression).FindStringSubmatch(deStr)
-	return res[1], nil
 }

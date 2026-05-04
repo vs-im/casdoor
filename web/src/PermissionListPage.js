@@ -17,6 +17,7 @@ import {Link} from "react-router-dom";
 import {Button, Modal, Switch, Table, Upload} from "antd";
 import moment from "moment";
 import * as Setting from "./Setting";
+import * as Conf from "./Conf";
 import * as PermissionBackend from "./backend/PermissionBackend";
 import i18next from "i18next";
 import BaseListPage from "./BaseListPage";
@@ -38,7 +39,7 @@ class PermissionListPage extends BaseListPage {
       roles: [],
       domains: [],
       resourceType: "Application",
-      resources: ["hasura"],
+      resources: [Conf.DefaultApplication],
       actions: ["Read"],
       effect: "Allow",
       isEnabled: true,
@@ -337,9 +338,9 @@ class PermissionListPage extends BaseListPage {
             case "Write":
               return i18next.t("permission:Write");
             case "Admin":
-              return i18next.t("permission:Admin");
+              return i18next.t("general:Admin");
             default:
-              return null;
+              return tag || null;
             }
           });
           return Setting.getTags(tags);
@@ -414,7 +415,7 @@ class PermissionListPage extends BaseListPage {
         dataIndex: "approveTime",
         key: "approveTime",
         filterMultiple: false,
-        width: "120px",
+        width: "130px",
         sorter: true,
         render: (text, record, index) => {
           return Setting.getFormattedDate(text);
@@ -427,7 +428,7 @@ class PermissionListPage extends BaseListPage {
         filterMultiple: false,
         filters: [
           {text: i18next.t("permission:Approved"), value: "Approved"},
-          {text: i18next.t("permission:Pending"), value: "Pending"},
+          {text: i18next.t("webhook:Pending"), value: "Pending"},
         ],
         width: "120px",
         sorter: true,
@@ -436,7 +437,7 @@ class PermissionListPage extends BaseListPage {
           case "Approved":
             return Setting.getTag("success", i18next.t("permission:Approved"));
           case "Pending":
-            return Setting.getTag("error", i18next.t("permission:Pending"));
+            return Setting.getTag("error", i18next.t("webhook:Pending"));
           default:
             return null;
           }
@@ -483,7 +484,7 @@ class PermissionListPage extends BaseListPage {
               }
             </div>
           )}
-          loading={this.state.loading}
+          loading={this.getTableLoading()}
           onChange={this.handleTableChange}
         />
       </div>

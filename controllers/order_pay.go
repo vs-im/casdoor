@@ -15,8 +15,8 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
@@ -34,30 +34,22 @@ import (
 // @Success 200 {object} object.Order The Response object
 // @router /place-order [post]
 func (c *ApiController) PlaceOrder() {
-	productId := c.Ctx.Input.Query("productId")
-	pricingName := c.Ctx.Input.Query("pricingName")
-	planName := c.Ctx.Input.Query("planName")
-	customPriceStr := c.Ctx.Input.Query("customPrice")
+	owner := c.Ctx.Input.Query("owner")
 	paidUserName := c.Ctx.Input.Query("userName")
 
-	if productId == "" {
-		c.ResponseError(c.T("general:ProductId is required"))
+	var req struct {
+		ProductInfos []object.ProductInfo `json:"productInfos"`
+		CouponCode   string               `json:"couponCode"`
+	}
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, &req)
+	if err != nil {
+		c.ResponseError(err.Error())
 		return
 	}
 
-	var customPrice float64
-	if customPriceStr != "" {
-		var err error
-		customPrice, err = strconv.ParseFloat(customPriceStr, 64)
-		if err != nil {
-			c.ResponseError(fmt.Sprintf(c.T("general:Invalid customPrice: %s"), customPriceStr))
-			return
-		}
-	}
-
-	owner, _, err := util.GetOwnerAndNameFromIdWithError(productId)
-	if err != nil {
-		c.ResponseError(err.Error())
+	productInfos := req.ProductInfos
+	if len(productInfos) == 0 {
+		c.ResponseError(c.T("product:Product list cannot be empty"))
 		return
 	}
 
@@ -89,7 +81,7 @@ func (c *ApiController) PlaceOrder() {
 		return
 	}
 
-	order, err := object.PlaceOrder(productId, user, pricingName, planName, customPrice)
+	order, err := object.PlaceOrder(owner, productInfos, user, req.CouponCode)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
@@ -129,7 +121,7 @@ func (c *ApiController) PayOrder() {
 		return
 	}
 
-	payment, attachInfo, err := object.PayOrder(providerName, host, paymentEnv, order)
+	payment, attachInfo, err := object.PayOrder(providerName, host, paymentEnv, order, c.GetAcceptLanguage())
 	if err != nil {
 		c.ResponseError(err.Error())
 		return

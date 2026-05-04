@@ -284,6 +284,11 @@ class SignupPage extends React.Component {
     }
   }
 
+  getLanguageSelectorMode(application) {
+    const languagesItem = application.signinItems?.find((item) => item.name === "Languages");
+    return languagesItem?.rule;
+  }
+
   onFinish(values) {
     const application = this.getApplicationObj();
 
@@ -315,53 +320,78 @@ class SignupPage extends React.Component {
       values.education = values.education.join(", ");
     }
 
+    if (this.state.invitationCode && !values.invitationCode) {
+      values.invitationCode = this.state.invitationCode;
+    }
+
     const params = new URLSearchParams(window.location.search);
     values.plan = params.get("plan");
     values.pricing = params.get("pricing");
 
+    // Get OAuth parameters if present
+    const oAuthParams = Util.getOAuthGetParameters();
     this.setState({
       loading: true,
     });
     if (!values.email) {
       values.email = this.state.email || "";
     }
-    AuthBackend.signup(values).then((res) => {
-      if (res.status === "ok") {
-        // the user's id will be returned by `signup()`, if user signup by phone, the `username` in `values` is undefined.
-        values.username = res.data.split("/")[1];
-        if (
-          Setting.hasPromptPage(application) &&
-          (!values.plan || !values.pricing)
-        ) {
-          AuthBackend.getAccount("").then((res) => {
-            let account = null;
-            if (res.status === "ok") {
-              account = res.data;
-              account.organization = res.data2;
 
-              this.onUpdateAccount(account);
-              Setting.goToLinkSoft(
-                this,
-                this.getResultPath(application, values)
-              );
-            } else {
-              Setting.showMessage(
-                "error",
-                `${i18next.t("application:Failed to sign in")}: ${res.msg}`
-              );
-            }
-          });
+    AuthBackend.signup(values, oAuthParams)
+      .then((res) => {
+        if (res.status === "ok") {
+          // Check if this is OAuth flow with code response
+          // When OAuth parameters are present and code is returned, it won't contain '/'
+          if (oAuthParams && res.data && typeof res.data === "string" && !res.data.includes("/")) {
+            // OAuth code returned, redirect to redirect_uri with code
+            const code = res.data;
+            const redirectUrl = `${oAuthParams.redirectUri}${oAuthParams.redirectUri.includes("?") ? "&" : "?"}code=${code}&state=${oAuthParams.state}`;
+            Setting.goToLink(redirectUrl);
+            return;
+          }
+
+          // Check if consent is required
+          if (oAuthParams && res.data && typeof res.data === "object" && res.data.required === true) {
+            // Consent required, redirect to consent page
+            Setting.goToLink(`/consent/${application.name}?${window.location.search.substring(1)}`);
+            return;
+          }
+
+          // the user's id will be returned by `signup()`, if user signup by phone, the `username` in `values` is undefined.
+          if (typeof res.data === "string") {
+            values.username = res.data.split("/")[1];
+          }
+          if (Setting.hasPromptPage(application) && (!values.plan || !values.pricing)) {
+            AuthBackend.getAccount("")
+              .then((res) => {
+                let account = null;
+                if (res.status === "ok") {
+                  account = res.data;
+                  account.organization = res.data2;
+
+                  this.onUpdateAccount(account);
+                  Setting.goToLinkSoft(
+                    this,
+                    this.getResultPath(application, values)
+                  );
+                } else {
+                  Setting.showMessage(
+                    "error",
+                    `${i18next.t("application:Failed to sign in")}: ${res.msg}`
+                  );
+                }
+              });
+          } else {
+            Setting.goToLinkSoft(this, this.getResultPath(application, values));
+          }
         } else {
-          Setting.goToLinkSoft(this, this.getResultPath(application, values));
+          Setting.showMessage("error", res.msg);
         }
-      } else {
-        Setting.showMessage("error", res.msg);
-      }
-    }).finally(() => {
-      this.setState({
-        loading: false,
+      }).finally(() => {
+        this.setState({
+          loading: false,
+        });
       });
-    });
   }
 
   onFinishFailed(values, errorFields, outOfDate) {
@@ -482,7 +512,7 @@ class SignupPage extends React.Component {
           name="name"
           key="name"
           className="signup-name"
-          label={(signupItem.label ? signupItem.label : (signupItem.rule === "Real name" || signupItem.rule === "First, last") ? i18next.t("general:Real name") : i18next.t("general:Display name"))}
+          label={(signupItem.label ? signupItem.label : (signupItem.rule === "Real name" || signupItem.rule === "First, last") ? i18next.t("application:Real name") : i18next.t("general:Display name"))}
           rules={displayNameRules}
         >
           <Input className="signup-name-input" placeholder={signupItem.placeholder} />
@@ -636,7 +666,7 @@ class SignupPage extends React.Component {
               rules={[
                 {
                   required: required,
-                  message: i18next.t("signup:Please input your Email!"),
+                  message: i18next.t("login:Please input your Email!"),
                 },
                 {
                   validator: (_, value) => {
@@ -645,9 +675,7 @@ class SignupPage extends React.Component {
                       !Setting.isValidEmail(this.state.email)
                     ) {
                       this.setState({validEmail: false});
-                      return Promise.reject(
-                        i18next.t("signup:The input is not valid Email!")
-                      );
+                      return Promise.reject(i18next.t("login:The input is not valid Email!"));
                     }
 
                     if (signupItem.regex) {
@@ -972,7 +1000,7 @@ class SignupPage extends React.Component {
             name="confirm"
             className="signup-confirm"
             label={
-              signupItem.label ? signupItem.label : i18next.t("signup:Confirm")
+              signupItem.label ? signupItem.label : i18next.t("general:Confirm")
             }
             dependencies={["password"]}
             hasFeedback
@@ -1301,13 +1329,20 @@ class SignupPage extends React.Component {
               <div dangerouslySetInnerHTML={{__html: application.formSideHtml}} />
             </div>
             <div className="login-form">
-              {Setting.renderHelmet(application)}
-              {Setting.renderLogo(application)}
+              {
+                Setting.renderHelmet(application)
+              }
+              {
+                Setting.renderLogo(application)
+              }
               <LanguageSelect
                 languages={application.organizationObj.languages}
+                mode={this.getLanguageSelectorMode(application)}
                 style={{top: "55px", right: "5px", position: "absolute"}}
               />
-              {this.renderForm(application)}
+              {
+                this.renderForm(application)
+              }
             </div>
           </div>
         </div>

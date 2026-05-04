@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React from "react";
+import Loading from "./common/Loading";
 import {Avatar, Button, Card, Col, Divider, Input, List, Row, Select, Space, Tag} from "antd";
 import {SendOutlined, UserOutlined} from "@ant-design/icons";
 import * as TicketBackend from "./backend/TicketBackend";
@@ -177,6 +178,22 @@ class TicketEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {i18next.t("general:Created time")}:
+          </Col>
+          <Col span={22} >
+            <Input value={this.state.ticket.createdTime} disabled={true} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {i18next.t("general:Updated time")}:
+          </Col>
+          <Col span={22} >
+            <Input value={this.state.ticket.updatedTime} disabled={true} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {i18next.t("general:Title")}:
           </Col>
           <Col span={22} >
@@ -187,7 +204,7 @@ class TicketEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {i18next.t("general:Content")}:
+            {i18next.t("provider:Content")}:
           </Col>
           <Col span={22} >
             <TextArea autoSize={{minRows: 3, maxRows: 10}} value={this.state.ticket.content} disabled={!isAdmin && !isOwner} onChange={e => {
@@ -200,7 +217,7 @@ class TicketEditPage extends React.Component {
             {i18next.t("general:User")}:
           </Col>
           <Col span={22} >
-            <Input value={this.state.ticket.user} disabled={true} />
+            <Input value={this.state.ticket.user} />
           </Col>
         </Row>
         <Row style={{marginTop: "20px"}} >
@@ -218,22 +235,6 @@ class TicketEditPage extends React.Component {
               <Option value="Resolved">{i18next.t("ticket:Resolved")}</Option>
               <Option value="Closed">{i18next.t("ticket:Closed")}</Option>
             </Select>
-          </Col>
-        </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {i18next.t("general:Created time")}:
-          </Col>
-          <Col span={22} >
-            <Input value={this.state.ticket.createdTime} disabled={true} />
-          </Col>
-        </Row>
-        <Row style={{marginTop: "20px"}} >
-          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {i18next.t("general:Updated time")}:
-          </Col>
-          <Col span={22} >
-            <Input value={this.state.ticket.updatedTime} disabled={true} />
           </Col>
         </Row>
       </Card>
@@ -304,11 +305,11 @@ class TicketEditPage extends React.Component {
     return (
       <div>
         {
-          this.state.ticket !== null ? this.renderTicket() : null
+          this.state.ticket !== null ? this.renderTicket() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
         <br />
         {
-          this.state.ticket !== null ? this.renderMessages() : null
+          this.state.ticket !== null ? this.renderMessages() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
       </div>
     );

@@ -17,35 +17,38 @@ package object
 import (
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/util"
-	"github.com/casvisor/casvisor-go-sdk/casvisorsdk"
 )
 
 type InitData struct {
-	Organizations []*Organization       `json:"organizations"`
-	Applications  []*Application        `json:"applications"`
-	Users         []*User               `json:"users"`
-	Certs         []*Cert               `json:"certs"`
-	Providers     []*Provider           `json:"providers"`
-	Ldaps         []*Ldap               `json:"ldaps"`
-	Models        []*Model              `json:"models"`
-	Permissions   []*Permission         `json:"permissions"`
-	Payments      []*Payment            `json:"payments"`
-	Products      []*Product            `json:"products"`
-	Resources     []*Resource           `json:"resources"`
-	Roles         []*Role               `json:"roles"`
-	Syncers       []*Syncer             `json:"syncers"`
-	Tokens        []*Token              `json:"tokens"`
-	Webhooks      []*Webhook            `json:"webhooks"`
-	Groups        []*Group              `json:"groups"`
-	Adapters      []*Adapter            `json:"adapters"`
-	Enforcers     []*Enforcer           `json:"enforcers"`
-	Plans         []*Plan               `json:"plans"`
-	Pricings      []*Pricing            `json:"pricings"`
-	Invitations   []*Invitation         `json:"invitations"`
-	Records       []*casvisorsdk.Record `json:"records"`
-	Sessions      []*Session            `json:"sessions"`
-	Subscriptions []*Subscription       `json:"subscriptions"`
-	Transactions  []*Transaction        `json:"transactions"`
+	Organizations []*Organization `json:"organizations"`
+	Applications  []*Application  `json:"applications"`
+	Users         []*User         `json:"users"`
+	Certs         []*Cert         `json:"certs"`
+	Providers     []*Provider     `json:"providers"`
+	Ldaps         []*Ldap         `json:"ldaps"`
+	Models        []*Model        `json:"models"`
+	Permissions   []*Permission   `json:"permissions"`
+	Payments      []*Payment      `json:"payments"`
+	Products      []*Product      `json:"products"`
+	Resources     []*Resource     `json:"resources"`
+	Roles         []*Role         `json:"roles"`
+	Syncers       []*Syncer       `json:"syncers"`
+	Tokens        []*Token        `json:"tokens"`
+	Webhooks      []*Webhook      `json:"webhooks"`
+	Groups        []*Group        `json:"groups"`
+	Adapters      []*Adapter      `json:"adapters"`
+	Enforcers     []*Enforcer     `json:"enforcers"`
+	Plans         []*Plan         `json:"plans"`
+	Pricings      []*Pricing      `json:"pricings"`
+	Invitations   []*Invitation   `json:"invitations"`
+	Records       []*Record       `json:"records"`
+	Sessions      []*Session      `json:"sessions"`
+	Subscriptions []*Subscription `json:"subscriptions"`
+	Transactions  []*Transaction  `json:"transactions"`
+	Sites         []*Site         `json:"sites"`
+	Rules         []*Rule         `json:"rules"`
+
+	ThirdPartyLinks []*ThirdPartyLink `json:"third_party_links"`
 
 	EnforcerPolicies map[string][][]string `json:"enforcerPolicies"`
 }
@@ -142,6 +145,15 @@ func InitFromFile() {
 		for _, transaction := range initData.Transactions {
 			initDefinedTransaction(transaction)
 		}
+		for _, rule := range initData.Rules {
+			initDefinedRule(rule)
+		}
+		for _, site := range initData.Sites {
+			initDefinedSite(site)
+		}
+		for _, link := range initData.ThirdPartyLinks {
+			initThirdPartyLinks(link)
+		}
 	}
 }
 
@@ -174,10 +186,14 @@ func readInitDataFromFile(filePath string) (*InitData, error) {
 		Plans:         []*Plan{},
 		Pricings:      []*Pricing{},
 		Invitations:   []*Invitation{},
-		Records:       []*casvisorsdk.Record{},
+		Records:       []*Record{},
 		Sessions:      []*Session{},
 		Subscriptions: []*Subscription{},
 		Transactions:  []*Transaction{},
+		Sites:         []*Site{},
+		Rules:         []*Rule{},
+
+		ThirdPartyLinks: []*ThirdPartyLink{},
 
 		EnforcerPolicies: map[string][][]string{},
 	}
@@ -291,7 +307,7 @@ func initDefinedOrganization(organization *Organization) {
 	}
 	organization.CreatedTime = util.GetCurrentTime()
 	if len(organization.AccountItems) == 0 {
-		organization.AccountItems = getBuiltInAccountItems()
+		organization.AccountItems = GetDefaultAccountItems()
 	}
 
 	_, err = AddOrganization(organization)
@@ -816,7 +832,7 @@ func initDefinedInvitation(invitation *Invitation) {
 	}
 }
 
-func initDefinedRecord(record *casvisorsdk.Record) {
+func initDefinedRecord(record *Record) {
 	record.Id = 0
 	record.CreatedTime = util.GetCurrentTime()
 	_ = AddRecord(record)
@@ -873,6 +889,78 @@ func initDefinedTransaction(transaction *Transaction) {
 	}
 	transaction.CreatedTime = util.GetCurrentTime()
 	_, _, err = AddTransaction(transaction, "en", false)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initDefinedSite(site *Site) {
+	existed, err := getSite(site.Owner, site.Name)
+	if err != nil {
+		panic(err)
+	}
+	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
+		affected, err := DeleteSite(site)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete site")
+		}
+	}
+	site.CreatedTime = util.GetCurrentTime()
+	_, err = AddSite(site)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initDefinedRule(rule *Rule) {
+	existed, err := getRule(rule.Owner, rule.Name)
+	if err != nil {
+		panic(err)
+	}
+	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
+		affected, err := DeleteRule(rule)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete rule")
+		}
+	}
+	rule.CreatedTime = util.GetCurrentTime()
+	_, err = AddRule(rule)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initThirdPartyLinks(link *ThirdPartyLink) {
+	existed, err := GetThirdPartyLink(link.Owner, link.UserName, link.ProviderName)
+	if err != nil {
+		panic(err)
+	}
+	if existed != nil {
+		if initDataNewOnly {
+			return
+		}
+		affected, err := DeleteThirdPartyLink(link.Owner, link.UserName, link.ProviderName)
+		if err != nil {
+			panic(err)
+		}
+		if !affected {
+			panic("Fail to delete third party link")
+		}
+	}
+	link.CreatedTime = util.GetCurrentTime()
+	_, err = AddThirdPartyLink(link)
 	if err != nil {
 		panic(err)
 	}

@@ -41,6 +41,7 @@ type Adapter struct {
 	Database     string `xorm:"varchar(100)" json:"database"`
 
 	*xormadapter.Adapter `xorm:"-" json:"-"`
+	engine               *xorm.Engine
 }
 
 func GetAdapterCount(owner, field, value string) (int64, error) {
@@ -146,7 +147,7 @@ func (adapter *Adapter) GetId() string {
 }
 
 func (adapter *Adapter) InitAdapter() error {
-	if adapter.Adapter != nil {
+	if adapter.Adapter != nil && adapter.engine != nil {
 		return nil
 	}
 
@@ -160,6 +161,9 @@ func (adapter *Adapter) InitAdapter() error {
 		}
 	} else {
 		driverName = adapter.DatabaseType
+		if driverName == "sqlite3" {
+			driverName = "sqlite"
+		}
 		switch driverName {
 		case "mssql":
 			dataSourceName = fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s", adapter.User,
@@ -173,7 +177,7 @@ func (adapter *Adapter) InitAdapter() error {
 		case "CockroachDB":
 			dataSourceName = fmt.Sprintf("user=%s password=%s host=%s port=%d sslmode=disable dbname=%s serial_normalization=virtual_sequence",
 				adapter.User, adapter.Password, adapter.Host, adapter.Port, adapter.Database)
-		case "sqlite3":
+		case "sqlite":
 			dataSourceName = fmt.Sprintf("file:%s", adapter.Host)
 		default:
 			return fmt.Errorf("unsupported database type: %s", adapter.DatabaseType)
@@ -199,10 +203,14 @@ func (adapter *Adapter) InitAdapter() error {
 
 	tableName := adapter.Table
 
-	adapter.Adapter, err = xormadapter.NewAdapterByEngineWithTableName(engine, tableName, "")
+	xa, err := xormadapter.NewAdapterByEngineWithTableName(engine, tableName, "")
 	if err != nil {
+		_ = engine.Close()
 		return err
 	}
+
+	adapter.engine = engine
+	adapter.Adapter = xa
 
 	return nil
 }

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React from "react";
+import Loading from "./common/Loading";
 import {Button, Card, Col, Input, InputNumber, Row, Select, Switch} from "antd";
 import * as AdapterBackend from "./backend/AdapterBackend";
 import * as OrganizationBackend from "./backend/OrganizationBackend";
@@ -158,7 +159,7 @@ class AdapterEditPage extends React.Component {
             <React.Fragment>
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-                  {Setting.getLabel(i18next.t("provider:Type"), i18next.t("provider:Type - Tooltip"))} :
+                  {Setting.getLabel(i18next.t("general:Type"), i18next.t("general:Type - Tooltip"))} :
                 </Col>
                 <Col span={22} >
                   <Select virtual={false} disabled={Setting.builtInObject(this.state.adapter)} style={{width: "100%"}} value={this.state.adapter.type} onChange={(value => {
@@ -196,7 +197,7 @@ class AdapterEditPage extends React.Component {
               </Row>
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-                  {Setting.getLabel(i18next.t("provider:Host"), i18next.t("provider:Host - Tooltip"))} :
+                  {Setting.getLabel(i18next.t("general:Host"), i18next.t("provider:Host - Tooltip"))} :
                 </Col>
                 <Col span={22} >
                   <Input value={this.state.adapter.host} onChange={e => {
@@ -206,7 +207,7 @@ class AdapterEditPage extends React.Component {
               </Row>
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-                  {Setting.getLabel(i18next.t("provider:Port"), i18next.t("provider:Port - Tooltip"))} :
+                  {Setting.getLabel(i18next.t("general:Port"), i18next.t("provider:Port - Tooltip"))} :
                 </Col>
                 <Col span={22} >
                   <InputNumber value={this.state.adapter.port} min={0} max={65535} onChange={value => {
@@ -316,7 +317,7 @@ class AdapterEditPage extends React.Component {
     return (
       <div>
         {
-          this.state.adapter !== null ? this.renderAdapter() : null
+          this.state.adapter !== null ? this.renderAdapter() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
         <div style={{marginTop: "20px", marginLeft: "40px"}}>
           <Button size="large" onClick={() => this.submitAdapterEdit(false)}>{i18next.t("general:Save")}</Button>

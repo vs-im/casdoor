@@ -14,6 +14,17 @@
 
 package object
 
+// OriginalGroup represents a group from an external system
+type OriginalGroup struct {
+	Id          string
+	Name        string
+	DisplayName string
+	Description string
+	Type        string
+	Manager     string
+	Email       string
+}
+
 // SyncerProvider defines the interface that all syncer implementations must satisfy.
 // Different syncer types (Database, Keycloak, WeCom, Azure AD) implement this interface.
 type SyncerProvider interface {
@@ -22,6 +33,12 @@ type SyncerProvider interface {
 
 	// GetOriginalUsers retrieves all users from the external system
 	GetOriginalUsers() ([]*OriginalUser, error)
+
+	// GetOriginalGroups retrieves all groups from the external system
+	GetOriginalGroups() ([]*OriginalGroup, error)
+
+	// GetOriginalUserGroups retrieves the group IDs that a user belongs to
+	GetOriginalUserGroups(userId string) ([]string, error)
 
 	// AddUser adds a new user to the external system
 	AddUser(user *OriginalUser) (bool, error)
@@ -47,6 +64,16 @@ func GetSyncerProvider(syncer *Syncer) SyncerProvider {
 		return &GoogleWorkspaceSyncerProvider{Syncer: syncer}
 	case "Active Directory":
 		return &ActiveDirectorySyncerProvider{Syncer: syncer}
+	case "DingTalk":
+		return &DingtalkSyncerProvider{Syncer: syncer}
+	case "Lark":
+		return &LarkSyncerProvider{Syncer: syncer}
+	case "Okta":
+		return &OktaSyncerProvider{Syncer: syncer}
+	case "SCIM":
+		return &SCIMSyncerProvider{Syncer: syncer}
+	case "AWS IAM":
+		return &AwsIamSyncerProvider{Syncer: syncer}
 	case "Keycloak":
 		return &KeycloakSyncerProvider{
 			DatabaseSyncerProvider: DatabaseSyncerProvider{Syncer: syncer},

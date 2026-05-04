@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Card, Col, Divider, Progress, Row, Spin, Tour} from "antd";
+import {Card, Col, Progress, Row, Tour} from "antd";
+import Loading from "./common/Loading";
 import * as SystemBackend from "./backend/SystemInfo";
 import React from "react";
 import * as Setting from "./Setting";
@@ -20,12 +21,21 @@ import * as TourConfig from "./TourConfig";
 import i18next from "i18next";
 import PrometheusInfoTable from "./table/PrometheusInfoTable";
 
+const getProgressColor = (percent) => {
+  if (percent >= 90) {
+    return "#ff4d4f";
+  } else if (percent >= 70) {
+    return "#faad14";
+  }
+  return undefined;
+};
+
 class SystemInfo extends React.Component {
 
   constructor(props) {
     super(props);
     this.state = {
-      systemInfo: {cpuUsage: [], memoryUsed: 0, memoryTotal: 0},
+      systemInfo: {cpuUsage: [], memoryUsed: 0, memoryTotal: 0, diskUsed: 0, diskTotal: 0, networkSent: 0, networkRecv: 0, networkTotal: 0},
       versionInfo: {},
       prometheusInfo: {apiThroughput: [], apiLatency: [], totalThroughput: 0},
       intervalId: null,
@@ -144,20 +154,41 @@ class SystemInfo extends React.Component {
   render() {
     const cpuUi = this.state.systemInfo.cpuUsage?.length <= 0 ? i18next.t("general:Failed to get") :
       this.state.systemInfo.cpuUsage.map((usage, i) => {
+        const percent = Number(usage.toFixed(1));
         return (
-          <Progress key={i} percent={Number(usage.toFixed(1))} />
+          <Progress key={i} percent={percent} strokeColor={getProgressColor(percent)} format={p => `${p}%`} />
         );
       });
 
+    const memPercent = Number((Number(this.state.systemInfo.memoryUsed) / Number(this.state.systemInfo.memoryTotal) * 100).toFixed(2));
     const memUi = this.state.systemInfo.memoryUsed && this.state.systemInfo.memoryTotal && this.state.systemInfo.memoryTotal <= 0 ? i18next.t("general:Failed to get") :
       <div>
         {Setting.getFriendlyFileSize(this.state.systemInfo.memoryUsed)} / {Setting.getFriendlyFileSize(this.state.systemInfo.memoryTotal)}
         <br /> <br />
-        <Progress type="circle" percent={Number((Number(this.state.systemInfo.memoryUsed) / Number(this.state.systemInfo.memoryTotal) * 100).toFixed(2))} />
+        <Progress type="circle" percent={memPercent} strokeColor={getProgressColor(memPercent)} format={p => `${p}%`} />
       </div>;
-    const latencyUi = this.state.prometheusInfo?.apiLatency === null || this.state.prometheusInfo?.apiLatency?.length <= 0 ? <Spin size="large" /> :
+
+    const diskUi = this.state.systemInfo.diskTotal <= 0 ? i18next.t("general:Failed to get") :
+      <div>
+        {Setting.getFriendlyFileSize(this.state.systemInfo.diskUsed)} / {Setting.getFriendlyFileSize(this.state.systemInfo.diskTotal)}
+        <br /> <br />
+        <Progress type="circle" percent={Number((Number(this.state.systemInfo.diskUsed) / Number(this.state.systemInfo.diskTotal) * 100).toFixed(2))} />
+      </div>;
+
+    const networkUi = this.state.systemInfo.networkTotal === undefined || this.state.systemInfo.networkTotal === null ? i18next.t("general:Failed to get") :
+      <div>
+        {i18next.t("system:Sent")}: {Setting.getFriendlyFileSize(this.state.systemInfo.networkSent)}
+        <br />
+        {i18next.t("system:Received")}: {Setting.getFriendlyFileSize(this.state.systemInfo.networkRecv)}
+        <br /> <br />
+        <div style={{fontSize: "16px", fontWeight: "600", color: "rgba(0, 0, 0, 0.85)"}}>
+          {i18next.t("system:Total Throughput")}: {Setting.getFriendlyFileSize(this.state.systemInfo.networkTotal)}
+        </div>
+      </div>;
+
+    const latencyUi = this.state.prometheusInfo?.apiLatency === null || this.state.prometheusInfo?.apiLatency?.length <= 0 ? <Loading /> :
       <PrometheusInfoTable prometheusInfo={this.state.prometheusInfo} table={"latency"} />;
-    const throughputUi = this.state.prometheusInfo?.apiThroughput === null || this.state.prometheusInfo?.apiThroughput?.length <= 0 ? <Spin size="large" /> :
+    const throughputUi = this.state.prometheusInfo?.apiThroughput === null || this.state.prometheusInfo?.apiThroughput?.length <= 0 ? <Loading /> :
       <PrometheusInfoTable prometheusInfo={this.state.prometheusInfo} table={"throughput"} />;
     const link = this.state.versionInfo?.version !== "" ? `https://github.com/casdoor/casdoor/releases/tag/${this.state.versionInfo?.version}` : "";
     let versionText = this.state.versionInfo?.version !== "" ? this.state.versionInfo?.version : i18next.t("system:Unknown version");
@@ -168,32 +199,38 @@ class SystemInfo extends React.Component {
     if (!Setting.isMobile()) {
       return (
         <>
-          <Row>
-            <Col span={6}></Col>
+          <Row gutter={[16, 16]}>
+            <Col span={6}>
+              <Card id="network-card" title={i18next.t("system:Network Usage")} bordered={true} style={{textAlign: "center", height: "100%"}}>
+                {this.state.loading ? <Loading /> : networkUi}
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card id="cpu-card" title={i18next.t("system:CPU Usage")} bordered={true} style={{textAlign: "center", height: "100%"}}>
+                {this.state.loading ? <Loading /> : cpuUi}
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card id="memory-card" title={i18next.t("system:Memory Usage")} bordered={true} style={{textAlign: "center", height: "100%"}}>
+                {this.state.loading ? <Loading /> : memUi}
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card id="disk-card" title={i18next.t("system:Disk Usage")} bordered={true} style={{textAlign: "center", height: "100%"}}>
+                {this.state.loading ? <Loading /> : diskUi}
+              </Card>
+            </Col>
             <Col span={12}>
-              <Row gutter={[10, 10]}>
-                <Col span={12}>
-                  <Card id="cpu-card" title={i18next.t("system:CPU Usage")} bordered={true} style={{textAlign: "center", height: "100%"}}>
-                    {this.state.loading ? <Spin size="large" /> : cpuUi}
-                  </Card>
-                </Col>
-                <Col span={12}>
-                  <Card id="memory-card" title={i18next.t("system:Memory Usage")} bordered={true} style={{textAlign: "center", height: "100%"}}>
-                    {this.state.loading ? <Spin size="large" /> : memUi}
-                  </Card>
-                </Col>
-                <Col span={24}>
-                  <Card id="latency-card" title={i18next.t("system:API Latency")} bordered={true} style={{textAlign: "center", height: "100%"}}>
-                    {this.state.loading ? <Spin size="large" /> : latencyUi}
-                  </Card>
-                </Col>
-                <Col span={24}>
-                  <Card id="throughput-card" title={i18next.t("system:API Throughput")} bordered={true} style={{textAlign: "center", height: "100%"}}>
-                    {this.state.loading ? <Spin size="large" /> : throughputUi}
-                  </Card>
-                </Col>
-              </Row>
-              <Divider />
+              <Card id="latency-card" title={i18next.t("system:API Latency")} bordered={true} style={{textAlign: "center", height: "100%"}}>
+                {this.state.loading ? <Loading /> : latencyUi}
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card id="throughput-card" title={i18next.t("system:API Throughput")} bordered={true} style={{textAlign: "center", height: "100%"}}>
+                {this.state.loading ? <Loading /> : throughputUi}
+              </Card>
+            </Col>
+            <Col span={24}>
               <Card id="about-card" title={i18next.t("system:About Casdoor")} bordered={true} style={{textAlign: "center"}}>
                 <div>{i18next.t("system:An Identity and Access Management (IAM) / Single-Sign-On (SSO) platform with web UI supporting OAuth 2.0, OIDC, SAML and CAS")}</div>
                 GitHub: <a target="_blank" rel="noreferrer" href="https://github.com/casdoor/casdoor">Casdoor</a>
@@ -205,7 +242,6 @@ class SystemInfo extends React.Component {
                 {i18next.t("system:Community")}: <a target="_blank" rel="noreferrer" href="https://casdoor.org/#:~:text=Casdoor%20API-,Community,-GitHub">Get in Touch!</a>
               </Card>
             </Col>
-            <Col span={6}></Col>
           </Row>
           <Tour
             open={Setting.isMobile() ? false : this.state.isTourVisible}
@@ -222,15 +258,25 @@ class SystemInfo extends React.Component {
       );
     } else {
       return (
-        <Row gutter={[16, 0]}>
+        <Row gutter={[16, 16]}>
+          <Col span={24}>
+            <Card title={i18next.t("system:Network Usage")} bordered={true} style={{textAlign: "center", width: "100%"}}>
+              {this.state.loading ? <Loading /> : networkUi}
+            </Card>
+          </Col>
           <Col span={24}>
             <Card title={i18next.t("system:CPU Usage")} bordered={true} style={{textAlign: "center", width: "100%"}}>
-              {this.state.loading ? <Spin size="large" /> : cpuUi}
+              {this.state.loading ? <Loading /> : cpuUi}
             </Card>
           </Col>
           <Col span={24}>
             <Card title={i18next.t("system:Memory Usage")} bordered={true} style={{textAlign: "center", width: "100%"}}>
-              {this.state.loading ? <Spin size="large" /> : memUi}
+              {this.state.loading ? <Loading /> : memUi}
+            </Card>
+          </Col>
+          <Col span={24}>
+            <Card title={i18next.t("system:Disk Usage")} bordered={true} style={{textAlign: "center", width: "100%"}}>
+              {this.state.loading ? <Loading /> : diskUi}
             </Card>
           </Col>
           <Col span={24}>

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React from "react";
+import Loading from "./common/Loading";
 import {Button, Card, Col, Input, InputNumber, Row, Select, Space, Switch} from "antd";
 import {EyeInvisibleOutlined, EyeTwoTone, HolderOutlined, UsergroupAddOutlined} from "@ant-design/icons";
 import * as LddpBackend from "./backend/LdapBackend";
@@ -218,7 +219,7 @@ class LdapEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}}>
           <Col style={{lineHeight: "32px", textAlign: "right", paddingRight: "25px"}} span={3}>
-            {Setting.getLabel(i18next.t("ldap:Admin"), i18next.t("ldap:Admin - Tooltip"))} :
+            {Setting.getLabel(i18next.t("general:Admin"), i18next.t("ldap:Admin - Tooltip"))} :
           </Col>
           <Col span={21}>
             <Input value={this.state.ldap.username} onChange={e => {
@@ -259,15 +260,22 @@ class LdapEditPage extends React.Component {
             {Setting.getLabel(i18next.t("ldap:Default group"), i18next.t("ldap:Default group - Tooltip"))} :
           </Col>
           <Col span={21}>
-            <Select virtual={false} style={{width: "100%"}} value={this.state.ldap.defaultGroup ?? []} onChange={(value => {
-              this.updateLdapField("defaultGroup", value);
+            <Select virtual={false} mode="multiple" style={{width: "100%"}} value={this.state.ldap.defaultGroups ?? []} onChange={(values => {
+              const physicalGroups = values.filter(v => {
+                const group = this.state.groups?.find(g => `${g.owner}/${g.name}` === v);
+                return group?.type === "Physical";
+              });
+              if (physicalGroups.length > 1) {
+                Setting.showMessage("warning", i18next.t("ldap:Only one physical group can be selected as default"));
+                const firstPhysical = physicalGroups[0];
+                values = values.filter(v => {
+                  const group = this.state.groups?.find(g => `${g.owner}/${g.name}` === v);
+                  return group?.type !== "Physical" || v === firstPhysical;
+                });
+              }
+              this.updateLdapField("defaultGroups", values);
             })}
             >
-              <Option key={""} value={""}>
-                <Space>
-                  {i18next.t("general:Default")}
-                </Space>
-              </Option>
               {
                 this.state.groups?.map((group) => <Option key={group.name} value={`${group.owner}/${group.name}`}>
                   <Space>
@@ -328,7 +336,7 @@ class LdapEditPage extends React.Component {
     return (
       <div>
         {
-          this.state.ldap !== null ? this.renderLdap() : null
+          this.state.ldap !== null ? this.renderLdap() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
         <div style={{marginTop: "20px", marginLeft: "40px"}}>
           <Button size="large" onClick={() => this.submitLdapEdit()}>{i18next.t("general:Save")}</Button>

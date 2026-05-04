@@ -83,6 +83,45 @@ var ldapAttributesMapping = map[string]FieldRelation{
 			return message.AttributeValue(getUserPasswordWithType(user))
 		},
 	},
+	"loginShell": {
+		userField:     "loginShell",
+		notSearchable: true,
+		fieldMapper: func(user *object.User) message.AttributeValue {
+			// Check user properties first, otherwise return default shell
+			if user.Properties != nil {
+				if shell, ok := user.Properties["loginShell"]; ok && shell != "" {
+					return message.AttributeValue(shell)
+				}
+			}
+			return message.AttributeValue("/bin/bash")
+		},
+	},
+	"gecos": {
+		userField:     "gecos",
+		notSearchable: true,
+		fieldMapper: func(user *object.User) message.AttributeValue {
+			// GECOS field typically contains full name and other user info
+			// Format: Full Name,Room Number,Work Phone,Home Phone,Other
+			gecos := user.DisplayName
+			if gecos == "" {
+				gecos = user.Name
+			}
+			return message.AttributeValue(gecos)
+		},
+	},
+	"sshPublicKey": {
+		userField:     "sshPublicKey",
+		notSearchable: true,
+		fieldMapper: func(user *object.User) message.AttributeValue {
+			// Return SSH public key from user properties
+			if user.Properties != nil {
+				if sshKey, ok := user.Properties["sshPublicKey"]; ok && sshKey != "" {
+					return message.AttributeValue(sshKey)
+				}
+			}
+			return message.AttributeValue("")
+		},
+	},
 }
 
 const ldapMemberOfAttr = "memberOf"
@@ -153,6 +192,20 @@ func getUsername(filter string) string {
 func stringInSlice(value string, list []string) bool {
 	for _, item := range list {
 		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+// IsLdapAttrAllowed checks whether the given LDAP attribute is allowed for the organization.
+// An empty filter or a filter containing "All" means all attributes are allowed.
+func IsLdapAttrAllowed(org *object.Organization, attr string) bool {
+	if org == nil || len(org.LdapAttributes) == 0 {
+		return true
+	}
+	for _, f := range org.LdapAttributes {
+		if strings.EqualFold(f, "All") || strings.EqualFold(f, attr) {
 			return true
 		}
 	}

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import React from "react";
+import Loading from "./common/Loading";
+import Editor from "./common/Editor";
 import {Button, Card, Col, Input, Row} from "antd";
 import * as TokenBackend from "./backend/TokenBackend";
 import * as Setting from "./Setting";
@@ -75,13 +77,19 @@ class TokenEditPage extends React.Component {
 
   parseAccessToken(accessToken) {
     try {
-      const parsedHeader = JSON.stringify(jwtDecode(accessToken, {header: true}), null, 2);
-      const parsedPayload = JSON.stringify(jwtDecode(accessToken), null, 2);
-      const res = parsedHeader + "." + parsedPayload;
-      return res;
+      const header = jwtDecode(accessToken, {header: true});
+      const payload = jwtDecode(accessToken);
+      return JSON.stringify({header, payload}, null, 2);
     } catch (error) {
-      return error.message;
+      return JSON.stringify({error: error.message}, null, 2);
     }
+  }
+
+  getParsedTokenEditorHeight(parsedResult) {
+    const lineHeight = 22;
+    const lines = parsedResult.split("\n").length;
+    const visibleRows = Math.min(30, Math.max(10, lines));
+    return `${visibleRows * lineHeight}px`;
   }
 
   renderToken() {
@@ -188,7 +196,7 @@ class TokenEditPage extends React.Component {
             >
               {i18next.t("token:Copy access token")}
             </Button>
-            <TextArea autoSize={{minRows: 10, maxRows: 200}} value={this.state.token.accessToken} onChange={e => {
+            <TextArea autoSize={{minRows: 10, maxRows: 30}} value={this.state.token.accessToken} onChange={e => {
               this.updateTokenField("accessToken", e.target.value);
             }} />
           </Col>
@@ -204,7 +212,14 @@ class TokenEditPage extends React.Component {
             >
               {i18next.t("token:Copy parsed result")}
             </Button>
-            <TextArea autoSize={{minRows: 10, maxRows: 200}} value={parsedResult} />
+            <Editor
+              value={parsedResult}
+              lang="json"
+              readOnly
+              fillWidth
+              dark
+              height={this.getParsedTokenEditorHeight(parsedResult)}
+            />
           </Col>
         </Row>
       </Card>
@@ -254,7 +269,7 @@ class TokenEditPage extends React.Component {
     return (
       <div>
         {
-          this.state.token !== null ? this.renderToken() : null
+          this.state.token !== null ? this.renderToken() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
         <div style={{marginTop: "20px", marginLeft: "40px"}}>
           <Button size="large" onClick={() => this.submitTokenEdit(false)}>{i18next.t("general:Save")}</Button>

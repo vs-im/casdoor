@@ -14,7 +14,9 @@
 
 import moment from "moment";
 import React from "react";
+import Loading from "./common/Loading";
 import {Button, Card, Col, DatePicker, Input, Row, Select} from "antd";
+import PaginateSelect from "./common/PaginateSelect";
 import * as OrganizationBackend from "./backend/OrganizationBackend";
 import * as PricingBackend from "./backend/PricingBackend";
 import * as PlanBackend from "./backend/PlanBackend";
@@ -63,7 +65,6 @@ class SubscriptionEditPage extends React.Component {
           subscription: res.data,
         });
 
-        this.getUsers(this.state.organizationName);
         this.getPricings(this.state.organizationName);
         this.getPlans(this.state.organizationName);
       });
@@ -83,20 +84,6 @@ class SubscriptionEditPage extends React.Component {
       .then((res) => {
         this.setState({
           plans: res.data,
-        });
-      });
-  }
-
-  getUsers(organizationName) {
-    UserBackend.getUsers(organizationName)
-      .then((res) => {
-        if (res.status === "error") {
-          Setting.showMessage("error", res.msg);
-          return;
-        }
-
-        this.setState({
-          users: res.data,
         });
       });
   }
@@ -147,7 +134,6 @@ class SubscriptionEditPage extends React.Component {
           <Col span={22} >
             <Select virtual={false} style={{width: "100%"}} value={this.state.subscription.owner} disabled={isViewMode} onChange={(owner => {
               this.updateSubscriptionField("owner", owner);
-              this.getUsers(owner);
               this.getPlans(owner);
             })}
             options={this.state.organizations.map((organization) => Setting.getOption(organization.name, organization.name))
@@ -217,10 +203,21 @@ class SubscriptionEditPage extends React.Component {
             {Setting.getLabel(i18next.t("general:User"), i18next.t("general:User - Tooltip"))} :
           </Col>
           <Col span={22} >
-            <Select style={{width: "100%"}} value={this.state.subscription.user}
+            <PaginateSelect
+              virtual
+              style={{width: "100%"}}
+              value={this.state.subscription.user}
               disabled={isViewMode}
-              onChange={(value => {this.updateSubscriptionField("user", value);})}
-              options={this.state.users.map((user) => Setting.getOption(user.name, user.name))}
+              allowClear
+              fetchPage={UserBackend.getUsers}
+              buildFetchArgs={({page, pageSize, searchText}) => {
+                const field = searchText ? "name" : "";
+                return [this.state.subscription.owner, page, pageSize, field, searchText];
+              }}
+              reloadKey={this.state.subscription?.owner}
+              optionMapper={(user) => Setting.getOption(user.name, user.name)}
+              filterOption={false}
+              onChange={(value => {this.updateSubscriptionField("user", value || "");})}
             />
           </Col>
         </Row>
@@ -287,11 +284,11 @@ class SubscriptionEditPage extends React.Component {
               this.updateSubscriptionField("state", value);
             })}
             options={[
-              {value: "Pending", name: i18next.t("subscription:Pending")},
+              {value: "Pending", name: i18next.t("webhook:Pending")},
               {value: "Active", name: i18next.t("subscription:Active")},
               {value: "Upcoming", name: i18next.t("subscription:Upcoming")},
               {value: "Expired", name: i18next.t("subscription:Expired")},
-              {value: "Error", name: i18next.t("subscription:Error")},
+              {value: "Error", name: i18next.t("general:Error")},
               {value: "Suspended", name: i18next.t("subscription:Suspended")},
             ].map((item) => Setting.getOption(item.name, item.value))}
             />
@@ -344,7 +341,7 @@ class SubscriptionEditPage extends React.Component {
     return (
       <div>
         {
-          this.state.subscription !== null ? this.renderSubscription() : null
+          this.state.subscription !== null ? this.renderSubscription() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
         {this.state.mode !== "view" && (
           <div style={{marginTop: "20px", marginLeft: "40px"}}>

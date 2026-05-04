@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/casdoor/casdoor/util"
 	"github.com/go-sql-driver/mysql"
 	"golang.org/x/crypto/ssh"
 )
@@ -122,6 +123,10 @@ func (p *DatabaseSyncerProvider) AddUser(user *OriginalUser) (bool, error) {
 // UpdateUser updates an existing user in the database
 func (p *DatabaseSyncerProvider) UpdateUser(user *OriginalUser) (bool, error) {
 	key := p.Syncer.getTargetTablePrimaryKey()
+	if !util.FilterSQLIdentifier(key) {
+		return false, fmt.Errorf("object.UpdateUser: invalid primary key column name: %s", key)
+	}
+
 	m := p.Syncer.getMapFromOriginalUser(user)
 	pkValue := m[key]
 	delete(m, key)
@@ -163,4 +168,16 @@ func (t dsnConnector) Connect(ctx context.Context) (driver.Conn, error) {
 
 func (t dsnConnector) Driver() driver.Driver {
 	return t.driver
+}
+
+// GetOriginalGroups retrieves all groups from Database (not implemented yet)
+func (p *DatabaseSyncerProvider) GetOriginalGroups() ([]*OriginalGroup, error) {
+	// TODO: Implement Database group sync
+	return []*OriginalGroup{}, nil
+}
+
+// GetOriginalUserGroups retrieves the group IDs that a user belongs to (not implemented yet)
+func (p *DatabaseSyncerProvider) GetOriginalUserGroups(userId string) ([]string, error) {
+	// TODO: Implement Database user group membership sync
+	return []string{}, nil
 }

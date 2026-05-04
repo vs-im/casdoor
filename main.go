@@ -29,6 +29,7 @@ import (
 	"github.com/casdoor/casdoor/proxy"
 	"github.com/casdoor/casdoor/radius"
 	"github.com/casdoor/casdoor/routers"
+	"github.com/casdoor/casdoor/service"
 	"github.com/casdoor/casdoor/util"
 )
 
@@ -65,13 +66,20 @@ func main() {
 	}
 
 	object.InitDefaultStorageProvider()
+	object.InitLogProviders()
 	object.InitLdapAutoSynchronizer()
 	proxy.InitHttpClient()
 	authz.InitApi()
 	object.InitUserManager()
 	object.InitFromFile()
-	object.InitCasvisorConfig()
 	object.InitCleanupTokens()
+	object.InitCleanupDeviceAuthMap()
+
+	object.InitSiteMap()
+	if len(object.SiteMap) != 0 {
+		object.InitRuleMap()
+		object.StartMonitorSitesLoop()
+	}
 
 	util.SafeGoroutine(func() { object.RunSyncUsersJob() })
 	util.SafeGoroutine(func() { controllers.InitCLIDownloader() })
@@ -83,6 +91,7 @@ func main() {
 	web.SetStaticPath("/swagger", "swagger")
 	web.SetStaticPath("/files", "files")
 	// https://studygolang.com/articles/2303
+	web.InsertFilter("*", web.BeforeStatic, routers.RequestBodyFilter)
 	web.InsertFilter("*", web.BeforeRouter, routers.StaticFilter)
 	web.InsertFilter("*", web.BeforeRouter, routers.AutoSigninFilter)
 	web.InsertFilter("*", web.BeforeRouter, routers.CorsFilter)
@@ -125,6 +134,13 @@ func main() {
 	go ldap.StartLdapServer()
 	go radius.StartRadiusServer()
 	go object.ClearThroughputPerSecond()
+
+	// Start webhook delivery worker
+	object.StartWebhookDeliveryWorker()
+
+	if len(object.SiteMap) != 0 {
+		service.Start()
+	}
 
 	web.Run(fmt.Sprintf(":%v", port))
 }

@@ -131,7 +131,7 @@ class SubscriptionListPage extends BaseListPage {
         ...this.getColumnSearchProps("displayName"),
       },
       {
-        title: i18next.t("subscription:Period"),
+        title: i18next.t("plan:Period"),
         dataIndex: "period",
         key: "period",
         width: "140px",
@@ -165,7 +165,7 @@ class SubscriptionListPage extends BaseListPage {
         ...this.getColumnSearchProps("plan"),
         render: (text, record, index) => {
           return (
-            <Link to={`/plans/${record.owner}/${text}`}>
+            <Link to={`/plans/${text}`}>
               {text}
             </Link>
           );
@@ -179,7 +179,7 @@ class SubscriptionListPage extends BaseListPage {
         ...this.getColumnSearchProps("user"),
         render: (text, record, index) => {
           return (
-            <Link to={`/users/${record.owner}/${text}`}>
+            <Link to={`/users/${text}`}>
               {text}
             </Link>
           );
@@ -193,7 +193,7 @@ class SubscriptionListPage extends BaseListPage {
         ...this.getColumnSearchProps("payment"),
         render: (text, record, index) => {
           return (
-            <Link to={`/payments/${record.owner}/${text}`}>
+            <Link to={`/payments/${text}`}>
               {text}
             </Link>
           );
@@ -209,7 +209,7 @@ class SubscriptionListPage extends BaseListPage {
         render: (text, record, index) => {
           switch (text) {
           case "Pending":
-            return Setting.getTag("processing", i18next.t("subscription:Pending"), <ExclamationCircleOutlined />);
+            return Setting.getTag("processing", i18next.t("webhook:Pending"), <ExclamationCircleOutlined />);
           case "Active":
             return Setting.getTag("success", i18next.t("subscription:Active"), <SyncOutlined spin />);
           case "Upcoming":
@@ -217,7 +217,7 @@ class SubscriptionListPage extends BaseListPage {
           case "Expired":
             return Setting.getTag("warning", i18next.t("subscription:Expired"), <ClockCircleOutlined />);
           case "Error":
-            return Setting.getTag("error", i18next.t("subscription:Error"), <CloseCircleOutlined />);
+            return Setting.getTag("error", i18next.t("general:Error"), <CloseCircleOutlined />);
           case "Suspended":
             return Setting.getTag("default", i18next.t("subscription:Suspended"), <MinusCircleOutlined />);
           default:
@@ -267,7 +267,7 @@ class SubscriptionListPage extends BaseListPage {
               </div>
             );
           }}
-          loading={this.state.loading}
+          loading={this.getTableLoading()}
           onChange={this.handleTableChange}
         />
       </div>

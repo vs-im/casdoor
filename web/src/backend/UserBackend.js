@@ -45,17 +45,6 @@ export function getUser(owner, name) {
   }).then(res => res.json());
 }
 
-export function addUserKeys(user) {
-  return fetch(`${Setting.ServerUrl}/api/add-user-keys`, {
-    method: "POST",
-    credentials: "include",
-    body: JSON.stringify(user),
-    headers: {
-      "Accept-Language": Setting.getAcceptLanguage(),
-    },
-  }).then(res => res.json());
-}
-
 export function updateUser(owner, name, user) {
   const newUser = Setting.deepCopy(user);
   return fetch(`${Setting.ServerUrl}/api/update-user?id=${owner}/${encodeURIComponent(name)}`, {
@@ -194,6 +183,29 @@ export function resetEmailOrPhone(dest, type, code) {
     method: "POST",
     credentials: "include",
     body: formData,
+    headers: {
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
+  }).then(res => res.json());
+}
+
+export function impersonateUser(username) {
+  const formData = new FormData();
+  formData.append("username", username);
+  return fetch(`${Setting.ServerUrl}/api/impersonate-user`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+    headers: {
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
+  }).then(res => res.json());
+}
+
+export function exitImpersonateUser() {
+  return fetch(`${Setting.ServerUrl}/api/exit-impersonate-user`, {
+    method: "POST",
+    credentials: "include",
     headers: {
       "Accept-Language": Setting.getAcceptLanguage(),
     },

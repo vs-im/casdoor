@@ -16,6 +16,7 @@ package routers
 
 import (
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/beego/beego/v2/core/logs"
 	"github.com/beego/beego/v2/server/web/context"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/object"
@@ -48,6 +50,18 @@ func getWebBuildFolder() string {
 	}
 
 	path = filepath.Join(frontendBaseDir, "web/build")
+	if util.FileExist(filepath.Join(path, "index.html")) {
+		return path
+	}
+
+	casdoorDir := filepath.Join(filepath.Dir(frontendBaseDir), "casdoor")
+	if util.FileExist(filepath.Join(casdoorDir, "index.html")) {
+		return casdoorDir
+	}
+	if util.FileExist(filepath.Join(casdoorDir, "web/build", "index.html")) {
+		return filepath.Join(casdoorDir, "web/build")
+	}
+
 	return path
 }
 
@@ -89,11 +103,28 @@ func fastAutoSignin(ctx *context.Context) (string, error) {
 		return "", nil
 	}
 
-	code, err := object.GetOAuthCode(userId, clientId, "", "autoSignin", responseType, redirectUri, scope, state, nonce, codeChallenge, ctx.Request.Host, getAcceptLanguage(ctx))
+	user, err := object.GetUser(userId)
+	if err != nil {
+		return "", err
+	}
+	if user == nil {
+		return "", nil
+	}
+
+	consentRequired, err := object.CheckConsentRequired(user, application, scope)
+	if err != nil {
+		return "", err
+	}
+
+	if consentRequired {
+		return "", nil
+	}
+
+	code, err := object.GetOAuthCode(userId, clientId, "", "autoSignin", responseType, redirectUri, scope, state, nonce, codeChallenge, "", ctx.Request.Host, getAcceptLanguage(ctx))
 	if err != nil {
 		return "", err
 	} else if code.Message != "" {
-		return "", fmt.Errorf(code.Message)
+		return "", errors.New(code.Message)
 	}
 
 	sep := "?"
@@ -114,6 +145,12 @@ func StaticFilter(ctx *context.Context) {
 	if strings.HasPrefix(urlPath, "/api/") || strings.HasPrefix(urlPath, "/.well-known/") {
 		return
 	}
+	if serveAuthCallbackHandlerScript(ctx) {
+		return
+	}
+	if serveProviderHintRedirectScript(ctx) {
+		return
+	}
 	if strings.HasPrefix(urlPath, "/cas") && (strings.HasSuffix(urlPath, "/serviceValidate") || strings.HasSuffix(urlPath, "/proxy") || strings.HasSuffix(urlPath, "/proxyValidate") || strings.HasSuffix(urlPath, "/validate") || strings.HasSuffix(urlPath, "/p3/serviceValidate") || strings.HasSuffix(urlPath, "/p3/proxyValidate") || strings.HasSuffix(urlPath, "/samlValidate")) {
 		return
 	}
@@ -132,6 +169,14 @@ func StaticFilter(ctx *context.Context) {
 			http.Redirect(ctx.ResponseWriter, ctx.Request, redirectUrl, http.StatusFound)
 			return
 		}
+
+		if serveProviderHintRedirectPage(ctx) {
+			return
+		}
+	}
+
+	if serveAuthCallbackPage(ctx) {
+		return
 	}
 
 	webBuildFolder := getWebBuildFolder()
@@ -152,6 +197,12 @@ func StaticFilter(ctx *context.Context) {
 
 	if strings.Contains(path, "/../") || !util.FileExist(path) {
 		path = webBuildFolder + "/index.html"
+	}
+	if strings.HasSuffix(path, "/index.html") {
+		err = util.AppendWebConfigCookie(ctx)
+		if err != nil {
+			logs.Error("AppendWebConfigCookie failed in StaticFilter, error: %s", err)
+		}
 	}
 	if !util.FileExist(path) {
 		dir, err := os.Getwd()

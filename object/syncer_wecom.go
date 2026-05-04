@@ -275,6 +275,7 @@ func (p *WecomSyncerProvider) wecomUserToOriginalUser(wecomUser *WecomUser) *Ori
 		Address:     []string{},
 		Properties:  map[string]string{},
 		Groups:      []string{},
+		Wecom:       wecomUser.UserId, // Link WeCom provider account
 	}
 
 	// Set gender
@@ -302,4 +303,16 @@ func (p *WecomSyncerProvider) wecomUserToOriginalUser(wecomUser *WecomUser) *Ori
 	}
 
 	return user
+}
+
+// GetOriginalGroups retrieves all groups from WeCom (not implemented yet)
+func (p *WecomSyncerProvider) GetOriginalGroups() ([]*OriginalGroup, error) {
+	// TODO: Implement WeCom group sync
+	return []*OriginalGroup{}, nil
+}
+
+// GetOriginalUserGroups retrieves the group IDs that a user belongs to (not implemented yet)
+func (p *WecomSyncerProvider) GetOriginalUserGroups(userId string) ([]string, error) {
+	// TODO: Implement WeCom user group membership sync
+	return []string{}, nil
 }

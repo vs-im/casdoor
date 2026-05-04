@@ -1,0 +1,241 @@
+// Copyright 2026 The Casdoor Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import React from "react";
+import {DeleteOutlined, DownOutlined, UpOutlined} from "@ant-design/icons";
+import {AutoComplete, Button, Col, Input, Row, Table, Tooltip} from "antd";
+import * as Setting from "../Setting";
+import i18next from "i18next";
+import RegionSelect from "../common/select/RegionSelect";
+
+const TAG_OPTIONS = [
+  {value: "Home", label: "Home"},
+  {value: "Work", label: "Work"},
+  {value: "Other", label: "Other"},
+];
+
+class AddressTable extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      classes: props,
+      addresses: this.props.table !== null ? this.props.table.map((item, index) => {
+        item.key = index;
+        return item;
+      }) : [],
+    };
+  }
+
+  count = this.props.table?.length ?? 0;
+
+  updateTable(table) {
+    this.setState({
+      addresses: table,
+    });
+
+    this.props.onUpdateTable([...table].map((item) => {
+      const newItem = Setting.deepCopy(item);
+      delete newItem.key;
+      return newItem;
+    }));
+  }
+
+  updateField(table, index, key, value) {
+    table[index][key] = value;
+    this.updateTable(table);
+  }
+
+  addRow(table) {
+    const row = {key: this.count, tag: "", line1: "", line2: "", city: "", state: "", zipCode: "", region: ""};
+    if (table === undefined || table === null) {
+      table = [];
+    }
+
+    this.count += 1;
+    table = Setting.addRow(table, row);
+    this.updateTable(table);
+  }
+
+  deleteRow(table, i) {
+    table = Setting.deleteRow(table, i);
+    this.updateTable(table);
+  }
+
+  upRow(table, i) {
+    table = Setting.swapRow(table, i - 1, i);
+    this.updateTable(table);
+  }
+
+  downRow(table, i) {
+    table = Setting.swapRow(table, i, i + 1);
+    this.updateTable(table);
+  }
+
+  renderTable(table) {
+    const columns = [
+      {
+        title: i18next.t("general:Tag"),
+        dataIndex: "tag",
+        key: "tag",
+        width: "100px",
+        render: (text, record, index) => {
+          const tagOptions = TAG_OPTIONS.map(opt => ({...opt, label: opt.value === "Home" ? i18next.t("general:Home") : opt.value === "Work" ? i18next.t("user:Work") : i18next.t("user:Other")}));
+          return (
+            <AutoComplete
+              size="small"
+              style={{width: "100%"}}
+              value={text || ""}
+              options={tagOptions}
+              onChange={value => {
+                this.updateField(table, index, "tag", value);
+              }}
+              onSelect={value => {
+                this.updateField(table, index, "tag", value);
+              }}
+            />
+          );
+        },
+      },
+      {
+        title: i18next.t("user:Line 1"),
+        dataIndex: "line1",
+        key: "line1",
+        width: "150px",
+        render: (text, record, index) => {
+          return (
+            <Input size="small" value={text} onChange={e => {
+              this.updateField(table, index, "line1", e.target.value);
+            }} />
+          );
+        },
+      },
+      {
+        title: i18next.t("user:Line 2"),
+        dataIndex: "line2",
+        key: "line2",
+        width: "150px",
+        render: (text, record, index) => {
+          return (
+            <Input size="small" value={text} onChange={e => {
+              this.updateField(table, index, "line2", e.target.value);
+            }} />
+          );
+        },
+      },
+      {
+        title: i18next.t("user:City"),
+        dataIndex: "city",
+        key: "city",
+        width: "120px",
+        render: (text, record, index) => {
+          return (
+            <Input size="small" value={text} onChange={e => {
+              this.updateField(table, index, "city", e.target.value);
+            }} />
+          );
+        },
+      },
+      {
+        title: i18next.t("general:State"),
+        dataIndex: "state",
+        key: "state",
+        width: "100px",
+        render: (text, record, index) => {
+          return (
+            <Input size="small" value={text} onChange={e => {
+              this.updateField(table, index, "state", e.target.value);
+            }} />
+          );
+        },
+      },
+      {
+        title: i18next.t("user:Zip code"),
+        dataIndex: "zipCode",
+        key: "zipCode",
+        width: "100px",
+        render: (text, record, index) => {
+          return (
+            <Input size="small" value={text} onChange={e => {
+              this.updateField(table, index, "zipCode", e.target.value);
+            }} />
+          );
+        },
+      },
+      {
+        title: i18next.t("provider:Region"),
+        dataIndex: "region",
+        key: "region",
+        width: "150px",
+        render: (text, record, index) => {
+          return (
+            <RegionSelect
+              size="small"
+              value={text}
+              onChange={value => {
+                this.updateField(table, index, "region", value);
+              }}
+            />
+          );
+        },
+      },
+      {
+        title: i18next.t("general:Action"),
+        key: "action",
+        width: "100px",
+        render: (text, record, index) => {
+          return (
+            <div>
+              <Tooltip placement="bottomLeft" title={i18next.t("general:Up")}>
+                <Button style={{marginRight: "5px"}} disabled={index === 0} icon={<UpOutlined />} size="small" onClick={() => this.upRow(table, index)} />
+              </Tooltip>
+              <Tooltip placement="topLeft" title={i18next.t("general:Down")}>
+                <Button style={{marginRight: "5px"}} disabled={index === table.length - 1} icon={<DownOutlined />} size="small" onClick={() => this.downRow(table, index)} />
+              </Tooltip>
+              <Tooltip placement="topLeft" title={i18next.t("general:Delete")}>
+                <Button icon={<DeleteOutlined />} size="small" onClick={() => this.deleteRow(table, index)} />
+              </Tooltip>
+            </div>
+          );
+        },
+      },
+    ];
+
+    return (
+      <Table scroll={{x: "max-content"}} rowKey="key" columns={columns} dataSource={table} size="middle" bordered pagination={false}
+        title={() => (
+          <div>
+            {this.props.title}&nbsp;&nbsp;&nbsp;&nbsp;
+            <Button style={{marginRight: "5px"}} type="primary" size="small" onClick={() => this.addRow(table)}>{i18next.t("general:Add")}</Button>
+          </div>
+        )}
+      />
+    );
+  }
+
+  render() {
+    return (
+      <div>
+        <Row style={{marginTop: "20px"}} >
+          <Col span={24}>
+            {
+              this.renderTable(this.state.addresses)
+            }
+          </Col>
+        </Row>
+      </div>
+    );
+  }
+}
+
+export default AddressTable;

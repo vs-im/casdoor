@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/casdoor/casdoor/conf"
+	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/util"
 	"github.com/xorm-io/builder"
 	"github.com/xorm-io/core"
@@ -142,7 +143,7 @@ func GetGroup(id string) (*Group, error) {
 	return getGroup(owner, name)
 }
 
-func UpdateGroup(id string, group *Group) (bool, error) {
+func UpdateGroup(id string, group *Group, isGlobalAdmin bool, lang string) (bool, error) {
 	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
 	if err != nil {
 		return false, err
@@ -150,6 +151,10 @@ func UpdateGroup(id string, group *Group) (bool, error) {
 	oldGroup, err := getGroup(owner, name)
 	if oldGroup == nil {
 		return false, err
+	}
+
+	if !isGlobalAdmin && oldGroup.Owner != group.Owner {
+		return false, errors.New(i18n.Translate(lang, "auth:Unauthorized operation"))
 	}
 
 	err = checkGroupName(group.Name)
@@ -318,10 +323,12 @@ func GetGroupUserCount(groupId string, field, value string) (int64, error) {
 		return int64(len(names)), nil
 	} else {
 		tableNamePrefix := conf.GetConfigString("tableNamePrefix")
-		return ormer.Engine.Table(tableNamePrefix+"user").
-			Where("owner = ?", owner).In("name", names).
-			And(fmt.Sprintf("user.%s like ?", util.CamelToSnakeCase(field)), "%"+value+"%").
-			Count()
+		session := ormer.Engine.Table(tableNamePrefix+"user").
+			Where("owner = ?", owner).In("name", names)
+		if util.FilterField(field) {
+			session = session.And(fmt.Sprintf("user.%s like ?", util.CamelToSnakeCase(field)), "%"+value+"%")
+		}
+		return session.Count()
 	}
 }
 
@@ -345,15 +352,15 @@ func GetPaginationGroupUsers(groupId string, offset, limit int, field, value, so
 		session.Limit(limit, offset)
 	}
 
-	if field != "" && value != "" {
+	if field != "" && value != "" && util.FilterField(field) {
 		session = session.And(fmt.Sprintf("%s.%s like ?", prefixedUserTable, util.CamelToSnakeCase(field)), "%"+value+"%")
 	}
 
-	if sortField == "" || sortOrder == "" {
+	if sortField == "" || sortOrder == "" || !util.FilterField(sortField) {
 		sortField = "created_time"
 	}
 
-	orderQuery := fmt.Sprintf("%s.%s", prefixedUserTable, util.SnakeString(sortField))
+	orderQuery := fmt.Sprintf("%s.%s", prefixedUserTable, util.CamelToSnakeCase(sortField))
 
 	if sortOrder == "ascend" {
 		session = session.Asc(orderQuery)

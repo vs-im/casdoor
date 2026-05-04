@@ -40,13 +40,19 @@ func (c *ApiController) GetOrganizations() {
 	organizationName := c.Ctx.Input.Query("organizationName")
 
 	isGlobalAdmin := c.IsGlobalAdmin()
+	currentUser := c.getCurrentUser()
+	if !isGlobalAdmin && currentUser == nil {
+		c.ResponseError(c.T("general:Please sign in first"))
+		return
+	}
+
 	if limit == "" || page == "" {
 		var organizations []*object.Organization
 		var err error
 		if isGlobalAdmin {
 			organizations, err = object.GetMaskedOrganizations(object.GetOrganizations(owner))
 		} else {
-			organizations, err = object.GetMaskedOrganizations(object.GetOrganizations(owner, c.getCurrentUser().Owner))
+			organizations, err = object.GetMaskedOrganizations(object.GetOrganizations(owner, currentUser.Owner))
 		}
 
 		if err != nil {
@@ -57,7 +63,7 @@ func (c *ApiController) GetOrganizations() {
 		c.ResponseOk(organizations)
 	} else {
 		if !isGlobalAdmin {
-			organizations, err := object.GetMaskedOrganizations(object.GetOrganizations(owner, c.getCurrentUser().Owner))
+			organizations, err := object.GetMaskedOrganizations(object.GetOrganizations(owner, currentUser.Owner))
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -171,6 +177,22 @@ func (c *ApiController) AddOrganization() {
 
 	if organization.BalanceCurrency == "" {
 		organization.BalanceCurrency = "USD"
+	}
+
+	if len(organization.AccountItems) == 0 {
+		organization.AccountItems = object.GetDefaultAccountItems()
+	}
+
+	if len(organization.PasswordOptions) == 0 {
+		organization.PasswordOptions = []string{"AtLeast6"}
+	}
+
+	if len(organization.CountryCodes) == 0 {
+		organization.CountryCodes = []string{"US", "ES", "FR", "DE", "GB", "CN", "JP", "KR", "VN", "ID", "SG", "IN"}
+	}
+
+	if len(organization.Languages) == 0 {
+		organization.Languages = []string{"en", "es", "fr", "de", "ja", "zh", "vi", "pt", "tr", "pl", "uk"}
 	}
 
 	c.Data["json"] = wrapActionResponse(object.AddOrganization(&organization))

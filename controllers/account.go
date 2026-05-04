@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/beego/beego/v2/core/logs"
 	"github.com/casdoor/casdoor/form"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
@@ -312,6 +313,40 @@ func (c *ApiController) Signup() {
 	userId := user.GetId()
 	util.LogInfo(c.Ctx, "API: [%s] is signed up as new user", userId)
 
+	// Check if this is an OAuth flow and automatically generate code
+	clientId := c.Ctx.Input.Query("clientId")
+	responseType := c.Ctx.Input.Query("responseType")
+	redirectUri := c.Ctx.Input.Query("redirectUri")
+	scope := c.Ctx.Input.Query("scope")
+	state := c.Ctx.Input.Query("state")
+	nonce := c.Ctx.Input.Query("nonce")
+	codeChallenge := c.Ctx.Input.Query("code_challenge")
+
+	// If OAuth parameters are present, generate OAuth code and return it
+	if clientId != "" && responseType == ResponseTypeCode {
+		consentRequired, err := object.CheckConsentRequired(user, application, scope)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		if consentRequired {
+			c.ResponseOk(map[string]bool{"required": true})
+			return
+		}
+
+		code, err := object.GetOAuthCode(userId, clientId, "", "password", responseType, redirectUri, scope, state, nonce, codeChallenge, "", c.Ctx.Request.Host, c.GetAcceptLanguage())
+		if err != nil {
+			c.ResponseError(err.Error(), nil)
+			return
+		}
+
+		resp := codeToResponse(code)
+		c.Data["json"] = resp
+		c.ServeJSON()
+		return
+	}
+
 	c.ResponseOk(userId)
 }
 
@@ -339,22 +374,25 @@ func (c *ApiController) Logout() {
 			return
 		}
 
+		// Retrieve application and token before clearing the session
+		application := c.GetSessionApplication()
+		sessionToken := c.GetSessionToken()
+
 		c.ClearUserSession()
 		c.ClearTokenSession()
-		owner, username, err := util.GetOwnerAndNameFromIdWithError(user)
-		if err != nil {
-			c.ResponseError(err.Error())
-			return
-		}
-		_, err = object.DeleteSessionId(util.GetSessionId(owner, username, object.CasdoorApplication), c.Ctx.Input.CruSession.SessionID(context.Background()))
-		if err != nil {
+
+		if err := c.deleteUserSession(user); err != nil {
 			c.ResponseError(err.Error())
 			return
 		}
 
-		util.LogInfo(c.Ctx, "API: [%s] logged out", user)
+		// Propagate logout to external Custom OAuth2 providers
+		object.InvokeCustomProviderLogout(application, sessionToken)
 
-		application := c.GetSessionApplication()
+		// Send OIDC Back-Channel Logout notifications (https://openid.net/specs/openid-connect-backchannel-1_0.html)
+		bcOwner, bcUsername := util.GetOwnerAndNameFromIdNoCheck(user)
+		object.SendBackchannelLogout(bcOwner, bcUsername, "", c.Ctx.Request.Host)
+
 		if application == nil || application.Name == "hasura" || application.HomepageUrl == "" {
 			c.ResponseOk(user)
 			return
@@ -382,7 +420,7 @@ func (c *ApiController) Logout() {
 			return
 		}
 		if application == nil {
-			c.ResponseError(fmt.Sprintf(c.T("auth:The application: %s does not exist")), token.Application)
+			c.ResponseError(fmt.Sprintf(c.T("auth:The application: %s does not exist"), token.Application))
 			return
 		}
 
@@ -392,20 +430,18 @@ func (c *ApiController) Logout() {
 
 		c.ClearUserSession()
 		c.ClearTokenSession()
+
 		// TODO https://github.com/casdoor/casdoor/pull/1494#discussion_r1095675265
-		owner, username, err := util.GetOwnerAndNameFromIdWithError(user)
-		if err != nil {
+		if err := c.deleteUserSession(user); err != nil {
 			c.ResponseError(err.Error())
 			return
 		}
 
-		_, err = object.DeleteSessionId(util.GetSessionId(owner, username, object.CasdoorApplication), c.Ctx.Input.CruSession.SessionID(context.Background()))
-		if err != nil {
-			c.ResponseError(err.Error())
-			return
-		}
+		// Propagate logout to external Custom OAuth2 providers
+		object.InvokeCustomProviderLogout(application, accessToken)
 
-		util.LogInfo(c.Ctx, "API: [%s] logged out", user)
+		// Send OIDC Back-Channel Logout notifications (https://openid.net/specs/openid-connect-backchannel-1_0.html)
+		object.SendBackchannelLogout(token.Organization, token.User, "", c.Ctx.Request.Host)
 
 		if redirectUri == "" {
 			c.ResponseOk()
@@ -449,6 +485,10 @@ func (c *ApiController) SsoLogout() {
 	logoutAll := c.Ctx.Input.Query("logoutAll")
 	logoutAllSessions := logoutAll == "" || logoutAll == "true" || logoutAll == "1"
 
+	// Retrieve application and token before clearing the session
+	ssoApplication := c.GetSessionApplication()
+	ssoSessionToken := c.GetSessionToken()
+
 	c.ClearUserSession()
 	c.ClearTokenSession()
 	owner, username, err := util.GetOwnerAndNameFromIdWithError(user)
@@ -467,15 +507,17 @@ func (c *ApiController) SsoLogout() {
 	var tokens []*object.Token
 	var sessionIds []string
 
+	// Get tokens for notification (needed for both session-level and full logout)
+	// This enables subsystems to identify and invalidate corresponding access tokens
+	// Note: Tokens must be retrieved BEFORE expiration to include their hashes in the notification
+	tokens, err = object.GetTokensByUser(owner, username)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
 	if logoutAllSessions {
 		// Logout from all sessions: expire all tokens and delete all sessions
-		// Get tokens before expiring them (for session-level logout notification)
-		tokens, err = object.GetTokensByUser(owner, username)
-		if err != nil {
-			c.ResponseError(err.Error())
-			return
-		}
-
 		_, err = object.ExpireTokenByUser(owner, username)
 		if err != nil {
 			c.ResponseError(err.Error())
@@ -526,6 +568,12 @@ func (c *ApiController) SsoLogout() {
 		}
 	}
 
+	// Send OIDC Back-Channel Logout notifications (https://openid.net/specs/openid-connect-backchannel-1_0.html)
+	object.SendBackchannelLogout(owner, username, currentSessionId, c.Ctx.Request.Host)
+
+	// Propagate logout to external Custom OAuth2 providers
+	object.InvokeCustomProviderLogout(ssoApplication, ssoSessionToken)
+
 	c.ResponseOk()
 }
 
@@ -537,6 +585,11 @@ func (c *ApiController) SsoLogout() {
 // @router /get-account [get]
 func (c *ApiController) GetAccount() {
 	var err error
+	err = util.AppendWebConfigCookie(c.Ctx)
+	if err != nil {
+		logs.Error("AppendWebConfigCookie failed in GetAccount, error: %s", err)
+	}
+
 	user, ok := c.RequireSignedInUser()
 	if !ok {
 		return
@@ -663,6 +716,51 @@ func (c *ApiController) GetCaptcha() {
 	applicationId := c.Ctx.Input.Query("applicationId")
 	isCurrentProvider := c.Ctx.Input.Query("isCurrentProvider")
 
+	// When isCurrentProvider == "true", the frontend passes a provider ID instead of an application ID.
+	// In that case, skip application lookup and rule evaluation, and just return the provider config.
+	shouldSkipCaptcha := false
+
+	if isCurrentProvider != "true" {
+		application, err := object.GetApplication(applicationId)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		if application == nil {
+			c.ResponseError(fmt.Sprintf(c.T("auth:The application: %s does not exist"), applicationId))
+			return
+		}
+
+		// Check the CAPTCHA rule to determine if CAPTCHA should be shown
+		clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
+
+		// For Internet-Only rule, we can determine on the backend if CAPTCHA should be shown
+		// For other rules (Dynamic, Always), we need to return the CAPTCHA config
+		for _, providerItem := range application.Providers {
+			if providerItem.Provider == nil || providerItem.Provider.Category != "Captcha" {
+				continue
+			}
+
+			// For "None" rule, skip CAPTCHA
+			if providerItem.Rule == "None" || providerItem.Rule == "" {
+				shouldSkipCaptcha = true
+			} else if providerItem.Rule == "Internet-Only" {
+				// For Internet-Only rule, check if the client is from intranet
+				if !util.IsInternetIp(clientIp) {
+					// Client is from intranet, skip CAPTCHA
+					shouldSkipCaptcha = true
+				}
+			}
+
+			break // Only check the first CAPTCHA provider
+		}
+
+		if shouldSkipCaptcha {
+			c.ResponseOk(Captcha{Type: "none"})
+			return
+		}
+	}
 	captchaProvider, err := object.GetCaptchaProviderByApplication(applicationId, isCurrentProvider, c.GetAcceptLanguage())
 	if err != nil {
 		c.ResponseError(err.Error())
@@ -695,4 +793,25 @@ func (c *ApiController) GetCaptcha() {
 	}
 
 	c.ResponseOk(Captcha{Type: "none"})
+}
+
+func (c *ApiController) deleteUserSession(user string) error {
+	owner, username, err := util.GetOwnerAndNameFromIdWithError(user)
+	if err != nil {
+		return err
+	}
+
+	// Casdoor session ID derived from owner, username, and application
+	sessionId := util.GetSessionId(owner, username, object.CasdoorApplication)
+
+	// Explicitly get the Beego session ID from the context
+	beegoSessionId := c.Ctx.Input.CruSession.SessionID(context.Background())
+
+	_, err = object.DeleteSessionId(sessionId, beegoSessionId)
+	if err != nil {
+		return err
+	}
+
+	util.LogInfo(c.Ctx, "API: [%s] logged out", user)
+	return nil
 }

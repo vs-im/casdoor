@@ -14,12 +14,17 @@
 
 import React, {memo} from "react";
 import {createButton} from "react-social-login-buttons";
+import * as Setting from "../Setting";
 
 class SelfLoginButton extends React.Component {
   generateIcon() {
-    const avatar = this.props.account.avatar;
+    const account = this.props.account;
+    const avatarUrl = Setting.getEffectiveAvatarUrl(account);
     return () => {
-      return <img style={{borderRadius: "50%"}} width={36} height={36} src={avatar} alt="Sign in with Google" />;
+      if (!avatarUrl) {
+        return Setting.getAvatarPlaceholder(account.name, 36);
+      }
+      return <img style={{borderRadius: "50%"}} width={36} height={36} src={avatarUrl} alt={account.name} />;
     };
   }
 

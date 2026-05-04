@@ -28,8 +28,9 @@ import (
 )
 
 type TwitterIdProvider struct {
-	Client *http.Client
-	Config *oauth2.Config
+	Client       *http.Client
+	Config       *oauth2.Config
+	CodeVerifier string
 }
 
 func NewTwitterIdProvider(clientId string, clientSecret string, redirectUrl string) *TwitterIdProvider {
@@ -84,14 +85,25 @@ func (idp *TwitterIdProvider) GetToken(code string) (*oauth2.Token, error) {
 	params := url.Values{}
 	// params.Add("client_id", idp.Config.ClientID)
 	params.Add("redirect_uri", idp.Config.RedirectURL)
-	params.Add("code_verifier", "casdoor-verifier")
+	// Use dynamic code verifier if provided, otherwise fall back to static one
+	verifier := idp.CodeVerifier
+	if verifier == "" {
+		verifier = "casdoor-verifier"
+	}
+	params.Add("code_verifier", verifier)
 	params.Add("code", code)
 	params.Add("grant_type", "authorization_code")
 	req, err := http.NewRequest("POST", "https://api.twitter.com/2/oauth2/token", strings.NewReader(params.Encode()))
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	e := base64.StdEncoding.EncodeToString([]byte(idp.Config.ClientID + ":" + idp.Config.ClientSecret))
 	req.Header.Add("Authorization", "Basic "+e)
 	accessTokenResp, err := idp.GetUrlResp(req)
+	if err != nil {
+		return nil, err
+	}
 	var TwitterAccessToken TwitterAccessToken
 	if err = json.Unmarshal([]byte(accessTokenResp), &TwitterAccessToken); err != nil {
 		return nil, err
@@ -143,6 +155,9 @@ func (idp *TwitterIdProvider) GetUserInfo(token *oauth2.Token) (*UserInfo, error
 	// accessToken := token.AccessToken
 
 	req, err := http.NewRequest("GET", "https://api.twitter.com/2/users/me", nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Authorization", "Bearer "+token.AccessToken)
 	// req.URL.Query().Set("user.fields", "profile_image_url")

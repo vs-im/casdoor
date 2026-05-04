@@ -5,7 +5,7 @@
 *.so
 *.dylib
 *.swp
-server_*
+/server_*
 
 # Test binary, built with `go test -c`
 *.test
@@ -20,6 +20,7 @@ bin/
 .idea/
 *.iml
 .vscode/settings.json
+.claude
 
 tmp/
 tmpFiles/

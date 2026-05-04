@@ -17,6 +17,7 @@ package object
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -58,59 +59,59 @@ type User struct {
 	UpdatedTime string `xorm:"varchar(100)" json:"updatedTime"`
 	DeletedTime string `xorm:"varchar(100)" json:"deletedTime"`
 
-	Id                string   `xorm:"varchar(100) index" json:"id"`
-	ExternalId        string   `xorm:"varchar(100) index" json:"externalId"`
-	Type              string   `xorm:"varchar(100)" json:"type"`
-	Password          string   `xorm:"varchar(150)" json:"password"`
-	PasswordSalt      string   `xorm:"varchar(100)" json:"passwordSalt"`
-	PasswordType      string   `xorm:"varchar(100)" json:"passwordType"`
-	DisplayName       string   `xorm:"varchar(100)" json:"displayName"`
-	FirstName         string   `xorm:"varchar(100)" json:"firstName"`
-	LastName          string   `xorm:"varchar(100)" json:"lastName"`
-	Avatar            string   `xorm:"text" json:"avatar"`
-	AvatarType        string   `xorm:"varchar(100)" json:"avatarType"`
-	PermanentAvatar   string   `xorm:"varchar(500)" json:"permanentAvatar"`
-	Email             string   `xorm:"varchar(100) index" json:"email"`
-	EmailVerified     bool     `json:"emailVerified"`
-	Phone             string   `xorm:"varchar(100) index" json:"phone"`
-	CountryCode       string   `xorm:"varchar(6)" json:"countryCode"`
-	Region            string   `xorm:"varchar(100)" json:"region"`
-	Location          string   `xorm:"varchar(100)" json:"location"`
-	Address           []string `json:"address"`
-	Affiliation       string   `xorm:"varchar(100)" json:"affiliation"`
-	Title             string   `xorm:"varchar(100)" json:"title"`
-	IdCardType        string   `xorm:"varchar(100)" json:"idCardType"`
-	IdCard            string   `xorm:"varchar(100) index" json:"idCard"`
-	RealName          string   `xorm:"varchar(100)" json:"realName"`
-	IsVerified        bool     `json:"isVerified"`
-	Homepage          string   `xorm:"varchar(100)" json:"homepage"`
-	Bio               string   `xorm:"varchar(100)" json:"bio"`
-	Tag               string   `xorm:"varchar(100)" json:"tag"`
-	Language          string   `xorm:"varchar(100)" json:"language"`
-	Gender            string   `xorm:"varchar(100)" json:"gender"`
-	Birthday          string   `xorm:"varchar(100)" json:"birthday"`
-	Education         string   `xorm:"varchar(100)" json:"education"`
-	Score             int      `json:"score"`
-	Karma             int      `json:"karma"`
-	Ranking           int      `json:"ranking"`
-	Balance           float64  `json:"balance"`
-	BalanceCredit     float64  `json:"balanceCredit"`
-	Currency          string   `xorm:"varchar(100)" json:"currency"`
-	BalanceCurrency   string   `xorm:"varchar(100)" json:"balanceCurrency"`
-	IsDefaultAvatar   bool     `json:"isDefaultAvatar"`
-	IsOnline          bool     `json:"isOnline"`
-	IsAdmin           bool     `json:"isAdmin"`
-	IsForbidden       bool     `json:"isForbidden"`
-	IsDeleted         bool     `json:"isDeleted"`
-	SignupApplication string   `xorm:"varchar(100)" json:"signupApplication"`
-	Hash              string   `xorm:"varchar(100)" json:"hash"`
-	PreHash           string   `xorm:"varchar(100)" json:"preHash"`
-	RegisterType      string   `xorm:"varchar(100)" json:"registerType"`
-	RegisterSource    string   `xorm:"varchar(100)" json:"registerSource"`
-	AccessKey         string   `xorm:"varchar(100)" json:"accessKey"`
-	AccessSecret      string   `xorm:"varchar(100)" json:"accessSecret"`
-	AccessToken       string   `xorm:"mediumtext" json:"accessToken"`
-	OriginalToken     string   `xorm:"mediumtext" json:"originalToken"`
+	Id                   string     `xorm:"varchar(100) index" json:"id"`
+	ExternalId           string     `xorm:"varchar(100) index" json:"externalId"`
+	Type                 string     `xorm:"varchar(100)" json:"type"`
+	Password             string     `xorm:"varchar(150)" json:"password"`
+	PasswordSalt         string     `xorm:"varchar(100)" json:"passwordSalt"`
+	PasswordType         string     `xorm:"varchar(100)" json:"passwordType"`
+	DisplayName          string     `xorm:"varchar(100)" json:"displayName"`
+	FirstName            string     `xorm:"varchar(100)" json:"firstName"`
+	LastName             string     `xorm:"varchar(100)" json:"lastName"`
+	Avatar               string     `xorm:"text" json:"avatar"`
+	AvatarType           string     `xorm:"varchar(100)" json:"avatarType"`
+	PermanentAvatar      string     `xorm:"varchar(500)" json:"permanentAvatar"`
+	Email                string     `xorm:"varchar(100) index" json:"email"`
+	EmailVerified        bool       `json:"emailVerified"`
+	Phone                string     `xorm:"varchar(100) index" json:"phone"`
+	CountryCode          string     `xorm:"varchar(6)" json:"countryCode"`
+	Region               string     `xorm:"varchar(100)" json:"region"`
+	Location             string     `xorm:"varchar(100)" json:"location"`
+	Address              []string   `json:"address"`
+	Addresses            []*Address `xorm:"addresses blob" json:"addresses"`
+	Affiliation          string     `xorm:"varchar(100)" json:"affiliation"`
+	Title                string     `xorm:"varchar(100)" json:"title"`
+	IdCardType           string     `xorm:"varchar(100)" json:"idCardType"`
+	IdCard               string     `xorm:"varchar(100) index" json:"idCard"`
+	RealName             string     `xorm:"varchar(100)" json:"realName"`
+	IsVerified           bool       `json:"isVerified"`
+	Homepage             string     `xorm:"varchar(100)" json:"homepage"`
+	Bio                  string     `xorm:"varchar(100)" json:"bio"`
+	Tag                  string     `xorm:"varchar(100)" json:"tag"`
+	Language             string     `xorm:"varchar(100)" json:"language"`
+	Gender               string     `xorm:"varchar(100)" json:"gender"`
+	Birthday             string     `xorm:"varchar(100)" json:"birthday"`
+	Education            string     `xorm:"varchar(100)" json:"education"`
+	Score                int        `json:"score"`
+	Karma                int        `json:"karma"`
+	Ranking              int        `json:"ranking"`
+	Balance              float64    `json:"balance"`
+	BalanceCredit        float64    `json:"balanceCredit"`
+	Currency             string     `xorm:"varchar(100)" json:"currency"`
+	BalanceCurrency      string     `xorm:"varchar(100)" json:"balanceCurrency"`
+	IsDefaultAvatar      bool       `json:"isDefaultAvatar"`
+	IsOnline             bool       `json:"isOnline"`
+	IsAdmin              bool       `json:"isAdmin"`
+	IsForbidden          bool       `json:"isForbidden"`
+	IsDeleted            bool       `json:"isDeleted"`
+	SignupApplication    string     `xorm:"varchar(100)" json:"signupApplication"`
+	Hash                 string     `xorm:"varchar(100)" json:"hash"`
+	PreHash              string     `xorm:"varchar(100)" json:"preHash"`
+	RegisterType         string     `xorm:"varchar(100)" json:"registerType"`
+	RegisterSource       string     `xorm:"varchar(100)" json:"registerSource"`
+	AccessToken          string     `xorm:"mediumtext" json:"accessToken"`
+	OriginalToken        string     `xorm:"mediumtext" json:"originalToken"`
+	OriginalRefreshToken string     `xorm:"mediumtext" json:"originalRefreshToken"`
 
 	CreatedIp      string `xorm:"varchar(100)" json:"createdIp"`
 	LastSigninTime string `xorm:"varchar(100)" json:"lastSigninTime"`
@@ -178,6 +179,7 @@ type User struct {
 	Spotify         string `xorm:"spotify varchar(100)" json:"spotify"`
 	Strava          string `xorm:"strava varchar(100)" json:"strava"`
 	Stripe          string `xorm:"stripe varchar(100)" json:"stripe"`
+	Telegram        string `xorm:"telegram varchar(100)" json:"telegram"`
 	TikTok          string `xorm:"tiktok varchar(100)" json:"tiktok"`
 	Tumblr          string `xorm:"tumblr varchar(100)" json:"tumblr"`
 	Twitch          string `xorm:"twitch varchar(100)" json:"twitch"`
@@ -220,9 +222,12 @@ type User struct {
 	Invitation          string                `xorm:"varchar(100) index" json:"invitation"`
 	InvitationCode      string                `xorm:"varchar(100) index" json:"invitationCode"`
 	FaceIds             []*FaceId             `json:"faceIds"`
+	Cart                []ProductInfo         `xorm:"mediumtext" json:"cart"`
 
 	Ldap       string            `xorm:"ldap varchar(100)" json:"ldap"`
 	Properties map[string]string `json:"properties"`
+
+	ThirdPartyLinks []*ThirdPartyLink `xorm:"-" json:"thirdPartyLinks,omitempty"`
 
 	Roles       []*Role       `json:"roles"`
 	Permissions []*Permission `json:"permissions"`
@@ -238,6 +243,7 @@ type User struct {
 	MfaRememberDeadline string           `xorm:"varchar(100)" json:"mfaRememberDeadline"`
 	NeedUpdatePassword  bool             `json:"needUpdatePassword"`
 	IpWhitelist         string           `xorm:"varchar(200)" json:"ipWhitelist"`
+	ApplicationScopes   []ConsentRecord  `xorm:"mediumtext" json:"applicationScopes"`
 }
 
 type Userinfo struct {
@@ -270,6 +276,16 @@ type MfaAccount struct {
 	Issuer      string `xorm:"varchar(100)" json:"issuer"`
 	SecretKey   string `xorm:"varchar(100)" json:"secretKey"`
 	Origin      string `xorm:"varchar(100)" json:"origin"`
+}
+
+type Address struct {
+	Tag     string `xorm:"varchar(100)" json:"tag"`
+	Line1   string `xorm:"varchar(100)" json:"line1"`
+	Line2   string `xorm:"varchar(100)" json:"line2"`
+	City    string `xorm:"varchar(100)" json:"city"`
+	State   string `xorm:"varchar(100)" json:"state"`
+	ZipCode string `xorm:"varchar(100)" json:"zipCode"`
+	Region  string `xorm:"varchar(100)" json:"region"`
 }
 
 type FaceId struct {
@@ -392,6 +408,9 @@ func GetUsersByTagWithFilter(owner string, tag string, cond builder.Cond) ([]*Us
 
 func GetSortedUsers(owner string, sorter string, limit int) ([]*User, error) {
 	users := []*User{}
+	if !util.FilterSQLIdentifier(sorter) {
+		return nil, fmt.Errorf("object.GetSortedUsers() error: invalid sorter field: %s", sorter)
+	}
 	err := ormer.Engine.Desc(sorter).Limit(limit, 0).Find(&users, &User{Owner: owner})
 	if err != nil {
 		return nil, err
@@ -623,29 +642,22 @@ func GetUserByInvitationCode(owner string, invitationCode string) (*User, error)
 	}
 }
 
-func GetUserByAccessKey(accessKey string) (*User, error) {
-	if accessKey == "" {
-		return nil, nil
-	}
-	user := User{AccessKey: accessKey}
-	existed, err := ormer.Engine.Get(&user)
-	if err != nil {
-		return nil, err
-	}
-
-	if existed {
-		return &user, nil
-	} else {
-		return nil, nil
-	}
-}
-
 func GetUser(id string) (*User, error) {
 	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
 	if err != nil {
 		return nil, err
 	}
-	return getUser(owner, name)
+	user, err := getUser(owner, name)
+	if err != nil {
+		return nil, err
+	}
+	if user != nil {
+		err = user.PopulateThirdPartyLinks()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return user, nil
 }
 
 func GetUserNoCheck(id string) (*User, error) {
@@ -667,11 +679,20 @@ func GetMaskedUser(user *User, isAdminOrSelf bool, errs ...error) (*User, error)
 	}
 
 	if !isAdminOrSelf {
-		if user.AccessSecret != "" {
-			user.AccessSecret = "***"
-		}
 		if user.OriginalToken != "" {
 			user.OriginalToken = "***"
+		}
+		if user.OriginalRefreshToken != "" {
+			user.OriginalRefreshToken = "***"
+		}
+		// Mask per-provider OAuth tokens in Properties
+		if user.Properties != nil {
+			for key := range user.Properties {
+				// More specific pattern matching to avoid masking unrelated properties
+				if strings.HasPrefix(key, "oauth_") && (strings.HasSuffix(key, "_accessToken") || strings.HasSuffix(key, "_refreshToken")) {
+					user.Properties[key] = "***"
+				}
+			}
 		}
 	}
 
@@ -811,7 +832,7 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 	}
 
 	if name != user.Name {
-		err := userChangeTrigger(name, user.Name)
+		err := userChangeTrigger(owner, name, user.Name)
 		if err != nil {
 			return false, err
 		}
@@ -835,20 +856,22 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 	if len(columns) == 0 {
 		columns = []string{
 			"owner", "display_name", "avatar", "first_name", "last_name",
-			"location", "address", "country_code", "region", "language", "affiliation", "title", "id_card_type", "id_card", "homepage", "bio", "tag", "language", "gender", "birthday", "education", "score", "karma", "ranking", "signup_application",
-			"is_admin", "is_forbidden", "is_deleted", "hash", "is_default_avatar", "properties", "webauthnCredentials", "managedAccounts", "face_ids", "mfaAccounts",
-			"signin_wrong_times", "last_change_password_time", "last_signin_wrong_time", "groups", "access_key", "access_secret", "mfa_phone_enabled", "mfa_email_enabled", "email_verified",
+			"location", "address", "addresses", "country_code", "region", "language", "affiliation", "title", "id_card_type", "id_card", "homepage", "bio", "tag", "language", "gender", "birthday", "education", "score", "karma", "ranking", "signup_application", "register_type", "register_source",
+			"hash", "is_default_avatar", "properties", "webauthnCredentials", "mfa_items", "last_change_password_time", "managedAccounts", "face_ids", "mfaAccounts",
+			"signin_wrong_times", "last_signin_wrong_time", "groups", "mfa_phone_enabled", "mfa_email_enabled", "email_verified",
 			"github", "google", "qq", "wechat", "facebook", "dingtalk", "weibo", "gitee", "linkedin", "wecom", "lark", "gitlab", "adfs",
 			"baidu", "alipay", "casdoor", "infoflow", "apple", "azuread", "azureadb2c", "slack", "steam", "bilibili", "okta", "douyin", "kwai", "line", "amazon",
 			"auth0", "battlenet", "bitbucket", "box", "cloudfoundry", "dailymotion", "deezer", "digitalocean", "discord", "dropbox",
 			"eveonline", "fitbit", "gitea", "heroku", "influxcloud", "instagram", "intercom", "kakao", "lastfm", "mailru", "meetup",
 			"microsoftonline", "naver", "nextcloud", "onedrive", "oura", "patreon", "paypal", "salesforce", "shopify", "soundcloud",
-			"spotify", "strava", "stripe", "type", "tiktok", "tumblr", "twitch", "twitter", "typetalk", "uber", "vk", "wepay", "xero", "yahoo",
-			"yammer", "yandex", "zoom", "custom", "need_update_password", "ip_whitelist", "mfa_items", "mfa_remember_deadline",
+			"spotify", "strava", "stripe", "type", "telegram", "tiktok", "tumblr", "twitch", "twitter", "typetalk", "uber", "vk", "wepay", "xero", "yahoo",
+			"yammer", "yandex", "zoom", "custom", "need_update_password", "ip_whitelist", "mfa_remember_deadline",
+			"cart", "application_scopes",
 		}
 	}
 	if isAdmin {
-		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "balance_credit", "balance_currency", "mfa_items", "register_type", "register_source")
+		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "balance_credit", "balance_currency", "mfa_items", "register_type", "register_source",
+			"is_admin", "is_forbidden", "is_deleted")
 	}
 
 	columns = append(columns, "updated_time")
@@ -908,7 +931,7 @@ func UpdateUserForAllFields(id string, user *User) (bool, error) {
 	}
 
 	if name != user.Name {
-		err := userChangeTrigger(name, user.Name)
+		err := userChangeTrigger(owner, name, user.Name)
 		if err != nil {
 			return false, err
 		}
@@ -927,6 +950,13 @@ func UpdateUserForAllFields(id string, user *User) (bool, error) {
 	}
 
 	user.UpdatedTime = util.GetCurrentTime()
+
+	if len(user.Groups) > 0 {
+		_, err = userEnforcer.UpdateGroupsForUser(user.GetId(), user.Groups)
+		if err != nil {
+			return false, err
+		}
+	}
 
 	affected, err := ormer.Engine.ID(core.PK{owner, name}).AllCols().Update(user)
 	if err != nil {
@@ -952,7 +982,7 @@ func AddUser(user *User, lang string) (bool, error) {
 	}
 
 	if user.Owner == "" || user.Name == "" {
-		return false, fmt.Errorf(i18n.Translate(lang, "user:the user's owner and name should not be empty"))
+		return false, errors.New(i18n.Translate(lang, "user:the user's owner and name should not be empty"))
 	}
 
 	if CheckUsernameWithEmail(user.Name, "en") != "" {
@@ -978,7 +1008,7 @@ func AddUser(user *User, lang string) (bool, error) {
 	}
 
 	if organization.Name == "built-in" && !organization.HasPrivilegeConsent && user.Name != "admin" {
-		return false, fmt.Errorf(i18n.Translate(lang, "organization:adding a new user to the 'built-in' organization is currently disabled. Please note: all users in the 'built-in' organization are global administrators in Casdoor. Refer to the docs: https://casdoor.org/docs/basic/core-concepts#how-does-casdoor-manage-itself. If you still wish to create a user for the 'built-in' organization, go to the organization's settings page and enable the 'Has privilege consent' option."))
+		return false, errors.New(i18n.Translate(lang, "organization:adding a new user to the 'built-in' organization is currently disabled. Please note: all users in the 'built-in' organization are global administrators in Casdoor. Refer to the docs: https://casdoor.org/docs/basic/core-concepts#how-does-casdoor-manage-itself. If you still wish to create a user for the 'built-in' organization, go to the organization's settings page and enable the 'Has privilege consent' option."))
 	}
 
 	if user.BalanceCurrency == "" {
@@ -1156,6 +1186,11 @@ func DeleteUser(user *User) (bool, error) {
 		return false, err
 	}
 
+	_, err = DeleteThirdPartyLinksByUser(user.Owner, user.Name)
+	if err != nil {
+		return false, err
+	}
+
 	organization, err := GetOrganizationByUser(user)
 	if err != nil {
 		return false, err
@@ -1226,8 +1261,30 @@ func LinkUserAccount(user *User, field string, value string) (bool, error) {
 	return SetUserField(user, field, value)
 }
 
+func LinkFlexibleCustomAccount(user *User, providerName string, providerId string) (bool, error) {
+	if providerId == "" {
+		return DeleteThirdPartyLink(user.Owner, user.Name, providerName)
+	}
+	link := &ThirdPartyLink{
+		Owner:        user.Owner,
+		UserName:     user.Name,
+		ProviderName: providerName,
+		ProviderId:   providerId,
+	}
+	return AddThirdPartyLink(link)
+}
+
 func (user *User) GetId() string {
 	return fmt.Sprintf("%s/%s", user.Owner, user.Name)
+}
+
+func (user *User) PopulateThirdPartyLinks() error {
+	links, err := GetThirdPartyLinksByUser(user.Owner, user.Name)
+	if err != nil {
+		return err
+	}
+	user.ThirdPartyLinks = links
+	return nil
 }
 
 func (user *User) GetFriendlyName() string {
@@ -1278,7 +1335,7 @@ func DeleteGroupForUser(user string, group string) (bool, error) {
 	return userEnforcer.DeleteGroupForUser(user, group)
 }
 
-func userChangeTrigger(oldName string, newName string) error {
+func userChangeTrigger(owner string, oldName string, newName string) error {
 	session := ormer.Engine.NewSession()
 	defer session.Close()
 
@@ -1296,12 +1353,12 @@ func userChangeTrigger(oldName string, newName string) error {
 	for _, role := range roles {
 		for j, u := range role.Users {
 			// u = organization/username
-			owner, name, err := util.GetOwnerAndNameFromIdWithError(u)
+			roleOwner, roleName, err := util.GetOwnerAndNameFromIdWithError(u)
 			if err != nil {
 				return err
 			}
-			if name == oldName {
-				role.Users[j] = util.GetId(owner, newName)
+			if roleName == oldName {
+				role.Users[j] = util.GetId(roleOwner, newName)
 			}
 		}
 		_, err = session.Where("name=?", role.Name).And("owner=?", role.Owner).Update(role)
@@ -1322,12 +1379,12 @@ func userChangeTrigger(oldName string, newName string) error {
 			}
 
 			// u = organization/username
-			owner, name, err := util.GetOwnerAndNameFromIdWithError(u)
+			permOwner, permName, err := util.GetOwnerAndNameFromIdWithError(u)
 			if err != nil {
 				return err
 			}
-			if name == oldName {
-				permission.Users[j] = util.GetId(owner, newName)
+			if permName == oldName {
+				permission.Users[j] = util.GetId(permOwner, newName)
 			}
 		}
 		_, err = session.Where("name=?", permission.Name).And("owner=?", permission.Owner).Update(permission)
@@ -1339,6 +1396,11 @@ func userChangeTrigger(oldName string, newName string) error {
 	resource := new(Resource)
 	resource.User = newName
 	_, err = session.Where("user=?", oldName).Update(resource)
+	if err != nil {
+		return err
+	}
+
+	_, err = session.Where("owner = ? AND user_name = ?", owner, oldName).Cols("user_name").Update(&ThirdPartyLink{UserName: newName})
 	if err != nil {
 		return err
 	}
@@ -1358,17 +1420,6 @@ func (user *User) GetPreferredMfaProps(masked bool) *MfaProps {
 		return nil
 	}
 	return user.GetMfaProps(user.PreferredMfaType, masked)
-}
-
-func AddUserKeys(user *User, isAdmin bool) (bool, error) {
-	if user == nil {
-		return false, fmt.Errorf("the user is not found")
-	}
-
-	user.AccessKey = util.GenerateId()
-	user.AccessSecret = util.GenerateId()
-
-	return UpdateUser(user.GetId(), user, []string{}, isAdmin)
 }
 
 func (user *User) IsApplicationAdmin(application *Application) bool {

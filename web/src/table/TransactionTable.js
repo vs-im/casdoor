@@ -54,7 +54,7 @@ class TransactionTable extends React.Component {
             {i18next.t("general:Search")}
           </Button>
           <Button onClick={() => this.handleReset(clearFilters)} size="small" style={{width: 90}}>
-            {i18next.t("general:Reset")}
+            {i18next.t("forget:Reset")}
           </Button>
           <Button
             type="link"
@@ -131,13 +131,18 @@ class TransactionTable extends React.Component {
         columns={columns}
         dataSource={this.props.transactions}
         rowKey={(record) => `${record.owner}/${record.name}`}
-        size="small"
+        size="middle"
         bordered
         pagination={{
           pageSize: 10,
           showSizeChanger: true,
           pageSizeOptions: ["10", "20", "50", "100"],
         }}
+        title={this.props.title ? () => (
+          <div>
+            {this.props.title}&nbsp;&nbsp;&nbsp;&nbsp;
+          </div>
+        ) : undefined}
       />
     );
   }

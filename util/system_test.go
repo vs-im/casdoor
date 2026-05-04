@@ -17,7 +17,10 @@
 package util
 
 import (
+	"fmt"
+	"os"
 	"path"
+	"regexp"
 	"runtime"
 	"testing"
 
@@ -39,10 +42,41 @@ func TestGetMemoryUsage(t *testing.T) {
 	t.Log(used, total)
 }
 
+func TestGetDiskUsage(t *testing.T) {
+	used, total, err := getDiskUsage()
+	assert.Nil(t, err)
+	t.Log(used, total)
+}
+
+func TestGetNetworkUsage(t *testing.T) {
+	sent, recv, total, err := getNetworkUsage()
+	assert.Nil(t, err)
+	t.Log(sent, recv, total)
+}
+
 func TestGetVersionInfo(t *testing.T) {
 	versionInfo, err := GetVersionInfo()
-	assert.Nil(t, err)
-	t.Log(versionInfo)
+	assert.NoError(t, err)
+	assert.NotNil(t, versionInfo)
+
+	_, filename, _, _ := runtime.Caller(0)
+	variablePath := path.Join(path.Dir(filename), "variable.go")
+
+	content, err := os.ReadFile(variablePath)
+	assert.NoError(t, err)
+
+	replacements := map[*regexp.Regexp]string{
+		regexp.MustCompile(`Version\s*=\s*".*"`):       fmt.Sprintf(`Version      = "%s"`, versionInfo.Version),
+		regexp.MustCompile(`CommitId\s*=\s*".*"`):      fmt.Sprintf(`CommitId     = "%s"`, versionInfo.CommitId),
+		regexp.MustCompile(`CommitOffset\s*=\s*-?\d+`): fmt.Sprintf(`CommitOffset = %d`, versionInfo.CommitOffset),
+	}
+	updated := string(content)
+	for re, val := range replacements {
+		updated = re.ReplaceAllString(updated, val)
+	}
+
+	err = os.WriteFile(variablePath, []byte(updated), 0o644)
+	assert.NoError(t, err)
 }
 
 func TestGetVersion(t *testing.T) {
@@ -91,10 +125,4 @@ func TestGetVersion(t *testing.T) {
 
 	assert.Equal(t, 3, aheadCnt)
 	assert.Equal(t, "v1.257.0", releaseVersion)
-}
-
-func TestFromFile(t *testing.T) {
-	versionInfo, err := GetVersionInfoFromFile()
-	assert.Nil(t, err)
-	t.Log(versionInfo)
 }

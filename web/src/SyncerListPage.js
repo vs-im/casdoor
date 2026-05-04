@@ -86,7 +86,7 @@ class SyncerListPage extends BaseListPage {
 
   runSyncer(i) {
     this.setState({loading: true});
-    SyncerBackend.runSyncer("admin", this.state.data[i].name)
+    SyncerBackend.runSyncer("admin", this.state.data[i].name, this.state.data[i].organization)
       .then((res) => {
         if (res.status === "ok") {
           this.setState({loading: false});
@@ -115,7 +115,7 @@ class SyncerListPage extends BaseListPage {
         ...this.getColumnSearchProps("name"),
         render: (text, record, index) => {
           return (
-            <Link to={`/syncers/${text}`}>
+            <Link to={`/syncers/${record.organization}/${text}`}>
               {text}
             </Link>
           );
@@ -147,7 +147,7 @@ class SyncerListPage extends BaseListPage {
         },
       },
       {
-        title: i18next.t("provider:Type"),
+        title: i18next.t("general:Type"),
         dataIndex: "type",
         key: "type",
         width: "100px",
@@ -162,11 +162,11 @@ class SyncerListPage extends BaseListPage {
         title: i18next.t("syncer:Database type"),
         dataIndex: "databaseType",
         key: "databaseType",
-        width: "130px",
+        width: "140px",
         sorter: (a, b) => a.databaseType.localeCompare(b.databaseType),
       },
       {
-        title: i18next.t("provider:Host"),
+        title: i18next.t("general:Host"),
         dataIndex: "host",
         key: "host",
         width: "120px",
@@ -174,7 +174,7 @@ class SyncerListPage extends BaseListPage {
         ...this.getColumnSearchProps("host"),
       },
       {
-        title: i18next.t("provider:Port"),
+        title: i18next.t("general:Port"),
         dataIndex: "port",
         key: "port",
         width: "100px",
@@ -215,7 +215,7 @@ class SyncerListPage extends BaseListPage {
         title: i18next.t("syncer:Sync interval"),
         dataIndex: "syncInterval",
         key: "syncInterval",
-        width: "140px",
+        width: "150px",
         sorter: true,
         ...this.getColumnSearchProps("syncInterval"),
       },
@@ -241,7 +241,7 @@ class SyncerListPage extends BaseListPage {
           return (
             <div>
               <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} type="primary" onClick={() => this.runSyncer(index)}>{i18next.t("general:Sync")}</Button>
-              <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} onClick={() => this.props.history.push(`/syncers/${record.name}`)}>{i18next.t("general:Edit")}</Button>
+              <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} onClick={() => this.props.history.push(`/syncers/${record.organization}/${record.name}`)}>{i18next.t("general:Edit")}</Button>
               <PopconfirmModal
                 title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
                 onConfirm={() => this.deleteSyncer(index)}
@@ -269,7 +269,7 @@ class SyncerListPage extends BaseListPage {
               <Button type="primary" size="small" onClick={this.addSyncer.bind(this)}>{i18next.t("general:Add")}</Button>
             </div>
           )}
-          loading={this.state.loading}
+          loading={this.getTableLoading()}
           onChange={this.handleTableChange}
         />
       </div>

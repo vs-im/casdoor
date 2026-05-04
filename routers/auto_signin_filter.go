@@ -15,10 +15,12 @@
 package routers
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/beego/beego/v2/server/web/context"
+	"github.com/casdoor/casdoor/mcpself"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
 )
@@ -27,6 +29,14 @@ func AutoSigninFilter(ctx *context.Context) {
 	urlPath := ctx.Request.URL.Path
 	if strings.HasPrefix(urlPath, "/api/login/oauth/access_token") {
 		return
+	}
+	if urlPath == "/api/mcp" {
+		var req mcpself.McpRequest
+		if err := json.Unmarshal(ctx.Input.RequestBody, &req); err == nil {
+			if req.Method == "initialize" || req.Method == "notifications/initialized" || req.Method == "ping" || req.Method == "tools/list" {
+				return
+			}
+		}
 	}
 	//if getSessionUser(ctx) != "" {
 	//	return
@@ -60,6 +70,25 @@ func AutoSigninFilter(ctx *context.Context) {
 			return
 		}
 
+		// Validate DPoP proof for DPoP-bound tokens (RFC 9449).
+		if token.TokenType == "DPoP" {
+			dpopProof := ctx.Request.Header.Get("DPoP")
+			if dpopProof == "" {
+				responseError(ctx, "DPoP proof header required for DPoP-bound access token")
+				return
+			}
+			htu := object.GetDPoPHtu(ctx.Request.Host, ctx.Request.URL.Path)
+			jkt, dpopErr := object.ValidateDPoPProof(dpopProof, ctx.Request.Method, htu, accessToken)
+			if dpopErr != nil {
+				responseError(ctx, fmt.Sprintf("DPoP proof validation failed: %s", dpopErr.Error()))
+				return
+			}
+			if jkt != token.DPoPJkt {
+				responseError(ctx, "DPoP proof key binding mismatch")
+				return
+			}
+		}
+
 		userId := util.GetId(token.Organization, token.User)
 		application, err := object.GetApplicationByUserId(fmt.Sprintf("app/%s", token.Application))
 		if err != nil {
@@ -76,19 +105,19 @@ func AutoSigninFilter(ctx *context.Context) {
 		return
 	}
 
-	accessKey := ctx.Input.Query("accessKey")
-	accessSecret := ctx.Input.Query("accessSecret")
-	if accessKey != "" && accessSecret != "" {
-		userId, err := getUsernameByKeys(ctx)
-		if err != nil {
-			responseError(ctx, err.Error())
-		}
-
-		setSessionUser(ctx, userId)
-	}
-
 	// "/page?clientId=123&clientSecret=456"
 	userId, err := getUsernameByClientIdSecret(ctx)
+	if err != nil {
+		responseError(ctx, err.Error())
+		return
+	}
+	if userId != "" {
+		setSessionUser(ctx, userId)
+		return
+	}
+
+	// "/page?accessKey=123&accessSecret=456"
+	userId, err = getUsernameByAccessKey(ctx)
 	if err != nil {
 		responseError(ctx, err.Error())
 		return

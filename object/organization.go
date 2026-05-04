@@ -32,6 +32,7 @@ type AccountItem struct {
 	ViewRule   string `json:"viewRule"`
 	ModifyRule string `json:"modifyRule"`
 	Regex      string `json:"regex"`
+	Tab        string `json:"tab"`
 }
 
 type ThemeData struct {
@@ -66,6 +67,7 @@ type Organization struct {
 	PasswordExpireDays     int        `json:"passwordExpireDays"`
 	CountryCodes           []string   `xorm:"mediumtext"  json:"countryCodes"`
 	DefaultAvatar          string     `xorm:"varchar(200)" json:"defaultAvatar"`
+	UsePermanentAvatar     bool       `xorm:"bool" json:"usePermanentAvatar"`
 	DefaultApplication     string     `xorm:"varchar(100)" json:"defaultApplication"`
 	UserTypes              []string   `xorm:"mediumtext" json:"userTypes"`
 	Tags                   []string   `xorm:"mediumtext" json:"tags"`
@@ -88,7 +90,17 @@ type Organization struct {
 
 	MfaItems           []*MfaItem     `xorm:"varchar(300)" json:"mfaItems"`
 	MfaRememberInHours int            `json:"mfaRememberInHours"`
+	AccountMenu        string         `xorm:"varchar(20)" json:"accountMenu"`
 	AccountItems       []*AccountItem `xorm:"mediumtext" json:"accountItems"`
+
+	DcrPolicy string `xorm:"varchar(100)" json:"dcrPolicy"`
+
+	LdapAttributes []string `xorm:"mediumtext" json:"ldapAttributes"`
+
+	KerberosRealm       string `xorm:"varchar(200)" json:"kerberosRealm"`
+	KerberosKdcHost     string `xorm:"varchar(200)" json:"kerberosKdcHost"`
+	KerberosKeytab      string `xorm:"mediumtext" json:"kerberosKeytab"`
+	KerberosServiceName string `xorm:"varchar(100)" json:"kerberosServiceName"`
 
 	OrgBalance      float64 `json:"orgBalance"`
 	UserBalance     float64 `json:"userBalance"`
@@ -295,7 +307,11 @@ func GetOrganizationByUser(user *User) (*Organization, error) {
 		return nil, nil
 	}
 
-	return getOrganization("admin", user.Owner)
+	org, err := getOrganization("admin", user.Owner)
+	if err != nil {
+		return nil, err
+	}
+	return org, nil
 }
 
 func GetAccountItemByName(name string, organization *Organization) *AccountItem {

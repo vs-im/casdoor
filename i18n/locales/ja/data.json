@@ -2,7 +2,6 @@
   "account": {
     "Failed to add user": "ユーザーの追加に失敗しました",
     "Get init score failed, error: %w": "イニットスコアの取得に失敗しました。エラー：%w",
-    "Please sign out first": "最初にサインアウトしてください",
     "The application does not allow to sign up new account": "アプリケーションは新しいアカウントの登録を許可しません"
   },
   "auth": {
@@ -23,6 +22,7 @@
     "The login method: login with email is not enabled for the application": "このアプリケーションではメールログインは有効になっていません",
     "The login method: login with face is not enabled for the application": "このアプリケーションでは顔認証ログインは有効になっていません",
     "The login method: login with password is not enabled for the application": "ログイン方法：パスワードでのログインはアプリケーションで有効になっていません",
+    "The order: %s does not exist": "注文：%s は存在しません",
     "The organization: %s does not exist": "組織「%s」は存在しません",
     "The organization: %s has disabled users to signin": "組織: %s はユーザーのサインインを無効にしました",
     "The plan: %s does not exist": "プラン: %sは存在しません",
@@ -57,11 +57,11 @@
     "Face data mismatch": "顔認証データが一致しません",
     "Failed to parse client IP: %s": "クライアント IP「%s」の解析に失敗しました",
     "FirstName cannot be blank": "ファーストネームは空白にできません",
+    "Guest users must upgrade their account by setting a username and password before they can sign in directly": "ゲストユーザーは直接サインインする前に、ユーザー名とパスワードを設定してアカウントをアップグレードする必要があります",
     "Invitation code cannot be blank": "招待コードは空にできません",
     "Invitation code exhausted": "招待コードの使用回数が上限に達しました",
     "Invitation code is invalid": "招待コードが無効です",
     "Invitation code suspended": "招待コードは一時的に無効化されています",
-    "LDAP user name or password incorrect": "Ldapのユーザー名またはパスワードが間違っています",
     "LastName cannot be blank": "姓は空白にできません",
     "Multiple accounts with same uid, please check your ldap server": "同じuidを持つ複数のアカウントがあります。あなたのLDAPサーバーを確認してください",
     "Organization does not exist": "組織は存在しません",
@@ -83,8 +83,8 @@
     "The user is forbidden to sign in, please contact the administrator": "ユーザーはサインインできません。管理者に連絡してください",
     "The user: %s doesn't exist in LDAP server": "ユーザー「%s」は LDAP サーバーに存在しません",
     "The username may only contain alphanumeric characters, underlines or hyphens, cannot have consecutive hyphens or underlines, and cannot begin or end with a hyphen or underline.": "ユーザー名には英数字、アンダースコア、ハイフンしか含めることができません。連続したハイフンまたはアンダースコアは不可であり、ハイフンまたはアンダースコアで始まるまたは終わることもできません。",
-    "The value \\\"%s\\\" for account field \\\"%s\\\" doesn't match the account item regex": "アカウントフィールド「%s」の値「%s」がアカウント項目の正規表現に一致しません",
-    "The value \\\"%s\\\" for signup field \\\"%s\\\" doesn't match the signup item regex of the application \\\"%s\\\"": "アプリケーション「%s」のサインアップ項目「%s」の値「%s」が正規表現に一致しません",
+    "The value \"%s\" for account field \"%s\" doesn't match the account item regex": "アカウントフィールド「%s」の値「%s」がアカウント項目の正規表現に一致しません",
+    "The value \"%s\" for signup field \"%s\" doesn't match the signup item regex of the application \"%s\"": "アプリケーション「%s」のサインアップ項目「%s」の値「%s」が正規表現に一致しません",
     "Username already exists": "ユーザー名はすでに存在しています",
     "Username cannot be an email address": "ユーザー名には電子メールアドレスを使用できません",
     "Username cannot contain white spaces": "ユーザ名にはスペースを含めることはできません",
@@ -94,7 +94,7 @@
     "Username supports email format. Also The username may only contain alphanumeric characters, underlines or hyphens, cannot have consecutive hyphens or underlines, and cannot begin or end with a hyphen or underline. Also pay attention to the email format.": "ユーザー名はメール形式もサポートします。ユーザー名は英数字、アンダースコア、またはハイフンのみを含め、連続するハイフンやアンダースコアは使用できません。また、ハイフンまたはアンダースコアで始まったり終わったりすることもできません。メール形式にも注意してください。",
     "You have entered the wrong password or code too many times, please wait for %d minutes and try again": "あなたは間違ったパスワードまたはコードを何度も入力しました。%d 分間待ってから再度お試しください",
     "Your IP address: %s has been banned according to the configuration of: ": "あなたの IP アドレス「%s」は設定によりアクセスが禁止されています: ",
-    "Your password has expired. Please reset your password by clicking \\\"Forgot password\\\"": "パスワードの有効期限が切れています。「パスワードを忘れた方はこちら」をクリックしてリセットしてください",
+    "Your password has expired. Please reset your password by clicking \"Forgot password\"": "パスワードの有効期限が切れています。「パスワードを忘れた方はこちら」をクリックしてリセットしてください",
     "Your region is not allow to signup by phone": "あなたの地域は電話でサインアップすることができません",
     "password or code is incorrect": "パスワードまたはコードが正しくありません",
     "password or code is incorrect, you have %s remaining chances": "パスワードまたはコードが間違っています。あと %s 回の試行機会があります",
@@ -106,11 +106,17 @@
   "general": {
     "Failed to import groups": "グループのインポートに失敗しました",
     "Failed to import users": "ユーザーのインポートに失敗しました",
+    "Insufficient balance: new balance %v would be below credit limit %v": "残高不足：新しい残高 %v がクレジット制限 %v を下回ります",
+    "Insufficient balance: new organization balance %v would be below credit limit %v": "残高不足：新しい組織残高 %v がクレジット制限 %v を下回ります",
     "Missing parameter": "不足しているパラメーター",
     "Only admin user can specify user": "管理者ユーザーのみがユーザーを指定できます",
     "Please login first": "最初にログインしてください",
+    "The LDAP: %s does not exist": "LDAP：%s は存在しません",
     "The organization: %s should have one application at least": "組織「%s」は少なくとも1つのアプリケーションを持っている必要があります",
+    "The syncer: %s does not exist": "同期装置：%s は存在しません",
     "The user: %s doesn't exist": "そのユーザー：%sは存在しません",
+    "The user: %s is not found": "ユーザー：%s が見つかりません",
+    "User is required for User category transaction": "ユーザーカテゴリトランザクションにはユーザーが必要です",
     "Wrong userId": "無効なユーザーIDです",
     "don't support captchaProvider: ": "captchaProviderをサポートしないでください",
     "this operation is not allowed in demo mode": "この操作はデモモードでは許可されていません",
@@ -137,10 +143,16 @@
     "adding a new user to the 'built-in' organization is currently disabled. Please note: all users in the 'built-in' organization are global administrators in Casdoor. Refer to the docs: https://casdoor.org/docs/basic/core-concepts#how-does-casdoor-manage-itself. If you still wish to create a user for the 'built-in' organization, go to the organization's settings page and enable the 'Has privilege consent' option.": "「built-in」（組み込み）組織への新しいユーザーの追加は現在無効になっています。注意：「built-in」組織のすべてのユーザーは、Casdoor のグローバル管理者です。ドキュメントを参照してください：https://casdoor.org/docs/basic/core-concepts#how-does-casdoor-manage-itself。「built-in」組織のユーザーを作成したい場合は、組織の設定ページに移動し、「特権同意を持つ」オプションを有効にしてください。"
   },
   "permission": {
-    "The permission: \\\"%s\\\" doesn't exist": "権限「%s」は存在しません"
+    "The permission: \"%s\" doesn't exist": "権限「%s」は存在しません"
+  },
+  "product": {
+    "Product list cannot be empty": "商品リストは空にできません"
   },
   "provider": {
+    "Failed to initialize ID Verification provider": "ID認証プロバイダーの初期化に失敗しました",
     "Invalid application id": "アプリケーションIDが無効です",
+    "No ID Verification provider configured": "ID認証プロバイダーが設定されていません",
+    "Provider is not an ID Verification provider": "プロバイダーはID認証プロバイダーではありません",
     "the provider: %s does not exist": "プロバイダー%sは存在しません"
   },
   "resource": {
@@ -158,12 +170,18 @@
     "Invalid Email receivers: %s": "無効な電子メール受信者：%s",
     "Invalid phone receivers: %s": "電話受信者が無効です：%s"
   },
+  "session": {
+    "session id %s is the current session and cannot be deleted": "セッションID %s は現在のセッションであり、削除できません"
+  },
   "storage": {
     "The objectKey: %s is not allowed": "オブジェクトキー %s は許可されていません",
     "The provider type: %s is not supported": "プロバイダータイプ：%sはサポートされていません"
   },
   "subscription": {
     "Error": "エラー"
+  },
+  "ticket": {
+    "Ticket not found": "チケットが見つかりません"
   },
   "token": {
     "Grant_type: %s is not supported in this application": "grant_type：%sはこのアプリケーションでサポートされていません",
@@ -174,10 +192,14 @@
   },
   "user": {
     "Display name cannot be empty": "表示名は空にできません",
+    "ID card information and real name are required": "身分証明書の情報と実名が必要です",
+    "Identity verification failed": "身元確認に失敗しました",
     "MFA email is enabled but email is empty": "MFA メールが有効になっていますが、メールアドレスが空です",
     "MFA phone is enabled but phone number is empty": "MFA 電話番号が有効になっていますが、電話番号が空です",
     "New password cannot contain blank space.": "新しいパスワードにはスペースを含めることはできません。",
+    "No application found for user": "ユーザーのアプリケーションが見つかりません",
     "The new password must be different from your current password": "新しいパスワードは現在のパスワードと異なる必要があります",
+    "User is already verified": "ユーザーは既に認証済みです",
     "the user's owner and name should not be empty": "ユーザーのオーナーと名前は空にできません"
   },
   "util": {
@@ -188,6 +210,7 @@
   "verification": {
     "Invalid captcha provider.": "無効なCAPTCHAプロバイダー。",
     "Phone number is invalid in your region %s": "電話番号はあなたの地域で無効です %s",
+    "The forgot password feature is disabled": "パスワードを忘れた機能は無効になっています",
     "The verification code has already been used!": "この検証コードは既に使用されています！",
     "The verification code has not been sent yet!": "検証コードはまだ送信されていません！",
     "Turing test failed.": "チューリングテストは失敗しました。",
@@ -196,8 +219,8 @@
     "Unknown type": "不明なタイプ",
     "Wrong verification code!": "誤った検証コードです！",
     "You should verify your code in %d min!": "あなたは%d分であなたのコードを確認する必要があります！",
-    "please add a SMS provider to the \\\"Providers\\\" list for the application: %s": "アプリケーション「%s」の「Providers」リストに SMS プロバイダを追加してください",
-    "please add an Email provider to the \\\"Providers\\\" list for the application: %s": "アプリケーション「%s」の「Providers」リストにメールプロバイダを追加してください",
+    "please add a SMS provider to the \"Providers\" list for the application: %s": "アプリケーション「%s」の「Providers」リストに SMS プロバイダを追加してください",
+    "please add an Email provider to the \"Providers\" list for the application: %s": "アプリケーション「%s」の「Providers」リストにメールプロバイダを追加してください",
     "the user does not exist, please sign up first": "ユーザーは存在しません。まず登録してください"
   },
   "webauthn": {

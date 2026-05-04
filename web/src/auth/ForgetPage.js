@@ -491,7 +491,7 @@ class ForgetPage extends React.Component {
             >
               <Input.Password
                 prefix={<CheckCircleOutlined />}
-                placeholder={i18next.t("signup:Confirm")}
+                placeholder={i18next.t("general:Confirm")}
               />
             </Form.Item>
             <br />
@@ -526,11 +526,6 @@ class ForgetPage extends React.Component {
       return Util.renderMessageLarge(this, this.state.msg);
     }
 
-    const onBackButtonClick = (e) => {
-      e.preventDefault();
-      this.stepBack();
-    };
-
     return (
       <React.Fragment>
         <CustomGithubCorner />
@@ -542,7 +537,7 @@ class ForgetPage extends React.Component {
               style={{left: "10px"}}
               icon={<ArrowLeftOutlined style={{fontSize: "24px"}} />}
               size={"large"}
-              onClick={onBackButtonClick}
+              onClick={() => {this.stepBack();}}
             />
             <Row>
               <Col span={24} style={{justifyContent: "center"}}>
@@ -571,7 +566,7 @@ class ForgetPage extends React.Component {
                       current={this.state.current}
                       items={[
                         {
-                          title: i18next.t("forget:Account"),
+                          title: i18next.t("cert:Account"),
                           icon: <UserOutlined />,
                         },
                         {

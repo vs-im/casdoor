@@ -15,16 +15,25 @@
 package controllers
 
 type TokenRequest struct {
-	ClientId     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	GrantType    string `json:"grant_type"`
-	Code         string `json:"code"`
-	Verifier     string `json:"code_verifier"`
-	Scope        string `json:"scope"`
-	Nonce        string `json:"nonce"`
-	Username     string `json:"username"`
-	Password     string `json:"password"`
-	Tag          string `json:"tag"`
-	Avatar       string `json:"avatar"`
-	RefreshToken string `json:"refresh_token"`
+	Assertion           string `json:"assertion"`
+	ClientId            string `json:"client_id"`
+	ClientSecret        string `json:"client_secret"`
+	ClientAssertion     string `json:"client_assertion"`
+	ClientAssertionType string `json:"client_assertion_type"`
+	GrantType           string `json:"grant_type"`
+	Code                string `json:"code"`
+	Verifier            string `json:"code_verifier"`
+	Scope               string `json:"scope"`
+	Nonce               string `json:"nonce"`
+	Username            string `json:"username"`
+	Password            string `json:"password"`
+	Tag                 string `json:"tag"`
+	Avatar              string `json:"avatar"`
+	RefreshToken        string `json:"refresh_token"`
+	SubjectToken        string `json:"subject_token"`
+	SubjectTokenType    string `json:"subject_token_type"`
+	ActorToken          string `json:"actor_token"`
+	ActorTokenType      string `json:"actor_token_type"`
+	Audience            string `json:"audience"`
+	Resource            string `json:"resource"` // RFC 8707 Resource Indicator
 }

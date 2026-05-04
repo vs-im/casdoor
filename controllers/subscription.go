@@ -16,6 +16,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/beego/beego/v2/core/utils/pagination"
 	"github.com/casdoor/casdoor/object"
@@ -39,7 +40,26 @@ func (c *ApiController) GetSubscriptions() {
 	sortOrder := c.Ctx.Input.Query("sortOrder")
 
 	if limit == "" || page == "" {
-		subscriptions, err := object.GetSubscriptions(owner)
+		var subscriptions []*object.Subscription
+		var err error
+
+		if c.IsAdmin() {
+			// If field is "user", filter by that user even for admins
+			if field == "user" && value != "" {
+				subscriptions, err = object.GetSubscriptionsByUser(owner, value)
+			} else {
+				subscriptions, err = object.GetSubscriptions(owner)
+			}
+		} else {
+			user := c.GetSessionUsername()
+			_, userName, userErr := util.GetOwnerAndNameFromIdWithError(user)
+			if userErr != nil {
+				c.ResponseError(userErr.Error())
+				return
+			}
+			subscriptions, err = object.GetSubscriptionsByUser(owner, userName)
+		}
+
 		if err != nil {
 			c.ResponseError(err.Error())
 			return
@@ -48,6 +68,16 @@ func (c *ApiController) GetSubscriptions() {
 		c.ResponseOk(subscriptions)
 	} else {
 		limit := util.ParseInt(limit)
+		if !c.IsAdmin() {
+			user := c.GetSessionUsername()
+			_, userName, userErr := util.GetOwnerAndNameFromIdWithError(user)
+			if userErr != nil {
+				c.ResponseError(userErr.Error())
+				return
+			}
+			field = "user"
+			value = userName
+		}
 		count, err := object.GetSubscriptionCount(owner, field, value)
 		if err != nil {
 			c.ResponseError(err.Error())
@@ -119,6 +149,26 @@ func (c *ApiController) AddSubscription() {
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
+	}
+
+	// Check if plan restricts user to one subscription
+	if subscription.Plan != "" {
+		plan, err := object.GetPlan(util.GetId(subscription.Owner, subscription.Plan))
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		if plan != nil && plan.IsExclusive {
+			hasSubscription, err := object.HasActiveSubscriptionForPlan(subscription.Owner, subscription.User, subscription.Plan)
+			if err != nil {
+				c.ResponseError(err.Error())
+				return
+			}
+			if hasSubscription {
+				c.ResponseError(fmt.Sprintf("User already has an active subscription for plan: %s", subscription.Plan))
+				return
+			}
+		}
 	}
 
 	c.Data["json"] = wrapActionResponse(object.AddSubscription(&subscription))

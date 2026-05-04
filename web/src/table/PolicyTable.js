@@ -35,6 +35,10 @@ class PolicyTable extends React.Component {
   count = 0;
   pageSize = 100;
 
+  getTableLoading = () => {
+    return this.state.loading ? {tip: i18next.t("login:Loading")} : false;
+  };
+
   getIndex(index) {
     // Need to be used in all place when modify table. Parameter is the row index in table, need to calculate the index in dataSource.
     return index + (this.state.page - 1) * this.pageSize;
@@ -244,7 +248,7 @@ class PolicyTable extends React.Component {
           current: this.state.page,
         }}
         columns={columns} dataSource={table} rowKey="key" size="middle" bordered
-        loading={this.state.loading}
+        loading={this.getTableLoading()}
         title={() => (
           <div>
             <Button disabled={this.state.editingIndex !== "" || this.props.enforcer.model === "" || this.props.enforcer.adapter === "" || Setting.builtInObject(this.props.enforcer)} style={{marginRight: "5px"}} type="primary" size="small" onClick={() => this.addRow(table)}>{i18next.t("general:Add")}</Button>
