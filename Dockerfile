@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM node:20-alpine AS FRONT
+FROM --platform=$BUILDPLATFORM node:20-alpine AS front
 WORKDIR /web
 
 # Copy only dependency files first for better caching
@@ -10,7 +10,7 @@ COPY ./web .
 RUN NODE_OPTIONS="--max-old-space-size=4096" yarn run build
 
 
-FROM --platform=$BUILDPLATFORM golang:latest AS BACK
+FROM --platform=$BUILDPLATFORM golang:latest AS back
 WORKDIR /go/src/casdoor
 
 # Copy only go.mod and go.sum first for dependency caching
@@ -23,7 +23,7 @@ COPY . .
 RUN go test -v -run TestGetVersionInfo ./util/system_test.go ./util/system.go ./util/variable.go
 RUN ./build.sh
 
-FROM alpine:latest AS STANDARD
+FROM alpine:latest AS standard
 LABEL MAINTAINER="https://maxs.pro/"
 ARG USER=vitalik
 ARG TARGETOS
@@ -36,9 +36,9 @@ RUN sed -i 's/https/http/' /etc/apk/repositories && apk add --update sudo tzdata
 
 USER 1000
 WORKDIR /
-COPY --from=BACK --chown=$USER:$USER /go/src/casdoor/server_${BUILDX_ARCH} ./server
-COPY --from=BACK --chown=$USER:$USER /go/src/casdoor/swagger ./swagger
-COPY --from=BACK --chown=$USER:$USER /go/src/casdoor/conf/app.conf ./conf/app.conf
-COPY --from=FRONT --chown=$USER:$USER /web/build ./web/build
+COPY --from=back --chown=$USER:$USER /go/src/casdoor/server_${BUILDX_ARCH} ./server
+COPY --from=back --chown=$USER:$USER /go/src/casdoor/swagger ./swagger
+COPY --from=back --chown=$USER:$USER /go/src/casdoor/conf/app.conf ./conf/app.conf
+COPY --from=front --chown=$USER:$USER /web/build ./web/build
 
 ENTRYPOINT ["/server"]

@@ -11,11 +11,20 @@ if (!fs.existsSync(sourceDir)) {
 }
 
 if (fs.existsSync(targetDir)) {
-  fs.rmSync(targetDir, {recursive: true, force: true});
+  fs.rmSync(targetDir, { recursive: true, force: true });
   // eslint-disable-next-line no-console
   console.log(`Target directory "${targetDir}" has been deleted successfully.`);
 }
 
-fs.renameSync(sourceDir, targetDir);
+try {
+  fs.renameSync(sourceDir, targetDir);
+} catch (err) {
+  if (err.code === "EXDEV") {
+    fs.cpSync(sourceDir, targetDir, { recursive: true });
+    fs.rmSync(sourceDir, { recursive: true, force: true });
+  } else {
+    throw err;
+  }
+}
 // eslint-disable-next-line no-console
 console.log(`Renamed "${sourceDir}" to "${targetDir}" successfully.`);

@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/beego/beego/v2/core/logs"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/util"
 	"github.com/xorm-io/builder"

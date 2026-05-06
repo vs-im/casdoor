@@ -56,14 +56,26 @@ class EntryListPage extends BaseListPage {
     EntryBackend.addEntry(newEntry)
       .then((res) => {
         if (res.status === "ok") {
-          this.props.history.push({pathname: `/entries/${newEntry.owner}/${newEntry.name}`, mode: "add"});
-          Setting.showMessage("success", i18next.t("general:Successfully added"));
+          this.props.history.push({
+            pathname: `/entries/${newEntry.owner}/${newEntry.name}`,
+            mode: "add",
+          });
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully added")
+          );
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to add")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to add")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
@@ -71,19 +83,32 @@ class EntryListPage extends BaseListPage {
     EntryBackend.deleteEntry(this.state.data[i])
       .then((res) => {
         if (res.status === "ok") {
-          Setting.showMessage("success", i18next.t("general:Successfully deleted"));
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully deleted")
+          );
           this.fetch({
             pagination: {
               ...this.state.pagination,
-              current: this.state.pagination.current > 1 && this.state.data.length === 1 ? this.state.pagination.current - 1 : this.state.pagination.current,
+              current:
+                this.state.pagination.current > 1 &&
+                this.state.data.length === 1
+                  ? this.state.pagination.current - 1
+                  : this.state.pagination.current,
             },
           });
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to delete")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to delete")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
@@ -126,36 +151,54 @@ class EntryListPage extends BaseListPage {
   }
 
   fetch = (params = {}) => {
-    const field = params.searchedColumn, value = params.searchText;
-    const sortField = params.sortField, sortOrder = params.sortOrder;
+    const field = params.searchedColumn,
+      value = params.searchText;
+    const sortField = params.sortField,
+      sortOrder = params.sortOrder;
     const owner = Setting.getRequestOrganization(this.props.account);
     if (!params.pagination) {
-      params.pagination = {current: 1, pageSize: 10};
+      params.pagination = {current: 1, pageSize: 100};
     }
 
     this.setState({loading: true});
     Promise.all([
-      EntryBackend.getEntries(owner, params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder),
+      EntryBackend.getEntries(
+        owner,
+        params.pagination.current,
+        params.pagination.pageSize,
+        field,
+        value,
+        sortField,
+        sortOrder
+      ),
       this.getProviders(owner),
-    ]).then(([res]) => {
-      this.setState({loading: false});
-      if (res.status === "ok") {
-        this.setState({
-          data: res.data,
-          pagination: {
-            ...params.pagination,
-            total: res.data2,
-          },
-          searchText: params.searchText,
-          searchedColumn: params.searchedColumn,
-        });
-      } else {
-        Setting.showMessage("error", `${i18next.t("general:Failed to get")}: ${res.msg}`);
-      }
-    }).catch(error => {
-      this.setState({loading: false});
-      Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
-    });
+    ])
+      .then(([res]) => {
+        this.setState({loading: false});
+        if (res.status === "ok") {
+          this.setState({
+            data: res.data,
+            pagination: {
+              ...params.pagination,
+              total: res.data2,
+            },
+            searchText: params.searchText,
+            searchedColumn: params.searchedColumn,
+          });
+        } else {
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to get")}: ${res.msg}`
+          );
+        }
+      })
+      .catch((error) => {
+        this.setState({loading: false});
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
+      });
   };
 
   renderTable(entries) {
@@ -168,11 +211,7 @@ class EntryListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("owner"),
         render: (text) => {
-          return (
-            <Link to={`/organizations/${text}`}>
-              {text}
-            </Link>
-          );
+          return <Link to={`/organizations/${text}`}>{text}</Link>;
         },
       },
       {
@@ -183,11 +222,7 @@ class EntryListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("name"),
         render: (text, record) => {
-          return (
-            <Link to={`/entries/${record.owner}/${text}`}>
-              {text}
-            </Link>
-          );
+          return <Link to={`/entries/${record.owner}/${text}`}>{text}</Link>;
         },
       },
       {
@@ -211,11 +246,7 @@ class EntryListPage extends BaseListPage {
           if (!text) {
             return null;
           }
-          return (
-            <Link to={`/providers/${record.owner}/${text}`}>
-              {text}
-            </Link>
-          );
+          return <Link to={`/providers/${record.owner}/${text}`}>{text}</Link>;
         },
       },
       {
@@ -233,7 +264,11 @@ class EntryListPage extends BaseListPage {
         width: "140px",
         sorter: true,
         ...this.getColumnSearchProps("clientIp", (row, highlightContent) => (
-          <a target="_blank" rel="noreferrer" href={`https://db-ip.com/${row.text}`}>
+          <a
+            target="_blank"
+            rel="noreferrer"
+            href={`https://db-ip.com/${row.text}`}
+          >
             {highlightContent}
           </a>
         )),
@@ -258,8 +293,14 @@ class EntryListPage extends BaseListPage {
           return (
             <Popover
               placement="topRight"
-              content={(
-                <div style={{width: Setting.isMobile() ? Math.min(window.innerWidth - 40, 720) : 720}}>
+              content={
+                <div
+                  style={{
+                    width: Setting.isMobile()
+                      ? Math.min(window.innerWidth - 40, 720)
+                      : 720,
+                  }}
+                >
                   <EntryMessageViewer
                     entry={record}
                     provider={this.state.providerMap[record.provider] ?? null}
@@ -267,7 +308,7 @@ class EntryListPage extends BaseListPage {
                     contentSpan={24}
                   />
                 </div>
-              )}
+              }
               title=""
               trigger="hover"
             >
@@ -281,25 +322,49 @@ class EntryListPage extends BaseListPage {
         dataIndex: "op",
         key: "op",
         width: "180px",
-        fixed: (Setting.isMobile()) ? false : "right",
+        fixed: Setting.isMobile() ? false : "right",
         render: (text, record, index) => {
           return (
             <div>
-              <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} type="primary" onClick={() => this.props.history.push(`/entries/${record.owner}/${record.name}`)}>{i18next.t("general:Edit")}</Button>
-              <PopconfirmModal title={i18next.t("general:Sure to delete") + `: ${record.name} ?`} onConfirm={() => this.deleteEntry(index)}>
-              </PopconfirmModal>
+              <Button
+                style={{
+                  marginTop: "10px",
+                  marginBottom: "10px",
+                  marginRight: "10px",
+                }}
+                type="primary"
+                onClick={() =>
+                  this.props.history.push(
+                    `/entries/${record.owner}/${record.name}`
+                  )
+                }
+              >
+                {i18next.t("general:Edit")}
+              </Button>
+              <PopconfirmModal
+                title={
+                  i18next.t("general:Sure to delete") + `: ${record.name} ?`
+                }
+                onConfirm={() => this.deleteEntry(index)}
+              ></PopconfirmModal>
             </div>
           );
         },
       },
     ];
 
-    const filteredColumns = Setting.filterTableColumns(columns, this.props.formItems ?? this.state.formItems);
+    const filteredColumns = Setting.filterTableColumns(
+      columns,
+      this.props.formItems ?? this.state.formItems
+    );
     const paginationProps = {
       total: this.state.pagination.total,
       showQuickJumper: true,
       showSizeChanger: true,
-      showTotal: () => i18next.t("general:{total} in total").replace("{total}", this.state.pagination.total),
+      showTotal: () =>
+        i18next
+          .t("general:{total} in total")
+          .replace("{total}", this.state.pagination.total),
     };
 
     return (
@@ -307,7 +372,7 @@ class EntryListPage extends BaseListPage {
         scroll={{x: "max-content"}}
         dataSource={entries}
         columns={filteredColumns}
-        rowKey={record => `${record.owner}/${record.name}`}
+        rowKey={(record) => `${record.owner}/${record.name}`}
         pagination={{...this.state.pagination, ...paginationProps}}
         loading={this.getTableLoading()}
         onChange={this.handleTableChange}
@@ -316,7 +381,9 @@ class EntryListPage extends BaseListPage {
         title={() => (
           <div>
             {i18next.t("general:Entries")}&nbsp;&nbsp;&nbsp;&nbsp;
-            <Button type="primary" size="small" onClick={() => this.addEntry()}>{i18next.t("general:Add")}</Button>
+            <Button type="primary" size="small" onClick={() => this.addEntry()}>
+              {i18next.t("general:Add")}
+            </Button>
           </div>
         )}
       />

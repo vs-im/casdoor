@@ -39,19 +39,32 @@ class ResourceListPage extends BaseListPage {
     ResourceBackend.deleteResource(this.state.data[i])
       .then((res) => {
         if (res.status === "ok") {
-          Setting.showMessage("success", i18next.t("general:Successfully deleted"));
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully deleted")
+          );
           this.fetch({
             pagination: {
               ...this.state.pagination,
-              current: this.state.pagination.current > 1 && this.state.data.length === 1 ? this.state.pagination.current - 1 : this.state.pagination.current,
+              current:
+                this.state.pagination.current > 1 &&
+                this.state.data.length === 1
+                  ? this.state.pagination.current - 1
+                  : this.state.pagination.current,
             },
           });
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to delete")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to delete")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
@@ -59,26 +72,51 @@ class ResourceListPage extends BaseListPage {
     this.setState({uploading: true});
     const filename = info.fileList[0].name;
     const fullFilePath = `resource/${this.props.account.owner}/${this.props.account.name}/${filename}`;
-    ResourceBackend.uploadResource(this.props.account.owner, this.props.account.name, "custom", "ResourceListPage", fullFilePath, info.file)
-      .then(res => {
+    ResourceBackend.uploadResource(
+      this.props.account.owner,
+      this.props.account.name,
+      "custom",
+      "ResourceListPage",
+      fullFilePath,
+      info.file
+    )
+      .then((res) => {
         if (res.status === "ok") {
-          Setting.showMessage("success", i18next.t("application:File uploaded successfully"));
+          Setting.showMessage(
+            "success",
+            i18next.t("application:File uploaded successfully")
+          );
 
           const {pagination} = this.state;
           this.fetch({pagination});
         } else {
           Setting.showMessage("error", res.msg);
         }
-      }).finally(() => {
+      })
+      .finally(() => {
         this.setState({uploading: false});
       });
   }
 
   renderUpload() {
     return (
-      <Upload maxCount={1} showUploadList={false}
-        beforeUpload={file => {return false;}} onChange={info => {this.handleUpload(info);}}>
-        <Button id="upload-button" icon={<UploadOutlined />} loading={this.state.uploading} type="primary" size="small">
+      <Upload
+        maxCount={1}
+        showUploadList={false}
+        beforeUpload={(file) => {
+          return false;
+        }}
+        onChange={(info) => {
+          this.handleUpload(info);
+        }}
+      >
+        <Button
+          id="upload-button"
+          icon={<UploadOutlined />}
+          loading={this.state.uploading}
+          type="primary"
+          size="small"
+        >
           {i18next.t("resource:Upload a file...")}
         </Button>
       </Upload>
@@ -95,11 +133,7 @@ class ResourceListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("provider"),
         render: (text, record, index) => {
-          return (
-            <Link to={`/providers/${record.owner}/${text}`}>
-              {text}
-            </Link>
-          );
+          return <Link to={`/providers/${record.owner}/${text}`}>{text}</Link>;
         },
       },
       {
@@ -110,11 +144,7 @@ class ResourceListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("owner"),
         render: (text, record, index) => {
-          return (
-            <Link to={`/organizations/${text}`}>
-              {text}
-            </Link>
-          );
+          return <Link to={`/organizations/${text}`}>{text}</Link>;
         },
       },
       {
@@ -126,9 +156,7 @@ class ResourceListPage extends BaseListPage {
         ...this.getColumnSearchProps("application"),
         render: (text, record, index) => {
           return (
-            <Link to={`/applications/${record.owner}/${text}`}>
-              {text}
-            </Link>
+            <Link to={`/applications/${record.owner}/${text}`}>{text}</Link>
           );
         },
       },
@@ -141,9 +169,7 @@ class ResourceListPage extends BaseListPage {
         ...this.getColumnSearchProps("user"),
         render: (text, record, index) => {
           return (
-            <Link to={`/users/${record.owner}/${record.user}`}>
-              {text}
-            </Link>
+            <Link to={`/users/${record.owner}/${record.user}`}>{text}</Link>
           );
         },
       },
@@ -219,17 +245,12 @@ class ResourceListPage extends BaseListPage {
         dataIndex: "preview",
         key: "preview",
         width: "100px",
-        fixed: (Setting.isMobile()) ? "false" : "right",
+        fixed: Setting.isMobile() ? "false" : "right",
         render: (text, record, index) => {
           if (record.fileType === "image") {
-            const errorImage = "data:image/png;base64,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";
-            return (
-              <Image
-                width={200}
-                src={record.url}
-                fallback={errorImage}
-              />
-            );
+            const errorImage =
+              "data:image/png;base64,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";
+            return <Image width={200} src={record.url} fallback={errorImage} />;
           } else if (record.fileType === "video") {
             return (
               <video width={200} controls>
@@ -244,14 +265,18 @@ class ResourceListPage extends BaseListPage {
         dataIndex: "url",
         key: "url",
         width: "120px",
-        fixed: (Setting.isMobile()) ? "false" : "right",
+        fixed: Setting.isMobile() ? "false" : "right",
         render: (text, record, index) => {
           return (
             <div>
-              <Button onClick={() => {
-                copy(record.url);
-                Setting.showMessage("success", i18next.t("general:Copied to clipboard successfully"));
-              }}
+              <Button
+                onClick={() => {
+                  copy(record.url);
+                  Setting.showMessage(
+                    "success",
+                    i18next.t("general:Copied to clipboard successfully")
+                  );
+                }}
               >
                 {i18next.t("resource:Copy Link")}
               </Button>
@@ -264,17 +289,18 @@ class ResourceListPage extends BaseListPage {
         dataIndex: "",
         key: "op",
         width: "70px",
-        fixed: (Setting.isMobile()) ? "false" : "right",
+        fixed: Setting.isMobile() ? "false" : "right",
         render: (text, record, index) => {
           return (
             <div>
               <PopconfirmModal
-                title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
+                title={
+                  i18next.t("general:Sure to delete") + `: ${record.name} ?`
+                }
                 onConfirm={() => this.deleteResource(index)}
                 okText={i18next.t("general:OK")}
                 cancelText={i18next.t("general:Cancel")}
-              >
-              </PopconfirmModal>
+              ></PopconfirmModal>
             </div>
           );
         },
@@ -285,19 +311,29 @@ class ResourceListPage extends BaseListPage {
       total: this.state.pagination.total,
       showQuickJumper: true,
       showSizeChanger: true,
-      showTotal: () => i18next.t("general:{total} in total").replace("{total}", this.state.pagination.total),
+      pageSize: this.state.pagination.pageSize,
+      current: this.state.pagination.current,
+      showTotal: () =>
+        i18next
+          .t("general:{total} in total")
+          .replace("{total}", this.state.pagination.total),
     };
 
     return (
       <div>
-        <Table scroll={{x: "max-content"}} columns={columns} dataSource={resources} rowKey="name" size="middle" bordered pagination={paginationProps}
+        <Table
+          scroll={{x: "max-content"}}
+          columns={columns}
+          dataSource={resources}
+          rowKey="name"
+          size="middle"
+          bordered
+          pagination={paginationProps}
           title={() => (
             <div>
               {i18next.t("general:Resources")}&nbsp;&nbsp;&nbsp;&nbsp;
               {/* <Button type="primary" size="small" onClick={this.addResource.bind(this)}>{i18next.t("general:Add")}</Button>*/}
-              {
-                this.renderUpload()
-              }
+              {this.renderUpload()}
             </div>
           )}
           loading={this.getTableLoading()}
@@ -308,33 +344,45 @@ class ResourceListPage extends BaseListPage {
   }
 
   fetch = (params = {}) => {
-    const field = params.searchedColumn, value = params.searchText;
-    const sortField = params.sortField, sortOrder = params.sortOrder;
+    const field = params.searchedColumn,
+      value = params.searchText;
+    const sortField = params.sortField,
+      sortOrder = params.sortOrder;
     this.setState({loading: true});
-    ResourceBackend.getResources(Setting.isDefaultOrganizationSelected(this.props.account) ? "" : Setting.getRequestOrganization(this.props.account), this.props.account.name, params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
-      .then((res) => {
-        this.setState({
-          loading: false,
-        });
-        if (res.status === "ok") {
-          this.setState({
-            data: res.data,
-            pagination: {
-              ...params.pagination,
-              total: res.data2,
-            },
-            searchText: params.searchText,
-            searchedColumn: params.searchedColumn,
-          });
-        } else {
-          if (res.data.includes("Please login first")) {
-            this.setState({
-              loading: false,
-              isAuthorized: false,
-            });
-          }
-        }
+    ResourceBackend.getResources(
+      Setting.isDefaultOrganizationSelected(this.props.account)
+        ? ""
+        : Setting.getRequestOrganization(this.props.account),
+      this.props.account.name,
+      params.pagination.current,
+      params.pagination.pageSize,
+      field,
+      value,
+      sortField,
+      sortOrder
+    ).then((res) => {
+      this.setState({
+        loading: false,
       });
+      if (res.status === "ok") {
+        this.setState({
+          data: res.data,
+          pagination: {
+            ...params.pagination,
+            total: res.data2,
+          },
+          searchText: params.searchText,
+          searchedColumn: params.searchedColumn,
+        });
+      } else {
+        if (res.data.includes("Please login first")) {
+          this.setState({
+            loading: false,
+            isAuthorized: false,
+          });
+        }
+      }
+    });
   };
 }
 

@@ -23,7 +23,7 @@ import Editor from "./common/Editor";
 
 class RecordListPage extends BaseListPage {
   UNSAFE_componentWillMount() {
-    this.state.pagination.pageSize = 20;
+    this.state.pagination.pageSize = 100;
     const {pagination} = this.state;
     this.fetch({pagination});
   }
@@ -53,7 +53,11 @@ class RecordListPage extends BaseListPage {
         width: "120px",
         sorter: true,
         ...this.getColumnSearchProps("clientIp", (row, highlightContent) => (
-          <a target="_blank" rel="noreferrer" href={`https://db-ip.com/${row.text}`}>
+          <a
+            target="_blank"
+            rel="noreferrer"
+            href={`https://db-ip.com/${row.text}`}
+          >
             {highlightContent}
           </a>
         )),
@@ -76,11 +80,7 @@ class RecordListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("organization"),
         render: (text, record, index) => {
-          return (
-            <Link to={`/organizations/${text}`}>
-              {text}
-            </Link>
-          );
+          return <Link to={`/organizations/${text}`}>{text}</Link>;
         },
       },
       {
@@ -106,9 +106,16 @@ class RecordListPage extends BaseListPage {
         sorter: true,
         filterMultiple: false,
         filters: [
-          "GET", "HEAD", "POST", "PUT", "DELETE",
-          "CONNECT", "OPTIONS", "TRACE", "PATCH",
-        ].map(el => ({text: el, value: el})),
+          "GET",
+          "HEAD",
+          "POST",
+          "PUT",
+          "DELETE",
+          "CONNECT",
+          "OPTIONS",
+          "TRACE",
+          "PATCH",
+        ].map((el) => ({text: el, value: el})),
       },
       {
         title: i18next.t("general:Request URI"),
@@ -174,7 +181,7 @@ class RecordListPage extends BaseListPage {
         width: "200px",
         sorter: true,
         ...this.getColumnSearchProps("action"),
-        fixed: (Setting.isMobile()) ? "false" : "right",
+        fixed: Setting.isMobile() ? "false" : "right",
         render: (text, record, index) => {
           return text;
         },
@@ -185,14 +192,23 @@ class RecordListPage extends BaseListPage {
         key: "isTriggered",
         width: "120px",
         sorter: true,
-        fixed: (Setting.isMobile()) ? "false" : "right",
+        fixed: Setting.isMobile() ? "false" : "right",
         render: (text, record, index) => {
-          if (!["signup", "login", "logout", "update-user", "new-user"].includes(record.action)) {
+          if (
+            !["signup", "login", "logout", "update-user", "new-user"].includes(
+              record.action
+            )
+          ) {
             return null;
           }
 
           return (
-            <Switch disabled checkedChildren={i18next.t("general:ON")} unCheckedChildren={i18next.t("general:OFF")} checked={text} />
+            <Switch
+              disabled
+              checkedChildren={i18next.t("general:ON")}
+              unCheckedChildren={i18next.t("general:OFF")}
+              checked={text}
+            />
           );
         },
       },
@@ -204,12 +220,14 @@ class RecordListPage extends BaseListPage {
         sorter: true,
         fixed: "right",
         render: (text, record, index) => (
-          <Button onClick={() => {
-            this.setState({
-              detailRecord: record,
-              detailShow: true,
-            });
-          }}>
+          <Button
+            onClick={() => {
+              this.setState({
+                detailRecord: record,
+                detailShow: true,
+              });
+            }}
+          >
             {i18next.t("general:View")}
           </Button>
         ),
@@ -217,24 +235,33 @@ class RecordListPage extends BaseListPage {
     ];
 
     if (Setting.isLocalAdminUser(this.props.account)) {
-      columns = columns.filter(column => column.key !== "name");
+      columns = columns.filter((column) => column.key !== "name");
     }
 
     const paginationProps = {
       total: this.state.pagination.total,
       pageSize: this.state.pagination.pageSize,
+      current: this.state.pagination.current,
       showQuickJumper: true,
       showSizeChanger: true,
-      showTotal: () => i18next.t("general:{total} in total").replace("{total}", this.state.pagination.total),
+      showTotal: () =>
+        i18next
+          .t("general:{total} in total")
+          .replace("{total}", this.state.pagination.total),
     };
 
     return (
       <div>
-        <Table scroll={{x: "100%"}} columns={columns} dataSource={records} rowKey="id" size="middle" bordered pagination={paginationProps}
+        <Table
+          scroll={{x: "100%"}}
+          columns={columns}
+          dataSource={records}
+          rowKey="id"
+          size="middle"
+          bordered
+          pagination={paginationProps}
           title={() => (
-            <div>
-              {i18next.t("general:Records")}&nbsp;&nbsp;&nbsp;&nbsp;
-            </div>
+            <div>{i18next.t("general:Records")}&nbsp;&nbsp;&nbsp;&nbsp;</div>
           )}
           loading={this.getTableLoading()}
           onChange={this.handleTableChange}
@@ -248,25 +275,51 @@ class RecordListPage extends BaseListPage {
           onClose={() => this.setState({detailShow: false})}
           open={this.state.detailShow}
         >
-          <Descriptions bordered size="small" column={1} layout={Setting.isMobile() ? "vertical" : "horizontal"} style={{padding: "12px", height: "100%", overflowY: "auto"}}>
-            <Descriptions.Item label={i18next.t("general:ID")}>{this.getDetailField("id")}</Descriptions.Item>
-            <Descriptions.Item label={i18next.t("general:Client IP")}>{this.getDetailField("clientIp")}</Descriptions.Item>
-            <Descriptions.Item label={i18next.t("general:Timestamp")}>{this.getDetailField("createdTime")}</Descriptions.Item>
+          <Descriptions
+            bordered
+            size="small"
+            column={1}
+            layout={Setting.isMobile() ? "vertical" : "horizontal"}
+            style={{padding: "12px", height: "100%", overflowY: "auto"}}
+          >
+            <Descriptions.Item label={i18next.t("general:ID")}>
+              {this.getDetailField("id")}
+            </Descriptions.Item>
+            <Descriptions.Item label={i18next.t("general:Client IP")}>
+              {this.getDetailField("clientIp")}
+            </Descriptions.Item>
+            <Descriptions.Item label={i18next.t("general:Timestamp")}>
+              {this.getDetailField("createdTime")}
+            </Descriptions.Item>
             <Descriptions.Item label={i18next.t("general:Organization")}>
-              <Link to={`/organizations/${this.getDetailField("organization")}`}>
+              <Link
+                to={`/organizations/${this.getDetailField("organization")}`}
+              >
                 {this.getDetailField("organization")}
               </Link>
             </Descriptions.Item>
             <Descriptions.Item label={i18next.t("general:User")}>
-              <Link to={`/users/${this.getDetailField("organization")}/${this.getDetailField("user")}`}>
+              <Link
+                to={`/users/${this.getDetailField("organization")}/${this.getDetailField("user")}`}
+              >
                 {this.getDetailField("user")}
               </Link>
             </Descriptions.Item>
-            <Descriptions.Item label={i18next.t("general:Method")}>{this.getDetailField("method")}</Descriptions.Item>
-            <Descriptions.Item label={i18next.t("general:Request URI")}>{this.getDetailField("requestUri")}</Descriptions.Item>
-            <Descriptions.Item label={i18next.t("user:Language")}>{this.getDetailField("language")}</Descriptions.Item>
-            <Descriptions.Item label={i18next.t("rule:Status code")}>{this.getDetailField("statusCode")}</Descriptions.Item>
-            <Descriptions.Item label={i18next.t("general:Action")}>{this.getDetailField("action")}</Descriptions.Item>
+            <Descriptions.Item label={i18next.t("general:Method")}>
+              {this.getDetailField("method")}
+            </Descriptions.Item>
+            <Descriptions.Item label={i18next.t("general:Request URI")}>
+              {this.getDetailField("requestUri")}
+            </Descriptions.Item>
+            <Descriptions.Item label={i18next.t("user:Language")}>
+              {this.getDetailField("language")}
+            </Descriptions.Item>
+            <Descriptions.Item label={i18next.t("rule:Status code")}>
+              {this.getDetailField("statusCode")}
+            </Descriptions.Item>
+            <Descriptions.Item label={i18next.t("general:Action")}>
+              {this.getDetailField("action")}
+            </Descriptions.Item>
             <Descriptions.Item label={i18next.t("record:Response")}>
               <Editor
                 value={this.getDetailField("response")}
@@ -298,7 +351,7 @@ class RecordListPage extends BaseListPage {
     return Setting.isMobile() ? window.innerWidth - 60 : 475;
   };
 
-  jsonStrFormatter = str => {
+  jsonStrFormatter = (str) => {
     try {
       return JSON.stringify(JSON.parse(str), null, 2);
     } catch (e) {
@@ -308,44 +361,57 @@ class RecordListPage extends BaseListPage {
     }
   };
 
-  getDetailField = dataIndex => {
-    return this.state.detailRecord ? this.state.detailRecord?.[dataIndex] ?? "" : "";
+  getDetailField = (dataIndex) => {
+    return this.state.detailRecord
+      ? (this.state.detailRecord?.[dataIndex] ?? "")
+      : "";
   };
 
   fetch = (params = {}) => {
-    let field = params.searchedColumn, value = params.searchText;
-    const sortField = params.sortField, sortOrder = params.sortOrder;
+    let field = params.searchedColumn,
+      value = params.searchText;
+    const sortField = params.sortField,
+      sortOrder = params.sortOrder;
     if (params.method !== undefined && params.method !== null) {
       field = "method";
       value = params.method;
     }
     this.setState({loading: true});
-    RecordBackend.getRecords(Setting.isDefaultOrganizationSelected(this.props.account) ? "" : Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
-      .then((res) => {
-        this.setState({
-          loading: false,
-        });
-        if (res.status === "ok") {
-          this.setState({
-            data: res.data,
-            pagination: {
-              ...params.pagination,
-              total: res.data2,
-            },
-            searchText: params.searchText,
-            searchedColumn: params.searchedColumn,
-            detailShow: false,
-            detailRecord: null,
-          });
-        } else {
-          if (res.data.includes("Please login first")) {
-            this.setState({
-              loading: false,
-              isAuthorized: false,
-            });
-          }
-        }
+    RecordBackend.getRecords(
+      Setting.isDefaultOrganizationSelected(this.props.account)
+        ? ""
+        : Setting.getRequestOrganization(this.props.account),
+      params.pagination.current,
+      params.pagination.pageSize,
+      field,
+      value,
+      sortField,
+      sortOrder
+    ).then((res) => {
+      this.setState({
+        loading: false,
       });
+      if (res.status === "ok") {
+        this.setState({
+          data: res.data,
+          pagination: {
+            ...params.pagination,
+            total: res.data2,
+          },
+          searchText: params.searchText,
+          searchedColumn: params.searchedColumn,
+          detailShow: false,
+          detailRecord: null,
+        });
+      } else {
+        if (res.data.includes("Please login first")) {
+          this.setState({
+            loading: false,
+            isAuthorized: false,
+          });
+        }
+      }
+    });
   };
 }
 

@@ -50,11 +50,23 @@ class ApplicationListPage extends BaseListPage {
       enableSamlCompress: false,
       disableSamlAttributes: false,
       providers: [
-        {name: "provider_captcha_default", canSignUp: false, canSignIn: false, canUnlink: false, prompted: false, signupGroup: "", rule: ""},
+        {
+          name: "provider_captcha_default",
+          canSignUp: false,
+          canSignIn: false,
+          canUnlink: false,
+          prompted: false,
+          signupGroup: "",
+          rule: "",
+        },
       ],
       SigninMethods: [
         {name: "Password", displayName: "Password", rule: "All"},
-        {name: "Verification code", displayName: "Verification code", rule: "All"},
+        {
+          name: "Verification code",
+          displayName: "Verification code",
+          rule: "All",
+        },
         {name: "WebAuthn", displayName: "WebAuthn", rule: "None"},
         {name: "Face ID", displayName: "Face ID", rule: "None"},
       ],
@@ -63,14 +75,32 @@ class ApplicationListPage extends BaseListPage {
         {name: "Username", visible: true, required: true, rule: "None"},
         {name: "Display name", visible: true, required: true, rule: "None"},
         {name: "Password", visible: true, required: true, rule: "None"},
-        {name: "Confirm password", visible: true, required: true, rule: "None"},
+        {
+          name: "Confirm password",
+          visible: true,
+          required: true,
+          rule: "None",
+        },
         {name: "Email", visible: true, required: true, rule: "Normal"},
         {name: "Phone", visible: true, required: true, rule: "None"},
         {name: "Agreement", visible: true, required: true, rule: "None"},
         {name: "Signup button", visible: true, required: true, rule: "None"},
-        {name: "Providers", visible: true, required: true, rule: "None", customCss: SignupTableDefaultCssMap["Providers"]},
+        {
+          name: "Providers",
+          visible: true,
+          required: true,
+          rule: "None",
+          customCss: SignupTableDefaultCssMap["Providers"],
+        },
       ],
-      grantTypes: ["authorization_code", "password", "client_credentials", "token", "id_token", "refresh_token"],
+      grantTypes: [
+        "authorization_code",
+        "password",
+        "client_credentials",
+        "token",
+        "id_token",
+        "refresh_token",
+      ],
       cert: "cert-built-in",
       redirectUris: ["http://localhost:9000/callback"],
       tokenFormat: "JWT",
@@ -87,14 +117,26 @@ class ApplicationListPage extends BaseListPage {
     ApplicationBackend.addApplication(newApplication)
       .then((res) => {
         if (res.status === "ok") {
-          this.props.history.push({pathname: `/applications/${newApplication.organization}/${newApplication.name}`, mode: "add"});
-          Setting.showMessage("success", i18next.t("general:Successfully added"));
+          this.props.history.push({
+            pathname: `/applications/${newApplication.organization}/${newApplication.name}`,
+            mode: "add",
+          });
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully added")
+          );
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to add")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to add")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
@@ -102,19 +144,32 @@ class ApplicationListPage extends BaseListPage {
     ApplicationBackend.deleteApplication(this.state.data[i])
       .then((res) => {
         if (res.status === "ok") {
-          Setting.showMessage("success", i18next.t("general:Successfully deleted"));
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully deleted")
+          );
           this.fetch({
             pagination: {
               ...this.state.pagination,
-              current: this.state.pagination.current > 1 && this.state.data.length === 1 ? this.state.pagination.current - 1 : this.state.pagination.current,
+              current:
+                this.state.pagination.current > 1 &&
+                this.state.data.length === 1
+                  ? this.state.pagination.current - 1
+                  : this.state.pagination.current,
             },
           });
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to delete")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to delete")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
@@ -135,14 +190,26 @@ class ApplicationListPage extends BaseListPage {
     ApplicationBackend.addApplication(copiedApplication)
       .then((res) => {
         if (res.status === "ok") {
-          this.props.history.push({pathname: `/applications/${copiedApplication.organization}/${newName}`, mode: "add"});
-          Setting.showMessage("success", i18next.t("general:Successfully copied"));
+          this.props.history.push({
+            pathname: `/applications/${copiedApplication.organization}/${newName}`,
+            mode: "add",
+          });
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully copied")
+          );
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to copy")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to copy")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
@@ -233,11 +300,7 @@ class ApplicationListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("organization"),
         render: (text, record, index) => {
-          return (
-            <Link to={`/organizations/${text}`}>
-              {text}
-            </Link>
-          );
+          return <Link to={`/organizations/${text}`}>{text}</Link>;
         },
       },
       {
@@ -265,9 +328,21 @@ class ApplicationListPage extends BaseListPage {
                     <List.Item>
                       <div style={{display: "inline"}}>
                         <Tooltip placement="topLeft" title="Edit">
-                          <Button style={{marginRight: "5px"}} icon={<EditOutlined />} size="small" onClick={() => Setting.goToLinkSoft(this, `/providers/${record.organization}/${providerItem.name}`)} />
+                          <Button
+                            style={{marginRight: "5px"}}
+                            icon={<EditOutlined />}
+                            size="small"
+                            onClick={() =>
+                              Setting.goToLinkSoft(
+                                this,
+                                `/providers/${record.organization}/${providerItem.name}`
+                              )
+                            }
+                          />
                         </Tooltip>
-                        <Link to={`/providers/${record.organization}/${providerItem.name}`}>
+                        <Link
+                          to={`/providers/${record.organization}/${providerItem.name}`}
+                        >
                           {providerItem.name}
                         </Link>
                       </div>
@@ -281,16 +356,8 @@ class ApplicationListPage extends BaseListPage {
           return (
             <div>
               <Row>
-                <Col span={12}>
-                  {
-                    getList(providers.slice(0, half))
-                  }
-                </Col>
-                <Col span={12}>
-                  {
-                    getList(providers.slice(half))
-                  }
-                </Col>
+                <Col span={12}>{getList(providers.slice(0, half))}</Col>
+                <Col span={12}>{getList(providers.slice(half))}</Col>
               </Row>
             </div>
           );
@@ -301,39 +368,84 @@ class ApplicationListPage extends BaseListPage {
         dataIndex: "",
         key: "op",
         width: "280px",
-        fixed: (Setting.isMobile()) ? "false" : "right",
+        fixed: Setting.isMobile() ? "false" : "right",
         render: (text, record, index) => {
           return (
             <div>
-              <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} onClick={() => this.copyApplication(index)}>{i18next.t("general:Duplicate")}</Button>
-              <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} type="primary" onClick={() => this.props.history.push(`/applications/${record.organization}/${record.name}`)}>{i18next.t("general:Edit")}</Button>
+              <Button
+                style={{
+                  marginTop: "10px",
+                  marginBottom: "10px",
+                  marginRight: "10px",
+                }}
+                onClick={() => this.copyApplication(index)}
+              >
+                {i18next.t("general:Duplicate")}
+              </Button>
+              <Button
+                style={{
+                  marginTop: "10px",
+                  marginBottom: "10px",
+                  marginRight: "10px",
+                }}
+                type="primary"
+                onClick={() =>
+                  this.props.history.push(
+                    `/applications/${record.organization}/${record.name}`
+                  )
+                }
+              >
+                {i18next.t("general:Edit")}
+              </Button>
               <PopconfirmModal
-                title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
+                title={
+                  i18next.t("general:Sure to delete") + `: ${record.name} ?`
+                }
                 onConfirm={() => this.deleteApplication(index)}
                 disabled={record.name === "hasura"}
-              >
-              </PopconfirmModal>
+              ></PopconfirmModal>
             </div>
           );
         },
       },
     ];
 
-    const filteredColumns = Setting.filterTableColumns(columns, this.props.formItems ?? this.state.formItems);
+    const filteredColumns = Setting.filterTableColumns(
+      columns,
+      this.props.formItems ?? this.state.formItems
+    );
     const paginationProps = {
       total: this.state.pagination.total,
       showQuickJumper: true,
       showSizeChanger: true,
-      showTotal: () => i18next.t("general:{total} in total").replace("{total}", this.state.pagination.total),
+      pageSize: this.state.pagination.pageSize,
+      current: this.state.pagination.current,
+      showTotal: () =>
+        i18next
+          .t("general:{total} in total")
+          .replace("{total}", this.state.pagination.total),
     };
 
     return (
       <div>
-        <Table scroll={{x: "max-content"}} columns={filteredColumns} dataSource={applications} rowKey={(record) => `${record.owner}/${record.name}`} size="middle" bordered pagination={paginationProps}
+        <Table
+          scroll={{x: "max-content"}}
+          columns={filteredColumns}
+          dataSource={applications}
+          rowKey={(record) => `${record.owner}/${record.name}`}
+          size="middle"
+          bordered
+          pagination={paginationProps}
           title={() => (
             <div>
               {i18next.t("general:Applications")}&nbsp;&nbsp;&nbsp;&nbsp;
-              <Button type="primary" size="small" onClick={this.addApplication.bind(this)}>{i18next.t("general:Add")}</Button>
+              <Button
+                type="primary"
+                size="small"
+                onClick={this.addApplication.bind(this)}
+              >
+                {i18next.t("general:Add")}
+              </Button>
             </div>
           )}
           loading={this.getTableLoading()}
@@ -344,35 +456,55 @@ class ApplicationListPage extends BaseListPage {
   }
 
   fetch = (params = {}) => {
-    const field = params.searchedColumn, value = params.searchText;
-    const sortField = params.sortField, sortOrder = params.sortOrder;
+    const field = params.searchedColumn,
+      value = params.searchText;
+    const sortField = params.sortField,
+      sortOrder = params.sortOrder;
     this.setState({loading: true});
-    (Setting.isDefaultOrganizationSelected(this.props.account) ? ApplicationBackend.getApplications("admin", params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder) :
-      ApplicationBackend.getApplicationsByOrganization("admin", Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder))
-      .then((res) => {
+    (Setting.isDefaultOrganizationSelected(this.props.account)
+      ? ApplicationBackend.getApplications(
+        "admin",
+        params.pagination.current,
+        params.pagination.pageSize,
+        field,
+        value,
+        sortField,
+        sortOrder
+      )
+      : ApplicationBackend.getApplicationsByOrganization(
+        "admin",
+        Setting.getRequestOrganization(this.props.account),
+        params.pagination.current,
+        params.pagination.pageSize,
+        field,
+        value,
+        sortField,
+        sortOrder
+      )
+    ).then((res) => {
+      this.setState({
+        loading: false,
+      });
+      if (res.status === "ok") {
         this.setState({
-          loading: false,
+          data: res.data,
+          pagination: {
+            ...params.pagination,
+            total: res.data2,
+          },
+          searchText: params.searchText,
+          searchedColumn: params.searchedColumn,
         });
-        if (res.status === "ok") {
+      } else {
+        if (Setting.isResponseDenied(res)) {
           this.setState({
-            data: res.data,
-            pagination: {
-              ...params.pagination,
-              total: res.data2,
-            },
-            searchText: params.searchText,
-            searchedColumn: params.searchedColumn,
+            isAuthorized: false,
           });
         } else {
-          if (Setting.isResponseDenied(res)) {
-            this.setState({
-              isAuthorized: false,
-            });
-          } else {
-            Setting.showMessage("error", res.msg);
-          }
+          Setting.showMessage("error", res.msg);
         }
-      });
+      }
+    });
   };
 }
 

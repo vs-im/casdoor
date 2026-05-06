@@ -21,16 +21,28 @@ import {CheckOutlined} from "@ant-design/icons";
 import {CompactTheme, DarkTheme, Light} from "antd-token-previewer/es/icons";
 
 export const Themes = [
-  {label: "Default", key: "default", icon: <Light style={{fontSize: "24px"}} />},        // i18next.t("general:Default")
-  {label: "Dark", key: "dark", icon: <DarkTheme style={{fontSize: "24px"}} />},          // i18next.t("theme:Dark")
-  {label: "Compact", key: "compact", icon: <CompactTheme style={{fontSize: "24px"}} />}, // i18next.t("theme:Compact")
+  {
+    label: "Default",
+    key: "default",
+    icon: <Light style={{fontSize: "16px", color: "#8897AD"}} />,
+  },
+  {
+    label: "Dark",
+    key: "dark",
+    icon: <DarkTheme style={{fontSize: "16px", color: "#8897AD"}} />,
+  },
+  {
+    label: "Compact",
+    key: "compact",
+    icon: <CompactTheme style={{fontSize: "16px", color: "#8897AD"}} />,
+  },
 ];
 
 function getIcon(themeKey) {
   if (themeKey?.includes("dark")) {
-    return Themes.find(t => t.key === "dark").icon;
+    return Themes.find((t) => t.key === "dark").icon;
   } else if (themeKey?.includes("default")) {
-    return Themes.find(t => t.key === "default").icon;
+    return Themes.find((t) => t.key === "default").icon;
   }
 }
 
@@ -42,12 +54,18 @@ class ThemeSelect extends React.Component {
   icon = getIcon(this.props.themeAlgorithm);
 
   getThemeItems() {
-    return Themes.map((theme) => Setting.getItem(
-      <Space>
-        {i18next.t(`theme:${theme.label}`)}
-        {this.props.themeAlgorithm.includes(theme.key) ? <CheckOutlined style={{marginLeft: "5px"}} /> : null}
-      </Space>,
-      theme.key, theme.icon));
+    return Themes.map((theme) =>
+      Setting.getItem(
+        <Space>
+          {i18next.t(`theme:${theme.label}`)}
+          {this.props.themeAlgorithm.includes(theme.key) ? (
+            <CheckOutlined style={{marginLeft: "5px"}} />
+          ) : null}
+        </Space>,
+        theme.key,
+        theme.icon
+      )
+    );
   }
 
   render() {
@@ -55,16 +73,26 @@ class ThemeSelect extends React.Component {
       let nextTheme;
       if (e.key === "compact") {
         if (this.props.themeAlgorithm.includes("compact")) {
-          nextTheme = this.props.themeAlgorithm.filter((theme) => theme !== "compact");
+          nextTheme = this.props.themeAlgorithm.filter(
+            (theme) => theme !== "compact"
+          );
         } else {
           nextTheme = [...this.props.themeAlgorithm, "compact"];
         }
       } else {
         if (!this.props.themeAlgorithm.includes(e.key)) {
           if (e.key === "dark") {
-            nextTheme = [...this.props.themeAlgorithm.filter((theme) => theme !== "default"), e.key];
+            nextTheme = [
+              ...this.props.themeAlgorithm.filter(
+                (theme) => theme !== "default"
+              ),
+              e.key,
+            ];
           } else {
-            nextTheme = [...this.props.themeAlgorithm.filter((theme) => theme !== "dark"), e.key];
+            nextTheme = [
+              ...this.props.themeAlgorithm.filter((theme) => theme !== "dark"),
+              e.key,
+            ];
           }
         } else {
           nextTheme = [...this.props.themeAlgorithm];
@@ -76,16 +104,16 @@ class ThemeSelect extends React.Component {
     };
 
     return (
-      <Dropdown menu={{
-        items: this.getThemeItems(),
-        onClick,
-        selectable: true,
-        multiple: true,
-        selectedKeys: [...this.props.themeAlgorithm],
-      }}>
-        <div className="select-box">
-          {this.icon}
-        </div>
+      <Dropdown
+        menu={{
+          items: this.getThemeItems(),
+          onClick,
+          selectable: true,
+          multiple: true,
+          selectedKeys: [...this.props.themeAlgorithm],
+        }}
+      >
+        <div className="select-box">{this.icon}</div>
       </Dropdown>
     );
   }

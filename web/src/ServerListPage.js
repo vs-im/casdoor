@@ -56,14 +56,26 @@ class ServerListPage extends BaseListPage {
     ServerBackend.addServer(newServer)
       .then((res) => {
         if (res.status === "ok") {
-          this.props.history.push({pathname: `/servers/${newServer.owner}/${newServer.name}`, mode: "add"});
-          Setting.showMessage("success", i18next.t("general:Successfully added"));
+          this.props.history.push({
+            pathname: `/servers/${newServer.owner}/${newServer.name}`,
+            mode: "add",
+          });
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully added")
+          );
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to add")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to add")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
@@ -71,47 +83,72 @@ class ServerListPage extends BaseListPage {
     ServerBackend.deleteServer(this.state.data[i])
       .then((res) => {
         if (res.status === "ok") {
-          Setting.showMessage("success", i18next.t("general:Successfully deleted"));
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully deleted")
+          );
           this.fetch({
             pagination: {
               ...this.state.pagination,
-              current: this.state.pagination.current > 1 && this.state.data.length === 1 ? this.state.pagination.current - 1 : this.state.pagination.current,
+              current:
+                this.state.pagination.current > 1 &&
+                this.state.data.length === 1
+                  ? this.state.pagination.current - 1
+                  : this.state.pagination.current,
             },
           });
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to delete")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to delete")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
   fetch = (params = {}) => {
-    const field = params.searchedColumn, value = params.searchText;
-    const sortField = params.sortField, sortOrder = params.sortOrder;
+    const field = params.searchedColumn,
+      value = params.searchText;
+    const sortField = params.sortField,
+      sortOrder = params.sortOrder;
     if (!params.pagination) {
-      params.pagination = {current: 1, pageSize: 10};
+      params.pagination = {current: 1, pageSize: 100};
     }
 
     this.setState({loading: true});
-    ServerBackend.getServers(Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
-      .then((res) => {
-        this.setState({loading: false});
-        if (res.status === "ok") {
-          this.setState({
-            data: res.data,
-            pagination: {
-              ...params.pagination,
-              total: res.data2,
-            },
-            searchText: params.searchText,
-            searchedColumn: params.searchedColumn,
-          });
-        } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to get")}: ${res.msg}`);
-        }
-      });
+    ServerBackend.getServers(
+      Setting.getRequestOrganization(this.props.account),
+      params.pagination.current,
+      params.pagination.pageSize,
+      field,
+      value,
+      sortField,
+      sortOrder
+    ).then((res) => {
+      this.setState({loading: false});
+      if (res.status === "ok") {
+        this.setState({
+          data: res.data,
+          pagination: {
+            ...params.pagination,
+            total: res.data2,
+          },
+          searchText: params.searchText,
+          searchedColumn: params.searchedColumn,
+        });
+      } else {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to get")}: ${res.msg}`
+        );
+      }
+    });
   };
 
   scanIntranetServers = (providerOwner, providerName) => {
@@ -123,14 +160,23 @@ class ServerListPage extends BaseListPage {
           const scanResult = res.data ?? {};
           const scanServers = scanResult.servers ?? [];
           this.setState({scanResult: scanResult, scanServers: scanServers});
-          Setting.showMessage("success", `${i18next.t("general:Successfully got")}: ${scanServers.length} server(s)`);
+          Setting.showMessage(
+            "success",
+            `${i18next.t("general:Successfully got")}: ${scanServers.length} server(s)`
+          );
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to get")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to get")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
+      .catch((error) => {
         this.setState({scanLoading: false});
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   };
 
@@ -139,14 +185,25 @@ class ServerListPage extends BaseListPage {
     return ProviderBackend.getProviders(owner, 1, 200, "", "", "", "")
       .then((res) => {
         if (res.status !== "ok") {
-          Setting.showMessage("error", `${i18next.t("general:Failed to get")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to get")}: ${res.msg}`
+          );
           return [];
         }
 
-        return (res.data || []).filter(provider => provider.category === "Scan" && provider.type === "MCP Scan" && provider.subType === "Intranet Scan");
+        return (res.data || []).filter(
+          (provider) =>
+            provider.category === "Scan" &&
+            provider.type === "MCP Scan" &&
+            provider.subType === "Intranet Scan"
+        );
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
         return [];
       });
   };
@@ -156,7 +213,10 @@ class ServerListPage extends BaseListPage {
       this.setState({
         showScanModal: true,
         scanProviders: scanProviders,
-        selectedScanProvider: scanProviders.length > 0 ? `${scanProviders[0].owner}/${scanProviders[0].name}` : null,
+        selectedScanProvider:
+          scanProviders.length > 0
+            ? `${scanProviders[0].owner}/${scanProviders[0].name}`
+            : null,
         scanResult: null,
         scanServers: [],
       });
@@ -172,11 +232,15 @@ class ServerListPage extends BaseListPage {
 
   submitScan = () => {
     if (!this.state.selectedScanProvider) {
-      Setting.showMessage("error", i18next.t("server:Please select a provider"));
+      Setting.showMessage(
+        "error",
+        i18next.t("server:Please select a provider")
+      );
       return;
     }
 
-    const [providerOwner, providerName] = this.state.selectedScanProvider.split("/");
+    const [providerOwner, providerName] =
+      this.state.selectedScanProvider.split("/");
 
     this.scanIntranetServers(providerOwner, providerName);
   };
@@ -196,15 +260,24 @@ class ServerListPage extends BaseListPage {
     ServerBackend.addServer(newServer)
       .then((res) => {
         if (res.status === "ok") {
-          Setting.showMessage("success", i18next.t("general:Successfully added"));
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully added")
+          );
           const {pagination} = this.state;
           this.fetch({pagination});
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to add")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to add")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   };
 
@@ -218,11 +291,7 @@ class ServerListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("name"),
         render: (text, record, index) => {
-          return (
-            <Link to={`/servers/${record.owner}/${text}`}>
-              {text}
-            </Link>
-          );
+          return <Link to={`/servers/${record.owner}/${text}`}>{text}</Link>;
         },
       },
       {
@@ -281,25 +350,51 @@ class ServerListPage extends BaseListPage {
         dataIndex: "op",
         key: "op",
         width: "180px",
-        fixed: (Setting.isMobile()) ? false : "right",
+        fixed: Setting.isMobile() ? false : "right",
         render: (text, record, index) => {
           return (
             <div>
-              <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} type="primary" onClick={() => this.props.history.push(`/servers/${record.owner}/${record.name}`)}>{i18next.t("general:Edit")}</Button>
-              <PopconfirmModal title={i18next.t("general:Sure to delete") + `: ${record.name} ?`} onConfirm={() => this.deleteServer(index)}>
-              </PopconfirmModal>
+              <Button
+                style={{
+                  marginTop: "10px",
+                  marginBottom: "10px",
+                  marginRight: "10px",
+                }}
+                type="primary"
+                onClick={() =>
+                  this.props.history.push(
+                    `/servers/${record.owner}/${record.name}`
+                  )
+                }
+              >
+                {i18next.t("general:Edit")}
+              </Button>
+              <PopconfirmModal
+                title={
+                  i18next.t("general:Sure to delete") + `: ${record.name} ?`
+                }
+                onConfirm={() => this.deleteServer(index)}
+              ></PopconfirmModal>
             </div>
           );
         },
       },
     ];
 
-    const filteredColumns = Setting.filterTableColumns(columns, this.props.formItems ?? this.state.formItems);
+    const filteredColumns = Setting.filterTableColumns(
+      columns,
+      this.props.formItems ?? this.state.formItems
+    );
     const paginationProps = {
       total: this.state.pagination.total,
       showQuickJumper: true,
       showSizeChanger: true,
-      showTotal: () => i18next.t("general:{total} in total").replace("{total}", this.state.pagination.total),
+      pageSize: this.state.pagination.pageSize,
+      current: this.state.pagination.current,
+      showTotal: () =>
+        i18next
+          .t("general:{total} in total")
+          .replace("{total}", this.state.pagination.total),
     };
 
     return (
@@ -308,7 +403,7 @@ class ServerListPage extends BaseListPage {
           scroll={{x: "max-content"}}
           dataSource={servers}
           columns={filteredColumns}
-          rowKey={record => `${record.owner}/${record.name}`}
+          rowKey={(record) => `${record.owner}/${record.name}`}
           pagination={{...this.state.pagination, ...paginationProps}}
           loading={this.getTableLoading()}
           onChange={this.handleTableChange}
@@ -317,11 +412,24 @@ class ServerListPage extends BaseListPage {
           title={() => (
             <div>
               {i18next.t("server:Edit MCP Server")}&nbsp;&nbsp;&nbsp;&nbsp;
-              <Button type="primary" size="small" onClick={() => this.addServer()}>{i18next.t("general:Add")}</Button>
-            &nbsp;
-              <Button size="small" onClick={this.openScanModal}>{i18next.t("server:Scan server")}</Button>
-            &nbsp;
-              <Button size="small" onClick={() => this.props.history.push("/server-store")}>{i18next.t("general:MCP Store")}</Button>
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => this.addServer()}
+              >
+                {i18next.t("general:Add")}
+              </Button>
+              &nbsp;
+              <Button size="small" onClick={this.openScanModal}>
+                {i18next.t("server:Scan server")}
+              </Button>
+              &nbsp;
+              <Button
+                size="small"
+                onClick={() => this.props.history.push("/server-store")}
+              >
+                {i18next.t("general:MCP Store")}
+              </Button>
             </div>
           )}
         />
@@ -334,7 +442,13 @@ class ServerListPage extends BaseListPage {
           scanServers={this.state.scanServers}
           onSubmit={this.submitScan}
           onCancel={this.closeScanModal}
-          onChangeSelectedProvider={(providerId) => this.setState({selectedScanProvider: providerId, scanResult: null, scanServers: []})}
+          onChangeSelectedProvider={(providerId) =>
+            this.setState({
+              selectedScanProvider: providerId,
+              scanResult: null,
+              scanServers: [],
+            })
+          }
           onAddScannedServer={this.addScannedServer}
         />
       </>

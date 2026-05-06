@@ -22,21 +22,60 @@ const GridCards = (props) => {
   const items = props.items;
 
   if (items === null || items === undefined) {
-    return (
-      <Loading type="page" tip={i18next.t("login:Loading")} />
-    );
+    return <Loading type="page" tip={i18next.t("login:Loading")} />;
   }
 
-  return (
-    Setting.isMobile() ? (
-      <div id={"GridCardsMobile"} style={{padding: "12px", maxWidth: "100vw", width: "100%", gap: "12px", display: "flex", flexDirection: "column", overflowX: "hidden", flex: 1, backgroundColor: "#FFF"}}>
-        {items.map(item => <SingleCard key={item.link} logo={item.logo} link={item.link} title={item.name} desc={item.description} tags={item.tags} isSingle={items.length === 1} />)}
-      </div>
-    ) : (
-      <div id={"GridCardsDesktop"} style={{borderRadius: "8px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px"}}>
-        {items.map(item => <SingleCard logo={item.logo} link={item.link} title={item.name} desc={item.description} tags={item.tags} time={item.createdTime} isSingle={items.length === 1} key={item.name} />)}
-      </div>
-    )
+  return Setting.isMobile() ? (
+    <div
+      id={"GridCardsMobile"}
+      style={{
+        padding: "12px",
+        maxWidth: "100vw",
+        width: "100%",
+        gap: "12px",
+        display: "flex",
+        flexDirection: "column",
+        overflowX: "hidden",
+        flex: 1,
+        backgroundColor: "#FFF",
+      }}
+    >
+      {items.map((item) => (
+        <SingleCard
+          key={item.link}
+          logo={item.logo}
+          link={item.link}
+          title={item.name}
+          desc={item.description}
+          tags={item.tags}
+          isSingle={items.length === 1}
+        />
+      ))}
+    </div>
+  ) : (
+    <div
+      id={"GridCardsDesktop"}
+      style={{
+        borderRadius: "8px",
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+        gap: "12px",
+        width: "100%",
+      }}
+    >
+      {items.map((item) => (
+        <SingleCard
+          logo={item.logo}
+          link={item.link}
+          title={item.name}
+          desc={item.description}
+          tags={item.tags}
+          time={item.createdTime}
+          isSingle={items.length === 1}
+          key={item.name}
+        />
+      ))}
+    </div>
   );
 };
 

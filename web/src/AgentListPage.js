@@ -42,14 +42,26 @@ class AgentListPage extends BaseListPage {
     AgentBackend.addAgent(newAgent)
       .then((res) => {
         if (res.status === "ok") {
-          this.props.history.push({pathname: `/agents/${newAgent.owner}/${newAgent.name}`, mode: "add"});
-          Setting.showMessage("success", i18next.t("general:Successfully added"));
+          this.props.history.push({
+            pathname: `/agents/${newAgent.owner}/${newAgent.name}`,
+            mode: "add",
+          });
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully added")
+          );
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to add")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to add")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
@@ -57,47 +69,72 @@ class AgentListPage extends BaseListPage {
     AgentBackend.deleteAgent(this.state.data[i])
       .then((res) => {
         if (res.status === "ok") {
-          Setting.showMessage("success", i18next.t("general:Successfully deleted"));
+          Setting.showMessage(
+            "success",
+            i18next.t("general:Successfully deleted")
+          );
           this.fetch({
             pagination: {
               ...this.state.pagination,
-              current: this.state.pagination.current > 1 && this.state.data.length === 1 ? this.state.pagination.current - 1 : this.state.pagination.current,
+              current:
+                this.state.pagination.current > 1 &&
+                this.state.data.length === 1
+                  ? this.state.pagination.current - 1
+                  : this.state.pagination.current,
             },
           });
         } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to delete")}: ${res.msg}`);
+          Setting.showMessage(
+            "error",
+            `${i18next.t("general:Failed to delete")}: ${res.msg}`
+          );
         }
       })
-      .catch(error => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      .catch((error) => {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to connect to server")}: ${error}`
+        );
       });
   }
 
   fetch = (params = {}) => {
-    const field = params.searchedColumn, value = params.searchText;
-    const sortField = params.sortField, sortOrder = params.sortOrder;
+    const field = params.searchedColumn,
+      value = params.searchText;
+    const sortField = params.sortField,
+      sortOrder = params.sortOrder;
     if (!params.pagination) {
-      params.pagination = {current: 1, pageSize: 10};
+      params.pagination = {current: 1, pageSize: 100};
     }
 
     this.setState({loading: true});
-    AgentBackend.getAgents(Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
-      .then((res) => {
-        this.setState({loading: false});
-        if (res.status === "ok") {
-          this.setState({
-            data: res.data,
-            pagination: {
-              ...params.pagination,
-              total: res.data2,
-            },
-            searchText: params.searchText,
-            searchedColumn: params.searchedColumn,
-          });
-        } else {
-          Setting.showMessage("error", `${i18next.t("general:Failed to get")}: ${res.msg}`);
-        }
-      });
+    AgentBackend.getAgents(
+      Setting.getRequestOrganization(this.props.account),
+      params.pagination.current,
+      params.pagination.pageSize,
+      field,
+      value,
+      sortField,
+      sortOrder
+    ).then((res) => {
+      this.setState({loading: false});
+      if (res.status === "ok") {
+        this.setState({
+          data: res.data,
+          pagination: {
+            ...params.pagination,
+            total: res.data2,
+          },
+          searchText: params.searchText,
+          searchedColumn: params.searchedColumn,
+        });
+      } else {
+        Setting.showMessage(
+          "error",
+          `${i18next.t("general:Failed to get")}: ${res.msg}`
+        );
+      }
+    });
   };
 
   renderTable(agents) {
@@ -110,11 +147,7 @@ class AgentListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("name"),
         render: (text, record, index) => {
-          return (
-            <Link to={`/agents/${record.owner}/${text}`}>
-              {text}
-            </Link>
-          );
+          return <Link to={`/agents/${record.owner}/${text}`}>{text}</Link>;
         },
       },
       {
@@ -173,25 +206,51 @@ class AgentListPage extends BaseListPage {
         dataIndex: "op",
         key: "op",
         width: "180px",
-        fixed: (Setting.isMobile()) ? false : "right",
+        fixed: Setting.isMobile() ? false : "right",
         render: (text, record, index) => {
           return (
             <div>
-              <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} type="primary" onClick={() => this.props.history.push(`/agents/${record.owner}/${record.name}`)}>{i18next.t("general:Edit")}</Button>
-              <PopconfirmModal title={i18next.t("general:Sure to delete") + `: ${record.name} ?`} onConfirm={() => this.deleteAgent(index)}>
-              </PopconfirmModal>
+              <Button
+                style={{
+                  marginTop: "10px",
+                  marginBottom: "10px",
+                  marginRight: "10px",
+                }}
+                type="primary"
+                onClick={() =>
+                  this.props.history.push(
+                    `/agents/${record.owner}/${record.name}`
+                  )
+                }
+              >
+                {i18next.t("general:Edit")}
+              </Button>
+              <PopconfirmModal
+                title={
+                  i18next.t("general:Sure to delete") + `: ${record.name} ?`
+                }
+                onConfirm={() => this.deleteAgent(index)}
+              ></PopconfirmModal>
             </div>
           );
         },
       },
     ];
 
-    const filteredColumns = Setting.filterTableColumns(columns, this.props.formItems ?? this.state.formItems);
+    const filteredColumns = Setting.filterTableColumns(
+      columns,
+      this.props.formItems ?? this.state.formItems
+    );
     const paginationProps = {
       total: this.state.pagination.total,
       showQuickJumper: true,
       showSizeChanger: true,
-      showTotal: () => i18next.t("general:{total} in total").replace("{total}", this.state.pagination.total),
+      pageSize: this.state.pagination.pageSize,
+      current: this.state.pagination.current,
+      showTotal: () =>
+        i18next
+          .t("general:{total} in total")
+          .replace("{total}", this.state.pagination.total),
     };
 
     return (
@@ -199,7 +258,7 @@ class AgentListPage extends BaseListPage {
         scroll={{x: "max-content"}}
         dataSource={agents}
         columns={filteredColumns}
-        rowKey={record => `${record.owner}/${record.name}`}
+        rowKey={(record) => `${record.owner}/${record.name}`}
         pagination={{...this.state.pagination, ...paginationProps}}
         loading={this.getTableLoading()}
         onChange={this.handleTableChange}
@@ -208,7 +267,9 @@ class AgentListPage extends BaseListPage {
         title={() => (
           <div>
             {i18next.t("general:Agents")}&nbsp;&nbsp;&nbsp;&nbsp;
-            <Button type="primary" size="small" onClick={() => this.addAgent()}>{i18next.t("general:Add")}</Button>
+            <Button type="primary" size="small" onClick={() => this.addAgent()}>
+              {i18next.t("general:Add")}
+            </Button>
           </div>
         )}
       />

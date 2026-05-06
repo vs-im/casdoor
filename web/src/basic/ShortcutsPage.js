@@ -5,14 +5,30 @@ import GridCards from "./GridCards";
 
 const ShortcutsPage = () => {
   const items = [
-    {link: "/organizations", name: i18next.t("general:Organizations"), description: i18next.t("general:User containers")},
-    {link: "/users", name: i18next.t("general:Users"), description: i18next.t("general:Users under all organizations")},
-    {link: "/providers", name: i18next.t("application:Providers"), description: i18next.t("general:OAuth providers")},
-    {link: "/applications", name: i18next.t("general:Applications"), description: i18next.t("general:Applications that require authentication")},
+    {
+      link: "/organizations",
+      name: i18next.t("general:Organizations"),
+      description: i18next.t("general:User containers"),
+    },
+    {
+      link: "/users",
+      name: i18next.t("general:Users"),
+      description: i18next.t("general:Users under all organizations"),
+    },
+    {
+      link: "/providers",
+      name: i18next.t("application:Providers"),
+      description: i18next.t("general:OAuth providers"),
+    },
+    {
+      link: "/applications",
+      name: i18next.t("general:Applications"),
+      description: i18next.t("general:Applications that require authentication"),
+    },
   ];
 
   const getItems = () => {
-    return items.map(item => {
+    return items.map((item) => {
       item.logo = `${Setting.StaticBaseUrl}/img${item.link}.png`;
       item.createdTime = "";
       return item;
@@ -20,7 +36,16 @@ const ShortcutsPage = () => {
   };
 
   return (
-    <div style={{display: "flex", justifyContent: "center", flexDirection: "column", alignItems: "center", padding: "16px"}}>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        flexDirection: "column",
+        alignItems: "center",
+        padding: "16px",
+        width: "100%",
+      }}
+    >
       <GridCards items={getItems()} />
     </div>
   );

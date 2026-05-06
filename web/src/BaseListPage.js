@@ -27,11 +27,13 @@ class BaseListPage extends React.Component {
     super(props);
     this.state = {
       classes: props,
-      organizationName: this.props.match?.params.organizationName || Setting.getRequestOrganization(this.props.account),
+      organizationName:
+        this.props.match?.params.organizationName ||
+        Setting.getRequestOrganization(this.props.account),
       data: null,
       pagination: {
         current: 1,
-        pageSize: 10,
+        pageSize: 100,
       },
       loading: false,
       searchText: "",
@@ -43,13 +45,17 @@ class BaseListPage extends React.Component {
   }
 
   handleOrganizationChange = () => {
-    this.setState({
-      organizationName: this.props.match?.params.organizationName || Setting.getRequestOrganization(this.props.account),
-    },
-    () => {
-      const {pagination} = this.state;
-      this.fetch({pagination});
-    });
+    this.setState(
+      {
+        organizationName:
+          this.props.match?.params.organizationName ||
+          Setting.getRequestOrganization(this.props.account),
+      },
+      () => {
+        const {pagination} = this.state;
+        this.fetch({pagination});
+      }
+    );
   };
 
   handleTourChange = () => {
@@ -57,7 +63,10 @@ class BaseListPage extends React.Component {
   };
 
   componentDidMount() {
-    window.addEventListener("storageOrganizationChanged", this.handleOrganizationChange);
+    window.addEventListener(
+      "storageOrganizationChanged",
+      this.handleOrganizationChange
+    );
     window.addEventListener("storageTourChanged", this.handleTourChange);
     if (!Setting.isAdminUser(this.props.account)) {
       Setting.setOrganization("All");
@@ -69,7 +78,10 @@ class BaseListPage extends React.Component {
       clearInterval(this.state.intervalId);
     }
     window.removeEventListener("storageTourChanged", this.handleTourChange);
-    window.removeEventListener("storageOrganizationChanged", this.handleOrganizationChange);
+    window.removeEventListener(
+      "storageOrganizationChanged",
+      this.handleOrganizationChange
+    );
   }
 
   UNSAFE_componentWillMount() {
@@ -84,41 +96,48 @@ class BaseListPage extends React.Component {
     let formName = formType;
     if (tag !== "") {
       formName = formType + "-tag-" + tag;
-      FormBackend.getForm(this.props.account.owner, formName)
-        .then(res => {
-          if (res.status === "ok" && res.data) {
-            this.setState({formItems: res.data.formItems});
-          } else {
-            this.fetchFormWithoutTag(formType);
-          }
-        });
+      FormBackend.getForm(this.props.account.owner, formName).then((res) => {
+        if (res.status === "ok" && res.data) {
+          this.setState({formItems: res.data.formItems});
+        } else {
+          this.fetchFormWithoutTag(formType);
+        }
+      });
     } else {
       this.fetchFormWithoutTag(formType);
     }
   }
 
   fetchFormWithoutTag(formName) {
-    FormBackend.getForm(this.props.account.owner, formName)
-      .then(res => {
-        if (res.status === "ok" && res.data) {
-          this.setState({formItems: res.data.formItems});
-        } else {
-          this.setState({formItems: []});
-        }
-      });
+    FormBackend.getForm(this.props.account.owner, formName).then((res) => {
+      if (res.status === "ok" && res.data) {
+        this.setState({formItems: res.data.formItems});
+      } else {
+        this.setState({formItems: []});
+      }
+    });
   }
 
   getColumnSearchProps = (dataIndex, customRender = null) => ({
-    filterDropdown: ({setSelectedKeys, selectedKeys, confirm, clearFilters}) => (
+    filterDropdown: ({
+      setSelectedKeys,
+      selectedKeys,
+      confirm,
+      clearFilters,
+    }) => (
       <div style={{padding: 8}}>
         <Input
-          ref={node => {
+          ref={(node) => {
             this.searchInput = node;
           }}
           placeholder={i18next.t("general:Please input your search")}
           value={selectedKeys[0]}
-          onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-          onPressEnter={() => this.handleSearch(selectedKeys, confirm, dataIndex)}
+          onChange={(e) =>
+            setSelectedKeys(e.target.value ? [e.target.value] : [])
+          }
+          onPressEnter={() =>
+            this.handleSearch(selectedKeys, confirm, dataIndex)
+          }
           style={{marginBottom: 8, display: "block"}}
         />
 
@@ -132,7 +151,11 @@ class BaseListPage extends React.Component {
           >
             {i18next.t("general:Search")}
           </Button>
-          <Button onClick={() => this.handleReset(clearFilters)} size="small" style={{width: 90}}>
+          <Button
+            onClick={() => this.handleReset(clearFilters)}
+            size="small"
+            style={{width: 90}}
+          >
             {i18next.t("forget:Reset")}
           </Button>
           <Button
@@ -151,39 +174,51 @@ class BaseListPage extends React.Component {
         </Space>
       </div>
     ),
-    filterIcon: filtered => <SearchOutlined style={{color: filtered ? "#1890ff" : undefined}} />,
+    filterIcon: (filtered) => (
+      <SearchOutlined style={{color: filtered ? "#1890ff" : undefined}} />
+    ),
     onFilter: (value, record) =>
       record[dataIndex]
-        ? record[dataIndex].toString().toLowerCase().includes(value.toLowerCase())
+        ? record[dataIndex]
+          .toString()
+          .toLowerCase()
+          .includes(value.toLowerCase())
         : "",
     filterDropdownProps: {
-      onOpenChange: visible => {
+      onOpenChange: (visible) => {
         if (visible) {
           setTimeout(() => this.searchInput.select(), 100);
         }
       },
     },
     render: (text, record, index) => {
-      const highlightContent = this.state.searchedColumn === dataIndex ? (
-        <Highlighter
-          highlightStyle={{backgroundColor: "#ffc069", padding: 0}}
-          searchWords={[this.state.searchText]}
-          autoEscape
-          textToHighlight={text ? text.toString() : ""}
-        />
-      ) : (
-        text
-      );
+      const highlightContent =
+        this.state.searchedColumn === dataIndex ? (
+          <Highlighter
+            highlightStyle={{backgroundColor: "#ffc069", padding: 0}}
+            searchWords={[this.state.searchText]}
+            autoEscape
+            textToHighlight={text ? text.toString() : ""}
+          />
+        ) : (
+          text
+        );
 
-      return customRender ? customRender({text, record, index}, highlightContent) : highlightContent;
+      return customRender
+        ? customRender({text, record, index}, highlightContent)
+        : highlightContent;
     },
   });
 
   handleSearch = (selectedKeys, confirm, dataIndex) => {
-    this.fetch({searchText: selectedKeys[0], searchedColumn: dataIndex, pagination: this.state.pagination});
+    this.fetch({
+      searchText: selectedKeys[0],
+      searchedColumn: dataIndex,
+      pagination: this.state.pagination,
+    });
   };
 
-  handleReset = clearFilters => {
+  handleReset = (clearFilters) => {
     clearFilters();
     const {pagination} = this.state;
     this.fetch({pagination});
@@ -241,8 +276,14 @@ class BaseListPage extends React.Component {
         <Result
           status="403"
           title="403 Unauthorized"
-          subTitle={i18next.t("general:Sorry, you do not have permission to access this page or logged in status invalid.")}
-          extra={<a href="/"><Button type="primary">{i18next.t("general:Back Home")}</Button></a>}
+          subTitle={i18next.t(
+            "general:Sorry, you do not have permission to access this page or logged in status invalid."
+          )}
+          extra={
+            <a href="/">
+              <Button type="primary">{i18next.t("general:Back Home")}</Button>
+            </a>
+          }
         />
       );
     }
@@ -253,9 +294,7 @@ class BaseListPage extends React.Component {
 
     return (
       <div>
-        {
-          this.renderTable(this.state.data)
-        }
+        {this.renderTable(this.state.data)}
         <Tour
           open={Setting.isMobile() ? false : this.state.isTourVisible}
           onClose={this.setIsTourVisible}

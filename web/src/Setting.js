@@ -25,7 +25,11 @@ import {Helmet} from "react-helmet";
 import * as Conf from "./Conf";
 import * as phoneNumber from "libphonenumber-js";
 import moment from "moment";
-import {MfaAuthVerifyForm, NextMfa, RequiredMfa} from "./auth/mfa/MfaAuthVerifyForm";
+import {
+  MfaAuthVerifyForm,
+  NextMfa,
+  RequiredMfa
+} from "./auth/mfa/MfaAuthVerifyForm";
 import {EmailMfaType, SmsMfaType, TotpMfaType} from "./auth/MfaSetupPage";
 
 const {Option} = Select;
@@ -36,7 +40,7 @@ export const ServerUrl = "";
 
 export const StaticBaseUrl = Conf.StaticBaseUrl;
 
-export const MAX_PAGE_SIZE = 25;
+export const MAX_PAGE_SIZE = 100;
 export const SEARCH_DEBOUNCE_MS = 300;
 
 export const Countries = [
@@ -66,15 +70,18 @@ export function getThemeData(organization, application) {
 }
 
 export function getAlgorithm(themeAlgorithmNames) {
-  return themeAlgorithmNames.sort().reverse().map((algorithmName) => {
-    if (algorithmName === "dark") {
-      return theme.darkAlgorithm;
-    }
-    if (algorithmName === "compact") {
-      return theme.compactAlgorithm;
-    }
-    return theme.defaultAlgorithm;
-  });
+  return themeAlgorithmNames
+    .sort()
+    .reverse()
+    .map((algorithmName) => {
+      if (algorithmName === "dark") {
+        return theme.darkAlgorithm;
+      }
+      if (algorithmName === "compact") {
+        return theme.compactAlgorithm;
+      }
+      return theme.defaultAlgorithm;
+    });
 }
 
 export function getAlgorithmNames(themeData) {
@@ -163,15 +170,15 @@ export const OtherProviderInfo = {
     },
   },
   Email: {
-    "Default": {
+    Default: {
       logo: `${StaticBaseUrl}/img/email_default.png`,
       url: "",
     },
-    "SUBMAIL": {
+    SUBMAIL: {
       logo: `${StaticBaseUrl}/img/social_submail.svg`,
       url: "https://www.mysubmail.com",
     },
-    "Mailtrap": {
+    Mailtrap: {
       logo: `${StaticBaseUrl}/img/email_mailtrap.png`,
       url: "https://mailtrap.io",
     },
@@ -179,7 +186,7 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_azure.png`,
       url: "https://learn.microsoft.com/zh-cn/azure/communication-services",
     },
-    "SendGrid": {
+    SendGrid: {
       logo: `${StaticBaseUrl}/img/email_sendgrid.png`,
       url: "https://sendgrid.com/",
     },
@@ -187,7 +194,7 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_default.png`,
       url: "https://casdoor.org/docs/provider/email/overview",
     },
-    "Resend": {
+    Resend: {
       logo: `${StaticBaseUrl}/img/email_resend.png`,
       url: "https://resend.com/",
     },
@@ -201,7 +208,7 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_aws.png`,
       url: "https://aws.amazon.com/s3",
     },
-    "MinIO": {
+    MinIO: {
       logo: `${StaticBaseUrl}/img/social_minio.png`,
       url: "https://min.io/",
     },
@@ -225,11 +232,11 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_google_cloud.png`,
       url: "https://cloud.google.com/storage",
     },
-    "Synology": {
+    Synology: {
       logo: `${StaticBaseUrl}/img/social_synology.png`,
       url: "https://www.synology.com/en-global/dsm/feature/file_sharing",
     },
-    "Casdoor": {
+    Casdoor: {
       logo: `${StaticBaseUrl}/img/casdoor.png`,
       url: "https://casdoor.org/docs/provider/storage/overview",
     },
@@ -243,11 +250,11 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_aliyun.png`,
       url: "https://aliyun.com/product/idaas",
     },
-    "Keycloak": {
+    Keycloak: {
       logo: `${StaticBaseUrl}/img/social_keycloak.png`,
       url: "https://www.keycloak.org/",
     },
-    "Custom": {
+    Custom: {
       logo: `${StaticBaseUrl}/img/social_custom.png`,
       url: "https://door.casdoor.com/",
     },
@@ -257,15 +264,15 @@ export const OtherProviderInfo = {
     },
   },
   Payment: {
-    "Dummy": {
+    Dummy: {
       logo: `${StaticBaseUrl}/img/payment_paypal.png`,
       url: "",
     },
-    "Balance": {
+    Balance: {
       logo: `${StaticBaseUrl}/img/payment_balance.svg`,
       url: "",
     },
-    "Alipay": {
+    Alipay: {
       logo: `${StaticBaseUrl}/img/payment_alipay.png`,
       url: "https://www.alipay.com/",
     },
@@ -273,31 +280,31 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/payment_wechat_pay.png`,
       url: "https://pay.weixin.qq.com/",
     },
-    "PayPal": {
+    PayPal: {
       logo: `${StaticBaseUrl}/img/payment_paypal.png`,
       url: "https://www.paypal.com/",
     },
-    "Stripe": {
+    Stripe: {
       logo: `${StaticBaseUrl}/img/social_stripe.png`,
       url: "https://stripe.com/",
     },
-    "AirWallex": {
+    AirWallex: {
       logo: `${StaticBaseUrl}/img/payment_airwallex.svg`,
       url: "https://airwallex.com/",
     },
-    "GC": {
+    GC: {
       logo: `${StaticBaseUrl}/img/payment_gc.png`,
       url: "https://gc.org",
     },
-    "Polar": {
+    Polar: {
       logo: `${StaticBaseUrl}/img/payment_polar.png`,
       url: "https://polar.sh/",
     },
-    "Paddle": {
+    Paddle: {
       logo: `${StaticBaseUrl}/img/payment_paddle.png`,
       url: "https://www.paddle.com/",
     },
-    "FastSpring": {
+    FastSpring: {
       logo: `${StaticBaseUrl}/img/payment_fastspring.png`,
       url: "https://fastspring.com/",
     },
@@ -305,17 +312,17 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/payment_lemonsqueezy.jpg`,
       url: "https://www.lemonsqueezy.com/",
     },
-    "Adyen": {
+    Adyen: {
       logo: `${StaticBaseUrl}/img/payment_adyen.svg`,
       url: "https://www.adyen.com/",
     },
   },
   Captcha: {
-    "Default": {
+    Default: {
       logo: `${StaticBaseUrl}/img/captcha_default.png`,
       url: "https://pkg.go.dev/github.com/dchest/captcha",
     },
-    "reCAPTCHA": {
+    reCAPTCHA: {
       logo: `${StaticBaseUrl}/img/social_recaptcha.png`,
       url: "https://www.google.com/recaptcha",
     },
@@ -327,7 +334,7 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_recaptcha.png`,
       url: "https://www.google.com/recaptcha",
     },
-    "hCaptcha": {
+    hCaptcha: {
       logo: `${StaticBaseUrl}/img/social_hcaptcha.png`,
       url: "https://www.hcaptcha.com",
     },
@@ -335,7 +342,7 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_aliyun.png`,
       url: "https://help.aliyun.com/product/28308.html",
     },
-    "GEETEST": {
+    GEETEST: {
       logo: `${StaticBaseUrl}/img/social_geetest.png`,
       url: "https://www.geetest.com",
     },
@@ -351,17 +358,17 @@ export const OtherProviderInfo = {
     },
   },
   Web3: {
-    "MetaMask": {
+    MetaMask: {
       logo: `${StaticBaseUrl}/img/social_metamask.svg`,
       url: "https://metamask.io/",
     },
-    "Web3Onboard": {
+    Web3Onboard: {
       logo: `${StaticBaseUrl}/img/social_web3onboard.svg`,
       url: "https://onboard.blocknative.com/",
     },
   },
   Notification: {
-    "Telegram": {
+    Telegram: {
       logo: `${StaticBaseUrl}/img/social_telegram.png`,
       url: "https://telegram.org/",
     },
@@ -369,11 +376,11 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/email_default.png`,
       url: "https://casdoor.org/docs/provider/notification/overview",
     },
-    "DingTalk": {
+    DingTalk: {
       logo: `${StaticBaseUrl}/img/social_dingtalk.png`,
       url: "https://www.dingtalk.com/",
     },
-    "Lark": {
+    Lark: {
       logo: `${StaticBaseUrl}/img/social_lark.png`,
       url: "https://www.larksuite.com/",
     },
@@ -381,27 +388,27 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_teams.png`,
       url: "https://www.microsoft.com/microsoft-teams",
     },
-    "Bark": {
+    Bark: {
       logo: `${StaticBaseUrl}/img/social_bark.png`,
       url: "https://apps.apple.com/us/app/bark-customed-notifications/id1403753865",
     },
-    "Pushover": {
+    Pushover: {
       logo: `${StaticBaseUrl}/img/social_pushover.png`,
       url: "https://pushover.net/",
     },
-    "Pushbullet": {
+    Pushbullet: {
       logo: `${StaticBaseUrl}/img/social_pushbullet.png`,
       url: "https://www.pushbullet.com/",
     },
-    "Slack": {
+    Slack: {
       logo: `${StaticBaseUrl}/img/social_slack.png`,
       url: "https://slack.com/",
     },
-    "Webpush": {
+    Webpush: {
       logo: `${StaticBaseUrl}/img/email_default.png`,
       url: "https://developer.mozilla.org/en-US/docs/Web/API/Push_API",
     },
-    "Discord": {
+    Discord: {
       logo: `${StaticBaseUrl}/img/social_discord.png`,
       url: "https://discord.com/",
     },
@@ -409,19 +416,19 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_google_chat.png`,
       url: "https://workspace.google.com/intl/en/products/chat/",
     },
-    "Line": {
+    Line: {
       logo: `${StaticBaseUrl}/img/social_line.png`,
       url: "https://line.me/",
     },
-    "Matrix": {
+    Matrix: {
       logo: `${StaticBaseUrl}/img/social_matrix.png`,
       url: "https://www.matrix.org/",
     },
-    "Twitter": {
+    Twitter: {
       logo: `${StaticBaseUrl}/img/social_twitter.png`,
       url: "https://twitter.com/",
     },
-    "Reddit": {
+    Reddit: {
       logo: `${StaticBaseUrl}/img/social_reddit.png`,
       url: "https://www.reddit.com/",
     },
@@ -429,15 +436,15 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_rocket_chat.png`,
       url: "https://rocket.chat/",
     },
-    "Viber": {
+    Viber: {
       logo: `${StaticBaseUrl}/img/social_viber.png`,
       url: "https://www.viber.com/",
     },
-    "CUCloud": {
+    CUCloud: {
       logo: `${StaticBaseUrl}/img/cucloud.png`,
       url: "https://www.cucloud.cn/",
     },
-    "WeCom": {
+    WeCom: {
       logo: `${StaticBaseUrl}/img/social_wecom.png`,
       url: "https://work.weixin.qq.com/",
     },
@@ -448,14 +455,14 @@ export const OtherProviderInfo = {
       url: "https://vision.aliyun.com/facebody",
     },
   },
-  "MFA": {
-    "RADIUS": {
+  MFA: {
+    RADIUS: {
       logo: `${StaticBaseUrl}/img/mfa_radius.png`,
       url: "",
     },
   },
   "ID Verification": {
-    "Jumio": {
+    Jumio: {
       logo: `${StaticBaseUrl}/img/social_jumio.png`,
       url: "https://www.jumio.com/",
     },
@@ -473,7 +480,7 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/social_default.png`,
       url: "https://en.wikipedia.org/wiki/Syslog",
     },
-    "Agent": {
+    Agent: {
       logo: `${StaticBaseUrl}/img/social_default.png`,
       url: "",
     },
@@ -494,35 +501,216 @@ export const OtherProviderInfo = {
   },
 };
 
-export const UserFields = ["owner", "name", "password", "display_name", "id", "type", "email", "phone", "country_code",
-  "is_admin", "homepage", "birthday", "gender", "password_type", "password_salt", "external_id", "avatar", "first_name", "last_name",
-  "avatar_type", "permanent_avatar", "email_verified", "region", "location", "address",
-  "affiliation", "title", "id_card_type", "id_card", "real_name", "is_verified", "bio", "tag", "language",
-  "education", "score", "karma", "ranking", "balance", "balance_credit", "balance_currency", "currency", "is_default_avatar", "is_online",
-  "is_forbidden", "is_deleted", "signup_application", "register_type", "register_source", "hash", "pre_hash", "access_token",
-  "created_ip", "last_signin_time", "last_signin_ip", "github", "google", "qq", "wechat", "facebook", "dingtalk",
-  "weibo", "gitee", "linkedin", "wecom", "lark", "gitlab", "adfs", "baidu", "alipay", "casdoor", "infoflow", "apple",
-  "azuread", "azureadb2c", "slack", "steam", "bilibili", "okta", "douyin", "kwai", "line", "amazon", "auth0",
-  "battlenet", "bitbucket", "box", "cloudfoundry", "dailymotion", "deezer", "digitalocean", "discord", "dropbox",
-  "eveonline", "fitbit", "gitea", "heroku", "influxcloud", "instagram", "intercom", "kakao", "lastfm", "mailru",
-  "meetup", "microsoftonline", "naver", "nextcloud", "onedrive", "oura", "patreon", "paypal", "salesforce", "shopify",
-  "soundcloud", "spotify", "strava", "stripe", "tiktok", "tumblr", "twitch", "twitter", "typetalk", "uber", "vk",
-  "wepay", "xero", "yahoo", "yammer", "yandex", "zoom", "metamask", "web3onboard", "custom", "webauthnCredentials",
-  "preferred_mfa_type", "recovery_codes", "totp_secret", "mfa_phone_enabled", "mfa_email_enabled", "invitation",
-  "invitation_code", "face_ids", "ldap", "properties", "roles", "permissions", "groups", "last_change_password_time",
-  "last_signin_wrong_time", "signin_wrong_times", "managedAccounts", "mfaAccounts", "mfaItems", "need_update_password",
-  "created_time", "updated_time", "deleted_time",
-  "ip_whitelist"];
+export const UserFields = [
+  "owner",
+  "name",
+  "password",
+  "display_name",
+  "id",
+  "type",
+  "email",
+  "phone",
+  "country_code",
+  "is_admin",
+  "homepage",
+  "birthday",
+  "gender",
+  "password_type",
+  "password_salt",
+  "external_id",
+  "avatar",
+  "first_name",
+  "last_name",
+  "avatar_type",
+  "permanent_avatar",
+  "email_verified",
+  "region",
+  "location",
+  "address",
+  "affiliation",
+  "title",
+  "id_card_type",
+  "id_card",
+  "real_name",
+  "is_verified",
+  "bio",
+  "tag",
+  "language",
+  "education",
+  "score",
+  "karma",
+  "ranking",
+  "balance",
+  "balance_credit",
+  "balance_currency",
+  "currency",
+  "is_default_avatar",
+  "is_online",
+  "is_forbidden",
+  "is_deleted",
+  "signup_application",
+  "register_type",
+  "register_source",
+  "hash",
+  "pre_hash",
+  "access_token",
+  "created_ip",
+  "last_signin_time",
+  "last_signin_ip",
+  "github",
+  "google",
+  "qq",
+  "wechat",
+  "facebook",
+  "dingtalk",
+  "weibo",
+  "gitee",
+  "linkedin",
+  "wecom",
+  "lark",
+  "gitlab",
+  "adfs",
+  "baidu",
+  "alipay",
+  "casdoor",
+  "infoflow",
+  "apple",
+  "azuread",
+  "azureadb2c",
+  "slack",
+  "steam",
+  "bilibili",
+  "okta",
+  "douyin",
+  "kwai",
+  "line",
+  "amazon",
+  "auth0",
+  "battlenet",
+  "bitbucket",
+  "box",
+  "cloudfoundry",
+  "dailymotion",
+  "deezer",
+  "digitalocean",
+  "discord",
+  "dropbox",
+  "eveonline",
+  "fitbit",
+  "gitea",
+  "heroku",
+  "influxcloud",
+  "instagram",
+  "intercom",
+  "kakao",
+  "lastfm",
+  "mailru",
+  "meetup",
+  "microsoftonline",
+  "naver",
+  "nextcloud",
+  "onedrive",
+  "oura",
+  "patreon",
+  "paypal",
+  "salesforce",
+  "shopify",
+  "soundcloud",
+  "spotify",
+  "strava",
+  "stripe",
+  "tiktok",
+  "tumblr",
+  "twitch",
+  "twitter",
+  "typetalk",
+  "uber",
+  "vk",
+  "wepay",
+  "xero",
+  "yahoo",
+  "yammer",
+  "yandex",
+  "zoom",
+  "metamask",
+  "web3onboard",
+  "custom",
+  "webauthnCredentials",
+  "preferred_mfa_type",
+  "recovery_codes",
+  "totp_secret",
+  "mfa_phone_enabled",
+  "mfa_email_enabled",
+  "invitation",
+  "invitation_code",
+  "face_ids",
+  "ldap",
+  "properties",
+  "roles",
+  "permissions",
+  "groups",
+  "last_change_password_time",
+  "last_signin_wrong_time",
+  "signin_wrong_times",
+  "managedAccounts",
+  "mfaAccounts",
+  "mfaItems",
+  "need_update_password",
+  "created_time",
+  "updated_time",
+  "deleted_time",
+  "ip_whitelist",
+];
 
-export const GroupFields = ["owner", "name", "created_time", "updated_time", "display_name", "manager",
-  "contact_email", "type", "parent_id", "is_top_group", "is_enabled"];
+export const GroupFields = [
+  "owner",
+  "name",
+  "created_time",
+  "updated_time",
+  "display_name",
+  "manager",
+  "contact_email",
+  "type",
+  "parent_id",
+  "is_top_group",
+  "is_enabled",
+];
 
-export const RoleFields = ["owner", "name", "created_time", "display_name", "description",
-  "users", "groups", "roles", "domains", "is_enabled"];
+export const RoleFields = [
+  "owner",
+  "name",
+  "created_time",
+  "display_name",
+  "description",
+  "users",
+  "groups",
+  "roles",
+  "domains",
+  "is_enabled",
+];
 
-export const PermissionFields = ["owner", "name", "created_time", "display_name", "description",
-  "users", "groups", "roles", "domains", "model", "adapter", "resource_type",
-  "resources", "actions", "effect", "is_enabled", "submitter", "approver", "approve_time", "state"];
+export const PermissionFields = [
+  "owner",
+  "name",
+  "created_time",
+  "display_name",
+  "description",
+  "users",
+  "groups",
+  "roles",
+  "domains",
+  "model",
+  "adapter",
+  "resource_type",
+  "resources",
+  "actions",
+  "effect",
+  "is_enabled",
+  "submitter",
+  "approver",
+  "approve_time",
+  "state",
+];
 
 export const GetTranslatedUserItems = () => {
   return [
@@ -557,14 +745,20 @@ export const GetTranslatedUserItems = () => {
     {name: "Birthday", label: i18next.t("user:Birthday")},
     {name: "Education", label: i18next.t("user:Education")},
     {name: "Balance", label: i18next.t("user:Balance")},
-    {name: "Balance currency", label: i18next.t("organization:Balance currency")},
+    {
+      name: "Balance currency",
+      label: i18next.t("organization:Balance currency"),
+    },
     {name: "Balance credit", label: i18next.t("organization:Balance credit")},
     {name: "Cart", label: i18next.t("general:Cart")},
     {name: "Transactions", label: i18next.t("general:Transactions")},
     {name: "Score", label: i18next.t("user:Score")},
     {name: "Karma", label: i18next.t("user:Karma")},
     {name: "Ranking", label: i18next.t("user:Ranking")},
-    {name: "Signup application", label: i18next.t("general:Signup application")},
+    {
+      name: "Signup application",
+      label: i18next.t("general:Signup application"),
+    },
     {name: "Register type", label: i18next.t("user:Register type")},
     {name: "Register source", label: i18next.t("user:Register source")},
     {name: "API key", label: i18next.t("general:API key")},
@@ -577,11 +771,23 @@ export const GetTranslatedUserItems = () => {
     {name: "Is admin", label: i18next.t("user:Is admin")},
     {name: "Is forbidden", label: i18next.t("user:Is forbidden")},
     {name: "Is deleted", label: i18next.t("user:Is deleted")},
-    {name: "Need update password", label: i18next.t("user:Need update password")},
+    {
+      name: "Need update password",
+      label: i18next.t("user:Need update password"),
+    },
     {name: "IP whitelist", label: i18next.t("general:IP whitelist")},
-    {name: "Multi-factor authentication", label: i18next.t("mfa:Multi-factor authentication")},
-    {name: "WebAuthn credentials", label: i18next.t("user:WebAuthn credentials")},
-    {name: "Last change password time", label: i18next.t("user:Last change password time")},
+    {
+      name: "Multi-factor authentication",
+      label: i18next.t("mfa:Multi-factor authentication"),
+    },
+    {
+      name: "WebAuthn credentials",
+      label: i18next.t("user:WebAuthn credentials"),
+    },
+    {
+      name: "Last change password time",
+      label: i18next.t("user:Last change password time"),
+    },
     {name: "Managed accounts", label: i18next.t("user:Managed accounts")},
     {name: "Face ID", label: i18next.t("login:Face ID")},
     {name: "MFA accounts", label: i18next.t("user:MFA accounts")},
@@ -591,7 +797,7 @@ export const GetTranslatedUserItems = () => {
 
 export function getUserColumns() {
   const items = GetTranslatedUserItems();
-  return UserFields.map(field => {
+  return UserFields.map((field) => {
     let transField = "";
     if (field === "webauthnCredentials") {
       transField = "WebAuthn credentials";
@@ -608,7 +814,8 @@ export function getUserColumns() {
     } else {
       transField = field.toLowerCase().split("_").join(" ");
       transField = transField.charAt(0).toUpperCase() + transField.slice(1);
-      transField = transField.replace("ip", "IP")
+      transField = transField
+        .replace("ip", "IP")
         .replace("Ip", "IP")
         .replace("Id", "ID")
         .replace("id", "ID");
@@ -616,11 +823,16 @@ export function getUserColumns() {
     if (transField === "Owner") {
       transField = "Organization";
     }
-    const transFieldItem = items.find(item => item.name === transField);
+    const transFieldItem = items.find((item) => item.name === transField);
     if (transFieldItem === undefined) {
-      const toTranslateList = ["general", "user", "organization"].map(ns => `${ns}:${transField}`);
-      const transResult = toTranslateList.map(item => i18next.t(item) === transField ? null : i18next.t(item))
-        .find(item => item !== null);
+      const toTranslateList = ["general", "user", "organization"].map(
+        (ns) => `${ns}:${transField}`
+      );
+      const transResult = toTranslateList
+        .map((item) =>
+          i18next.t(item) === transField ? null : i18next.t(item)
+        )
+        .find((item) => item !== null);
       transField = transResult ? transResult : transField;
     }
     return `${transFieldItem ? transFieldItem.label : transField}#${field}`;
@@ -628,48 +840,57 @@ export function getUserColumns() {
 }
 
 export function getGroupColumns() {
-  return GroupFields.map(field => {
+  return GroupFields.map((field) => {
     let transField = field.toLowerCase().split("_").join(" ");
     transField = transField.charAt(0).toUpperCase() + transField.slice(1);
     transField = transField.replace("Id", "ID");
     if (transField === "Owner") {
       transField = "Organization";
     }
-    const toTranslateList = ["general", "group"].map(ns => `${ns}:${transField}`);
-    const transResult = toTranslateList.map(item => i18next.t(item) === transField ? null : i18next.t(item))
-      .find(item => item !== null);
+    const toTranslateList = ["general", "group"].map(
+      (ns) => `${ns}:${transField}`
+    );
+    const transResult = toTranslateList
+      .map((item) => (i18next.t(item) === transField ? null : i18next.t(item)))
+      .find((item) => item !== null);
     transField = transResult ? transResult : transField;
     return `${transField}#${field}`;
   });
 }
 
 export function getRoleColumns() {
-  return RoleFields.map(field => {
+  return RoleFields.map((field) => {
     let transField = field.toLowerCase().split("_").join(" ");
     transField = transField.charAt(0).toUpperCase() + transField.slice(1);
     transField = transField.replace("Id", "ID");
     if (transField === "Owner") {
       transField = "Organization";
     }
-    const toTranslateList = ["general", "role"].map(ns => `${ns}:${transField}`);
-    const transResult = toTranslateList.map(item => i18next.t(item) === transField ? null : i18next.t(item))
-      .find(item => item !== null);
+    const toTranslateList = ["general", "role"].map(
+      (ns) => `${ns}:${transField}`
+    );
+    const transResult = toTranslateList
+      .map((item) => (i18next.t(item) === transField ? null : i18next.t(item)))
+      .find((item) => item !== null);
     transField = transResult ? transResult : transField;
     return `${transField}#${field}`;
   });
 }
 
 export function getPermissionColumns() {
-  return PermissionFields.map(field => {
+  return PermissionFields.map((field) => {
     let transField = field.toLowerCase().split("_").join(" ");
     transField = transField.charAt(0).toUpperCase() + transField.slice(1);
     transField = transField.replace("Id", "ID");
     if (transField === "Owner") {
       transField = "Organization";
     }
-    const toTranslateList = ["general", "permission"].map(ns => `${ns}:${transField}`);
-    const transResult = toTranslateList.map(item => i18next.t(item) === transField ? null : i18next.t(item))
-      .find(item => item !== null);
+    const toTranslateList = ["general", "permission"].map(
+      (ns) => `${ns}:${transField}`
+    );
+    const transResult = toTranslateList
+      .map((item) => (i18next.t(item) === transField ? null : i18next.t(item)))
+      .find((item) => item !== null);
     transField = transResult ? transResult : transField;
     return `${transField}#${field}`;
   });
@@ -677,7 +898,9 @@ export function getPermissionColumns() {
 
 export function initCountries() {
   const countries = require("i18n-iso-countries");
-  countries.registerLocale(require("i18n-iso-countries/langs/" + getLanguage() + ".json"));
+  countries.registerLocale(
+    require("i18n-iso-countries/langs/" + getLanguage() + ".json")
+  );
   return countries;
 }
 
@@ -692,23 +915,36 @@ export function getCountryCodeData(countryCodes = phoneNumber.getCountries()) {
   if (countryCodes?.includes("All")) {
     countryCodes = phoneNumber.getCountries();
   }
-  return countryCodes?.map((countryCode) => {
-    if (phoneNumber.isSupportedCountry(countryCode)) {
-      const name = initCountries().getName(countryCode, getLanguage());
-      return {
-        code: countryCode,
-        name: name || "",
-        phone: phoneNumber.getCountryCallingCode(countryCode),
-      };
-    }
-  }).filter(item => item.name !== "")
+  return countryCodes
+    ?.map((countryCode) => {
+      if (phoneNumber.isSupportedCountry(countryCode)) {
+        const name = initCountries().getName(countryCode, getLanguage());
+        return {
+          code: countryCode,
+          name: name || "",
+          phone: phoneNumber.getCountryCallingCode(countryCode),
+        };
+      }
+    })
+    .filter((item) => item.name !== "")
     .sort((a, b) => a.phone - b.phone);
 }
 
 export function getCountryCodeOption(country) {
   return (
-    <Option key={country.code} value={country.code} label={`+${country.phone}`} text={`${country.name}, ${country.code}, ${country.phone}`} >
-      <div style={{display: "flex", justifyContent: "space-between", marginRight: "10px"}}>
+    <Option
+      key={country.code}
+      value={country.code}
+      label={`+${country.phone}`}
+      text={`${country.name}, ${country.code}, ${country.phone}`}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginRight: "10px",
+        }}
+      >
         <div>
           {country.code === "All" ? null : getCountryImage(country)}
           {`${country.name}`}
@@ -720,7 +956,14 @@ export function getCountryCodeOption(country) {
 }
 
 export function getCountryImage(country) {
-  return <img src={`${StaticBaseUrl}/flag-icons/${country.code}.svg`} alt={country.name} height={20} style={{marginRight: 10}} />;
+  return (
+    <img
+      src={`${StaticBaseUrl}/flag-icons/${country.code}.svg`}
+      alt={country.name}
+      height={20}
+      style={{marginRight: 10}}
+    />
+  );
 }
 
 export function initServerUrl() {
@@ -795,15 +1038,21 @@ export function isSignupItemPrompted(signupItem) {
 }
 
 export function getAllPromptedProviderItems(application) {
-  return application.providers?.filter(providerItem => isProviderPrompted(providerItem));
+  return application.providers?.filter((providerItem) =>
+    isProviderPrompted(providerItem)
+  );
 }
 
 export function getAllPromptedSignupItems(application) {
-  return application.signupItems?.filter(signupItem => isSignupItemPrompted(signupItem));
+  return application.signupItems?.filter((signupItem) =>
+    isSignupItemPrompted(signupItem)
+  );
 }
 
 export function getSignupItem(application, itemName) {
-  const signupItems = application.signupItems?.filter(signupItem => signupItem.name === itemName);
+  const signupItems = application.signupItems?.filter(
+    (signupItem) => signupItem.name === itemName
+  );
   if (signupItems?.length > 0) {
     return signupItems[0];
   }
@@ -827,7 +1076,8 @@ export function isValidIdCard(idCard) {
 
 export function isValidEmail(email) {
   // https://github.com/yiminghe/async-validator/blob/057b0b047f88fac65457bae691d6cb7c6fe48ce1/src/rule/type.ts#L9
-  const emailRegex = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  const emailRegex =
+    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   return emailRegex.test(email);
 }
 
@@ -837,10 +1087,13 @@ export function isValidPhone(phone, countryCode = "") {
   }
 
   // https://learnku.com/articles/31543, `^s*$` filter empty email individually.
-  const phoneCnRegex = /^1(3\d|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8\d|9[0-35-9])\d{8}$/;
+  const phoneCnRegex =
+    /^1(3\d|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8\d|9[0-35-9])\d{8}$/;
   const phoneRegex = /[0-9]{4,15}$/;
 
-  return countryCode === "CN" ? phoneCnRegex.test(phone) : phoneRegex.test(phone);
+  return countryCode === "CN"
+    ? phoneCnRegex.test(phone)
+    : phoneRegex.test(phone);
 }
 
 export function isValidInvoiceTitle(invoiceTitle) {
@@ -884,7 +1137,9 @@ export function hasPromptPage(application) {
   }
 
   const signupItems = getAllPromptedSignupItems(application);
-  if (signupItems?.filter(item => item.name === "Country/Region").length > 0) {
+  if (
+    signupItems?.filter((item) => item.name === "Country/Region").length > 0
+  ) {
     return true;
   }
 
@@ -971,8 +1226,13 @@ export function getMfaItemsByRules(user, organization, mfaRules = []) {
     return [];
   }
 
-  return mfaItems.filter((mfaItem) => mfaRules.includes(mfaItem.rule))
-    .filter((mfaItem) => user.multiFactorAuths.some((mfa) => mfa.mfaType === mfaItem.name && !mfa.enabled));
+  return mfaItems
+    .filter((mfaItem) => mfaRules.includes(mfaItem.rule))
+    .filter((mfaItem) =>
+      user.multiFactorAuths.some(
+        (mfa) => mfa.mfaType === mfaItem.name && !mfa.enabled
+      )
+    );
 }
 
 export function parseObject(s) {
@@ -1073,7 +1333,13 @@ export function deleteRow(array, i) {
 }
 
 export function swapRow(array, i, j) {
-  return [...array.slice(0, i), array[j], ...array.slice(i + 1, j), array[i], ...array.slice(j + 1)];
+  return [
+    ...array.slice(0, i),
+    array[j],
+    ...array.slice(i + 1, j),
+    array[i],
+    ...array.slice(j + 1),
+  ];
 }
 
 export function trim(str, ch) {
@@ -1084,11 +1350,15 @@ export function trim(str, ch) {
   let start = 0;
   let end = str.length;
 
-  while (start < end && str[start] === ch) {++start;}
+  while (start < end && str[start] === ch) {
+    ++start;
+  }
 
-  while (end > start && str[end - 1] === ch) {--end;}
+  while (end > start && str[end - 1] === ch) {
+    --end;
+  }
 
-  return (start > 0 || end < str.length) ? str.substring(start, end) : str;
+  return start > 0 || end < str.length ? str.substring(start, end) : str;
 }
 
 export function isMobile() {
@@ -1123,8 +1393,7 @@ export function getNameAtLeast(s) {
     <React.Fragment>
       &nbsp;
       {s}
-      &nbsp;
-      &nbsp;
+      &nbsp; &nbsp;
     </React.Fragment>
   );
 }
@@ -1143,7 +1412,7 @@ export function getFriendlyFileSize(size) {
   }
 
   const i = Math.floor(Math.log(size) / Math.log(1024));
-  let num = (size / Math.pow(1024, i));
+  let num = size / Math.pow(1024, i);
   const round = Math.round(num);
   num = round < 10 ? num.toFixed(2) : round < 100 ? num.toFixed(1) : round;
   return `${num} ${"KMGTPEZY"[i - 1]}B`;
@@ -1154,7 +1423,7 @@ function getHashInt(s) {
   if (s.length !== 0) {
     for (let i = 0; i < s.length; i++) {
       const char = s.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash;
     }
   }
@@ -1177,19 +1446,21 @@ export function getEffectiveAvatarUrl(user) {
 
 export function getAvatarPlaceholder(name, size = 40) {
   return (
-    <div style={{
-      alignItems: "center",
-      backgroundColor: getAvatarColor(name),
-      borderRadius: "50%",
-      color: "#fff",
-      display: "flex",
-      flexShrink: 0,
-      fontSize: Math.round(size * 0.44),
-      fontWeight: "bold",
-      height: size,
-      justifyContent: "center",
-      width: size,
-    }}>
+    <div
+      style={{
+        alignItems: "center",
+        backgroundColor: getAvatarColor(name),
+        borderRadius: "50%",
+        color: "#fff",
+        display: "flex",
+        flexShrink: 0,
+        fontSize: Math.round(size * 0.44),
+        fontWeight: "bold",
+        height: size,
+        justifyContent: "center",
+        width: size,
+      }}
+    >
       {name.charAt(0).toUpperCase()}
     </div>
   );
@@ -1215,7 +1486,12 @@ export function getLanguageText(text) {
 }
 
 export function getLanguage() {
-  return (i18next.language !== undefined && i18next.language !== null && i18next.language !== "" && i18next.language !== "null") ? i18next.language : Conf.DefaultLanguage;
+  return i18next.language !== undefined &&
+    i18next.language !== null &&
+    i18next.language !== "" &&
+    i18next.language !== "null"
+    ? i18next.language
+    : Conf.DefaultLanguage;
 }
 
 export function setLanguage(language) {
@@ -1232,10 +1508,15 @@ export function getAcceptLanguage() {
 
 export function getClickable(text) {
   return (
-    <a onClick={() => {
-      copy(text);
-      showMessage("success", i18next.t("general:Copied to clipboard successfully"));
-    }}>
+    <a
+      onClick={() => {
+        copy(text);
+        showMessage(
+          "success",
+          i18next.t("general:Copied to clipboard successfully")
+        );
+      }}
+    >
       {text}
     </a>
   );
@@ -1264,164 +1545,154 @@ export function getProviderLogoURL(provider) {
 export function getProviderLogo(provider) {
   const idp = provider.type.toLowerCase().trim().split(" ")[0];
   const url = getProviderLogoURL(provider);
-  return (
-    <img width={30} height={30} src={url} alt={idp} />
-  );
+  return <img width={30} height={30} src={url} alt={idp} />;
 }
 
 export function getProviderTypeOptions(category) {
   if (category === "OAuth") {
-    return (
-      [
-        {id: "Google", name: "Google"},
-        {id: "GitHub", name: "GitHub"},
-        {id: "QQ", name: "QQ"},
-        {id: "WeChat", name: "WeChat"},
-        {id: "WeChatMiniProgram", name: "WeChat Mini Program"},
-        {id: "Facebook", name: "Facebook"},
-        {id: "DingTalk", name: "DingTalk"},
-        {id: "Weibo", name: "Weibo"},
-        {id: "Gitee", name: "Gitee"},
-        {id: "LinkedIn", name: "LinkedIn"},
-        {id: "WeCom", name: "WeCom"},
-        {id: "Lark", name: "Lark"},
-        {id: "GitLab", name: "GitLab"},
-        {id: "ADFS", name: "ADFS"},
-        {id: "Baidu", name: "Baidu"},
-        {id: "Alipay", name: "Alipay"},
-        {id: "Casdoor", name: "Casdoor"},
-        {id: "Infoflow", name: "Infoflow"},
-        {id: "Apple", name: "Apple"},
-        {id: "AzureAD", name: "Azure AD"},
-        {id: "AzureADB2C", name: "Azure AD B2C"},
-        {id: "Slack", name: "Slack"},
-        {id: "Steam", name: "Steam"},
-        {id: "Bilibili", name: "Bilibili"},
-        {id: "Okta", name: "Okta"},
-        {id: "Douyin", name: "Douyin"},
-        {id: "Kwai", name: "Kwai"},
-        {id: "Line", name: "Line"},
-        {id: "Amazon", name: "Amazon"},
-        {id: "Auth0", name: "Auth0"},
-        {id: "BattleNet", name: "Battle.net"},
-        {id: "Bitbucket", name: "Bitbucket"},
-        {id: "Box", name: "Box"},
-        {id: "CloudFoundry", name: "Cloud Foundry"},
-        {id: "Dailymotion", name: "Dailymotion"},
-        {id: "Deezer", name: "Deezer"},
-        {id: "DigitalOcean", name: "DigitalOcean"},
-        {id: "Discord", name: "Discord"},
-        {id: "Dropbox", name: "Dropbox"},
-        {id: "EveOnline", name: "Eve Online"},
-        {id: "Fitbit", name: "Fitbit"},
-        {id: "Gitea", name: "Gitea"},
-        {id: "Heroku", name: "Heroku"},
-        {id: "InfluxCloud", name: "InfluxCloud"},
-        {id: "Instagram", name: "Instagram"},
-        {id: "Intercom", name: "Intercom"},
-        {id: "Kakao", name: "Kakao"},
-        {id: "Lastfm", name: "Lastfm"},
-        {id: "Mailru", name: "Mailru"},
-        {id: "Meetup", name: "Meetup"},
-        {id: "MicrosoftOnline", name: "MicrosoftOnline"},
-        {id: "Naver", name: "Naver"},
-        {id: "Nextcloud", name: "Nextcloud"},
-        {id: "OneDrive", name: "OneDrive"},
-        {id: "Oura", name: "Oura"},
-        {id: "Patreon", name: "Patreon"},
-        {id: "PayPal", name: "PayPal"},
-        {id: "SalesForce", name: "SalesForce"},
-        {id: "Shopify", name: "Shopify"},
-        {id: "Soundcloud", name: "Soundcloud"},
-        {id: "Spotify", name: "Spotify"},
-        {id: "Strava", name: "Strava"},
-        {id: "Stripe", name: "Stripe"},
-        {id: "Telegram", name: "Telegram"},
-        {id: "TikTok", name: "TikTok"},
-        {id: "Tumblr", name: "Tumblr"},
-        {id: "Twitch", name: "Twitch"},
-        {id: "Twitter", name: "Twitter"},
-        {id: "Typetalk", name: "Typetalk"},
-        {id: "Uber", name: "Uber"},
-        {id: "VK", name: "VK"},
-        {id: "Wepay", name: "Wepay"},
-        {id: "Xero", name: "Xero"},
-        {id: "Yahoo", name: "Yahoo"},
-        {id: "Yammer", name: "Yammer"},
-        {id: "Yandex", name: "Yandex"},
-        {id: "Zoom", name: "Zoom"},
-        {id: "Custom", name: "Custom"},
-        {id: "Custom2", name: "Custom2"},
-        {id: "Custom3", name: "Custom3"},
-        {id: "Custom4", name: "Custom4"},
-        {id: "Custom5", name: "Custom5"},
-        {id: "Custom6", name: "Custom6"},
-        {id: "Custom7", name: "Custom7"},
-        {id: "Custom8", name: "Custom8"},
-        {id: "Custom9", name: "Custom9"},
-        {id: "Custom10", name: "Custom10"},
-        {id: "Custom Flexible", name: "Custom Flexible"},
-      ]
-    );
+    return [
+      {id: "Google", name: "Google"},
+      {id: "GitHub", name: "GitHub"},
+      {id: "QQ", name: "QQ"},
+      {id: "WeChat", name: "WeChat"},
+      {id: "WeChatMiniProgram", name: "WeChat Mini Program"},
+      {id: "Facebook", name: "Facebook"},
+      {id: "DingTalk", name: "DingTalk"},
+      {id: "Weibo", name: "Weibo"},
+      {id: "Gitee", name: "Gitee"},
+      {id: "LinkedIn", name: "LinkedIn"},
+      {id: "WeCom", name: "WeCom"},
+      {id: "Lark", name: "Lark"},
+      {id: "GitLab", name: "GitLab"},
+      {id: "ADFS", name: "ADFS"},
+      {id: "Baidu", name: "Baidu"},
+      {id: "Alipay", name: "Alipay"},
+      {id: "Casdoor", name: "Casdoor"},
+      {id: "Infoflow", name: "Infoflow"},
+      {id: "Apple", name: "Apple"},
+      {id: "AzureAD", name: "Azure AD"},
+      {id: "AzureADB2C", name: "Azure AD B2C"},
+      {id: "Slack", name: "Slack"},
+      {id: "Steam", name: "Steam"},
+      {id: "Bilibili", name: "Bilibili"},
+      {id: "Okta", name: "Okta"},
+      {id: "Douyin", name: "Douyin"},
+      {id: "Kwai", name: "Kwai"},
+      {id: "Line", name: "Line"},
+      {id: "Amazon", name: "Amazon"},
+      {id: "Auth0", name: "Auth0"},
+      {id: "BattleNet", name: "Battle.net"},
+      {id: "Bitbucket", name: "Bitbucket"},
+      {id: "Box", name: "Box"},
+      {id: "CloudFoundry", name: "Cloud Foundry"},
+      {id: "Dailymotion", name: "Dailymotion"},
+      {id: "Deezer", name: "Deezer"},
+      {id: "DigitalOcean", name: "DigitalOcean"},
+      {id: "Discord", name: "Discord"},
+      {id: "Dropbox", name: "Dropbox"},
+      {id: "EveOnline", name: "Eve Online"},
+      {id: "Fitbit", name: "Fitbit"},
+      {id: "Gitea", name: "Gitea"},
+      {id: "Heroku", name: "Heroku"},
+      {id: "InfluxCloud", name: "InfluxCloud"},
+      {id: "Instagram", name: "Instagram"},
+      {id: "Intercom", name: "Intercom"},
+      {id: "Kakao", name: "Kakao"},
+      {id: "Lastfm", name: "Lastfm"},
+      {id: "Mailru", name: "Mailru"},
+      {id: "Meetup", name: "Meetup"},
+      {id: "MicrosoftOnline", name: "MicrosoftOnline"},
+      {id: "Naver", name: "Naver"},
+      {id: "Nextcloud", name: "Nextcloud"},
+      {id: "OneDrive", name: "OneDrive"},
+      {id: "Oura", name: "Oura"},
+      {id: "Patreon", name: "Patreon"},
+      {id: "PayPal", name: "PayPal"},
+      {id: "SalesForce", name: "SalesForce"},
+      {id: "Shopify", name: "Shopify"},
+      {id: "Soundcloud", name: "Soundcloud"},
+      {id: "Spotify", name: "Spotify"},
+      {id: "Strava", name: "Strava"},
+      {id: "Stripe", name: "Stripe"},
+      {id: "Telegram", name: "Telegram"},
+      {id: "TikTok", name: "TikTok"},
+      {id: "Tumblr", name: "Tumblr"},
+      {id: "Twitch", name: "Twitch"},
+      {id: "Twitter", name: "Twitter"},
+      {id: "Typetalk", name: "Typetalk"},
+      {id: "Uber", name: "Uber"},
+      {id: "VK", name: "VK"},
+      {id: "Wepay", name: "Wepay"},
+      {id: "Xero", name: "Xero"},
+      {id: "Yahoo", name: "Yahoo"},
+      {id: "Yammer", name: "Yammer"},
+      {id: "Yandex", name: "Yandex"},
+      {id: "Zoom", name: "Zoom"},
+      {id: "Custom", name: "Custom"},
+      {id: "Custom2", name: "Custom2"},
+      {id: "Custom3", name: "Custom3"},
+      {id: "Custom4", name: "Custom4"},
+      {id: "Custom5", name: "Custom5"},
+      {id: "Custom6", name: "Custom6"},
+      {id: "Custom7", name: "Custom7"},
+      {id: "Custom8", name: "Custom8"},
+      {id: "Custom9", name: "Custom9"},
+      {id: "Custom10", name: "Custom10"},
+      {id: "Custom Flexible", name: "Custom Flexible"},
+    ];
   } else if (category === "Email") {
-    return (
-      [
-        {id: "Default", name: "Default"},
-        {id: "SUBMAIL", name: "SUBMAIL"},
-        {id: "Mailtrap", name: "Mailtrap"},
-        {id: "Azure ACS", name: "Azure ACS"},
-        {id: "SendGrid", name: "SendGrid"},
-        {id: "Custom HTTP Email", name: "Custom HTTP Email"},
-        {id: "Resend", name: "Resend"},
-      ]
-    );
+    return [
+      {id: "Default", name: "Default"},
+      {id: "SUBMAIL", name: "SUBMAIL"},
+      {id: "Mailtrap", name: "Mailtrap"},
+      {id: "Azure ACS", name: "Azure ACS"},
+      {id: "SendGrid", name: "SendGrid"},
+      {id: "Custom HTTP Email", name: "Custom HTTP Email"},
+      {id: "Resend", name: "Resend"},
+    ];
   } else if (category === "SMS") {
-    return (
-      [
-        {id: "Aliyun SMS", name: "Alibaba Cloud SMS"},
-        {id: "Alibaba Cloud PNVS SMS", name: "Alibaba Cloud PNVS SMS"},
-        {id: "Amazon SNS", name: "Amazon SNS"},
-        {id: "Azure ACS", name: "Azure ACS"},
-        {id: "Custom HTTP SMS", name: "Custom HTTP SMS"},
-        {id: "Mock SMS", name: "Mock SMS"},
-        {id: "OSON SMS", name: "OSON SMS"},
-        {id: "Infobip SMS", name: "Infobip SMS"},
-        {id: "Tencent Cloud SMS", name: "Tencent Cloud SMS"},
-        {id: "Baidu Cloud SMS", name: "Baidu Cloud SMS"},
-        {id: "Volc Engine SMS", name: "Volc Engine SMS"},
-        {id: "Huawei Cloud SMS", name: "Huawei Cloud SMS"},
-        {id: "UCloud SMS", name: "UCloud SMS"},
-        {id: "Twilio SMS", name: "Twilio SMS"},
-        {id: "SmsBao SMS", name: "SmsBao SMS"},
-        {id: "SUBMAIL SMS", name: "SUBMAIL SMS"},
-        {id: "Msg91 SMS", name: "Msg91 SMS"},
-      ]
-    );
+    return [
+      {id: "Aliyun SMS", name: "Alibaba Cloud SMS"},
+      {id: "Alibaba Cloud PNVS SMS", name: "Alibaba Cloud PNVS SMS"},
+      {id: "Amazon SNS", name: "Amazon SNS"},
+      {id: "Azure ACS", name: "Azure ACS"},
+      {id: "Custom HTTP SMS", name: "Custom HTTP SMS"},
+      {id: "Mock SMS", name: "Mock SMS"},
+      {id: "OSON SMS", name: "OSON SMS"},
+      {id: "Infobip SMS", name: "Infobip SMS"},
+      {id: "Tencent Cloud SMS", name: "Tencent Cloud SMS"},
+      {id: "Baidu Cloud SMS", name: "Baidu Cloud SMS"},
+      {id: "Volc Engine SMS", name: "Volc Engine SMS"},
+      {id: "Huawei Cloud SMS", name: "Huawei Cloud SMS"},
+      {id: "UCloud SMS", name: "UCloud SMS"},
+      {id: "Twilio SMS", name: "Twilio SMS"},
+      {id: "SmsBao SMS", name: "SmsBao SMS"},
+      {id: "SUBMAIL SMS", name: "SUBMAIL SMS"},
+      {id: "Msg91 SMS", name: "Msg91 SMS"},
+    ];
   } else if (category === "Storage") {
-    return (
-      [
-        {id: "Local File System", name: "Local File System"},
-        {id: "AWS S3", name: "AWS S3"},
-        {id: "MinIO", name: "MinIO"},
-        {id: "Aliyun OSS", name: "Alibaba Cloud OSS"},
-        {id: "Tencent Cloud COS", name: "Tencent Cloud COS"},
-        {id: "Azure Blob", name: "Azure Blob"},
-        {id: "Qiniu Cloud Kodo", name: "Qiniu Cloud Kodo"},
-        {id: "Google Cloud Storage", name: "Google Cloud Storage"},
-        {id: "Synology", name: "Synology"},
-        {id: "Casdoor", name: "Casdoor"},
-        {id: "CUCloud OSS", name: "CUCloud OSS"},
-      ]
-    );
+    return [
+      {id: "Local File System", name: "Local File System"},
+      {id: "AWS S3", name: "AWS S3"},
+      {id: "MinIO", name: "MinIO"},
+      {id: "Aliyun OSS", name: "Alibaba Cloud OSS"},
+      {id: "Tencent Cloud COS", name: "Tencent Cloud COS"},
+      {id: "Azure Blob", name: "Azure Blob"},
+      {id: "Qiniu Cloud Kodo", name: "Qiniu Cloud Kodo"},
+      {id: "Google Cloud Storage", name: "Google Cloud Storage"},
+      {id: "Synology", name: "Synology"},
+      {id: "Casdoor", name: "Casdoor"},
+      {id: "CUCloud OSS", name: "CUCloud OSS"},
+    ];
   } else if (category === "SAML") {
-    return ([
+    return [
       {id: "Aliyun IDaaS", name: "Aliyun IDaaS"},
       {id: "Keycloak", name: "Keycloak"},
       {id: "Custom", name: "Custom"},
       {id: "Custom Flexible", name: "Custom Flexible"},
-    ]);
+    ];
   } else if (category === "Payment") {
-    return ([
+    return [
       {id: "Dummy", name: "Dummy"},
       {id: "Balance", name: "Balance"},
       {id: "Alipay", name: "Alipay"},
@@ -1435,9 +1706,9 @@ export function getProviderTypeOptions(category) {
       {id: "FastSpring", name: "FastSpring"},
       {id: "Lemon Squeezy", name: "Lemon Squeezy"},
       {id: "Adyen", name: "Adyen"},
-    ]);
+    ];
   } else if (category === "Captcha") {
-    return ([
+    return [
       {id: "Default", name: "Default"},
       {id: "reCAPTCHA v2", name: "reCAPTCHA v2"},
       {id: "reCAPTCHA v3", name: "reCAPTCHA v3"},
@@ -1445,14 +1716,14 @@ export function getProviderTypeOptions(category) {
       {id: "Aliyun Captcha", name: "Aliyun Captcha"},
       {id: "GEETEST", name: "GEETEST"},
       {id: "Cloudflare Turnstile", name: "Cloudflare Turnstile"},
-    ]);
+    ];
   } else if (category === "Web3") {
-    return ([
+    return [
       {id: "MetaMask", name: "MetaMask"},
       {id: "Web3Onboard", name: "Web3-Onboard"},
-    ]);
+    ];
   } else if (category === "Notification") {
-    return ([
+    return [
       {id: "Telegram", name: "Telegram"},
       {id: "Custom HTTP", name: "Custom HTTP"},
       {id: "DingTalk", name: "DingTalk"},
@@ -1473,32 +1744,28 @@ export function getProviderTypeOptions(category) {
       {id: "Viber", name: "Viber"},
       {id: "CUCloud", name: "CUCloud"},
       {id: "WeCom", name: "WeCom"},
-    ]);
+    ];
   } else if (category === "Face ID") {
-    return ([
-      {id: "Alibaba Cloud Facebody", name: "Alibaba Cloud Facebody"},
-    ]);
+    return [{id: "Alibaba Cloud Facebody", name: "Alibaba Cloud Facebody"}];
   } else if (category === "MFA") {
-    return ([
-      {id: "RADIUS", name: "RADIUS"},
-    ]);
+    return [{id: "RADIUS", name: "RADIUS"}];
   } else if (category === "ID Verification") {
-    return ([
+    return [
       {id: "Jumio", name: "Jumio"},
       {id: "Alibaba Cloud", name: "Alibaba Cloud"},
-    ]);
+    ];
   } else if (category === "Log") {
-    return ([
+    return [
       {id: "Casdoor Permission Log", name: "Casdoor Permission Log"},
       {id: "System Log", name: "System Log"},
       {id: "Agent", name: "Agent"},
       {id: "SELinux Log", name: "SELinux Log"},
-    ]);
+    ];
   } else if (category === "Scan") {
-    return ([
+    return [
       {id: "Security Scan", name: "Security Scan"},
       {id: "MCP Scan", name: "MCP Scan"},
-    ]);
+    ];
   } else {
     return [];
   }
@@ -1508,13 +1775,11 @@ export function getCryptoAlgorithmOptions(cryptoAlgorithm) {
   if (cryptoAlgorithm.startsWith("ES")) {
     return [];
   } else {
-    return (
-      [
-        {id: 1024, name: "1024"},
-        {id: 2048, name: "2048"},
-        {id: 4096, name: "4096"},
-      ]
-    );
+    return [
+      {id: 1024, name: "1024"},
+      {id: 2048, name: "2048"},
+      {id: 4096, name: "4096"},
+    ];
   }
 }
 
@@ -1525,20 +1790,40 @@ export function renderLogo(application, style) {
 
   if (application.homepageUrl !== "") {
     return (
-      <a target="_blank" rel="noreferrer" href={application.homepageUrl} style={style}>
-        <img className="panel-logo" width={250} src={application.logo} alt={application.displayName} />
+      <a
+        target="_blank"
+        rel="noreferrer"
+        href={application.homepageUrl}
+        style={style}
+      >
+        <img
+          className="panel-logo"
+          width={250}
+          src={application.logo}
+          alt={application.displayName}
+        />
       </a>
     );
   } else {
     return (
-      <img className="panel-logo" width={250} src={application.logo} alt={application.displayName} style={style} />
+      <img
+        className="panel-logo"
+        width={250}
+        src={application.logo}
+        alt={application.displayName}
+        style={style}
+      />
     );
   }
 }
 
 function isSigninMethodEnabled(application, signinMethod) {
   if (application && application.signinMethods) {
-    return application.signinMethods.filter(item => item.name === signinMethod && item.rule !== "Hide password").length > 0;
+    return (
+      application.signinMethods.filter(
+        (item) => item.name === signinMethod && item.rule !== "Hide password"
+      ).length > 0
+    );
   } else {
     return false;
   }
@@ -1557,16 +1842,30 @@ export function getCaptchaProviderItems(application) {
     return [];
   }
 
-  return providers.filter(providerItem => providerItem?.provider?.category === "Captcha");
+  return providers.filter(
+    (providerItem) => providerItem?.provider?.category === "Captcha"
+  );
 }
 
 export function getCaptchaRule(application) {
   const captchaProviderItems = getCaptchaProviderItems(application);
-  if (captchaProviderItems.some(providerItem => providerItem.rule === CaptchaRule.Always)) {
+  if (
+    captchaProviderItems.some(
+      (providerItem) => providerItem.rule === CaptchaRule.Always
+    )
+  ) {
     return CaptchaRule.Always;
-  } else if (captchaProviderItems.some(providerItem => providerItem.rule === CaptchaRule.Dynamic)) {
+  } else if (
+    captchaProviderItems.some(
+      (providerItem) => providerItem.rule === CaptchaRule.Dynamic
+    )
+  ) {
     return CaptchaRule.Dynamic;
-  } else if (captchaProviderItems.some(providerItem => providerItem.rule === CaptchaRule.InternetOnly)) {
+  } else if (
+    captchaProviderItems.some(
+      (providerItem) => providerItem.rule === CaptchaRule.InternetOnly
+    )
+  ) {
     return CaptchaRule.InternetOnly;
   }
 
@@ -1574,7 +1873,12 @@ export function getCaptchaRule(application) {
 }
 
 export function isInlineCaptchaEnabled(application) {
-  return application?.signinItems?.some(signinItem => signinItem.name === "Captcha" && signinItem.rule === "inline") || false;
+  return (
+    application?.signinItems?.some(
+      (signinItem) =>
+        signinItem.name === "Captcha" && signinItem.rule === "inline"
+    ) || false
+  );
 }
 
 export function isCaptchaEnabled(application) {
@@ -1606,7 +1910,10 @@ export function getLoginLink(application) {
   if (application === null) {
     url = null;
   } else if (window.location.pathname.includes("/signup/oauth/authorize")) {
-    url = window.location.pathname.replace("/signup/oauth/authorize", "/login/oauth/authorize");
+    url = window.location.pathname.replace(
+      "/signup/oauth/authorize",
+      "/login/oauth/authorize"
+    );
   } else if (authConfig.appName === application.name) {
     url = "/login";
   } else if (application.signinUrl === "") {
@@ -1633,19 +1940,33 @@ function renderLink(url, text, onClick) {
 
   if (url.startsWith("/")) {
     return (
-      <Link className="login-link" style={{float: "right"}} to={url} onClick={() => {
-        if (onClick !== null) {
-          onClick();
-        }
-      }}>{text}</Link>
+      <Link
+        className="login-link"
+        style={{float: "right"}}
+        to={url}
+        onClick={() => {
+          if (onClick !== null) {
+            onClick();
+          }
+        }}
+      >
+        {text}
+      </Link>
     );
   } else if (url.startsWith("http")) {
     return (
-      <a className="login-link" style={{float: "right"}} href={url} onClick={() => {
-        if (onClick !== null) {
-          onClick();
-        }
-      }}>{text}</a>
+      <a
+        className="login-link"
+        style={{float: "right"}}
+        href={url}
+        onClick={() => {
+          if (onClick !== null) {
+            onClick();
+          }
+        }}
+      >
+        {text}
+      </a>
     );
   } else {
     return null;
@@ -1662,7 +1983,10 @@ export function getSignupLink(application, text) {
   if (application === null) {
     url = null;
   } else if (window.location.pathname.includes("/login/oauth/authorize")) {
-    url = window.location.pathname.replace("/login/oauth/authorize", "/signup/oauth/authorize");
+    url = window.location.pathname.replace(
+      "/login/oauth/authorize",
+      "/signup/oauth/authorize"
+    );
   } else if (authConfig.appName === application.name) {
     url = "/signup";
   } else {
@@ -1677,7 +2001,10 @@ export function getSignupLink(application, text) {
   }
 
   const storeSigninUrl = () => {
-    sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
+    sessionStorage.setItem(
+      "signinUrl",
+      window.location.pathname + window.location.search
+    );
   };
 
   return [url + window.location.search, text, storeSigninUrl];
@@ -1702,14 +2029,23 @@ export function renderForgetLink(application, text) {
   }
 
   const storeSigninUrl = () => {
-    sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
+    sessionStorage.setItem(
+      "signinUrl",
+      window.location.pathname + window.location.search
+    );
   };
 
   return renderLink(url, text, storeSigninUrl);
 }
 
 export function renderHelmet(application) {
-  if (application === undefined || application === null || application.organizationObj === undefined || application.organizationObj === null || application.organizationObj === "") {
+  if (
+    application === undefined ||
+    application === null ||
+    application.organizationObj === undefined ||
+    application.organizationObj === null ||
+    application.organizationObj === ""
+  ) {
     return null;
   }
 
@@ -1748,17 +2084,19 @@ export function getOption(label, value) {
 }
 
 export function getArrayItem(array, key, value) {
-  const res = array.filter(item => item[key] === value)[0];
+  const res = array.filter((item) => item[key] === value)[0];
   return res;
 }
 
 export function getDeduplicatedArray(array, filterArray, key) {
-  const res = array.filter(item => !filterArray.some(tableItem => tableItem[key] === item[key]));
+  const res = array.filter(
+    (item) => !filterArray.some((tableItem) => tableItem[key] === item[key])
+  );
   return res;
 }
 
 export function getNewRowNameForTable(table, rowName) {
-  const emptyCount = table.filter(row => row.name.includes(rowName)).length;
+  const emptyCount = table.filter((row) => row.name.includes(rowName)).length;
   let res = rowName;
   for (let i = 0; i < emptyCount; i++) {
     res = res + " ";
@@ -1778,17 +2116,11 @@ export function getTags(tags, urlPrefix = null) {
 
   tags.forEach((tag, i) => {
     if (urlPrefix === null) {
-      res.push(
-        <Tag color={getTagColor(tag)}>
-          {tag}
-        </Tag>
-      );
+      res.push(<Tag color={getTagColor(tag)}>{tag}</Tag>);
     } else {
       res.push(
         <Link to={`/${urlPrefix}/${tag}`}>
-          <Tag color={getTagColor(tag)}>
-            {tag}
-          </Tag>
+          <Tag color={getTagColor(tag)}>{tag}</Tag>
         </Link>
       );
     }
@@ -2021,14 +2353,20 @@ export function getCurrencyFlag(currency) {
   }
 
   return (
-    <img src={`${StaticBaseUrl}/flag-icons/${countryCode}.svg`} alt={`${currency} flag`} height={20} style={{marginRight: 5}} />
+    <img
+      src={`${StaticBaseUrl}/flag-icons/${countryCode}.svg`}
+      alt={`${currency} flag`}
+      height={20}
+      style={{marginRight: 5}}
+    />
   );
 }
 
 export function getCurrencyWithFlag(currency) {
   const translationKey = `currency:${currency}`;
   const translatedText = i18next.t(translationKey);
-  const currencyText = translatedText === translationKey ? currency : translatedText;
+  const currencyText =
+    translatedText === translationKey ? currency : translatedText;
 
   const countryCode = getCurrencyCountryCode(currency);
   if (!countryCode) {
@@ -2037,7 +2375,12 @@ export function getCurrencyWithFlag(currency) {
 
   return (
     <span>
-      <img src={`${StaticBaseUrl}/flag-icons/${countryCode}.svg`} alt={`${currency} flag`} height={20} style={{marginRight: 5}} />
+      <img
+        src={`${StaticBaseUrl}/flag-icons/${countryCode}.svg`}
+        alt={`${currency} flag`}
+        height={20}
+        style={{marginRight: 5}}
+      />
       {currencyText}
     </span>
   );
@@ -2048,7 +2391,8 @@ export function getPriceDisplay(price, currency) {
   const currencyValue = currency || "USD";
   return (
     <>
-      {getCurrencyFlag(currencyValue)} {getCurrencySymbol(currencyValue)}{priceValue} ({getCurrencyText(currencyValue)})
+      {getCurrencyFlag(currencyValue)} {getCurrencySymbol(currencyValue)}
+      {priceValue} ({getCurrencyText(currencyValue)})
     </>
   );
 }
@@ -2074,7 +2418,105 @@ export function isAnonymousUserName(userName) {
 }
 
 export function getUserCommonFields() {
-  return ["Owner", "Name", "CreatedTime", "UpdatedTime", "DeletedTime", "Id", "ExternalId", "Type", "Password", "PasswordSalt", "PasswordType", "DisplayName", "FirstName", "LastName", "Avatar", "AvatarType", "PermanentAvatar", "Email", "EmailVerified", "Phone", "CountryCode", "Location", "Address", "Affiliation", "Title", "IdCardType", "IdCard", "RealName", "IsVerified", "Homepage", "Bio", "Tag", "Region", "Language", "Gender", "Birthday", "Education", "Score", "Karma", "Ranking", "Balance", "BalanceCredit", "Currency", "BalanceCurrency", "IsDefaultAvatar", "IsOnline", "IsAdmin", "IsForbidden", "IsDeleted", "SignupApplication", "RegisterType", "RegisterSource", "CreatedIp", "LastSigninTime", "LastSigninIp", "PreferredMfaType", "TotpSecret", "RecoveryCodes", "MfaPhoneEnabled", "MfaEmailEnabled", "MfaRadiusEnabled", "MfaRadiusUsername", "MfaRadiusProvider", "MfaPushEnabled", "MfaPushReceiver", "MfaPushProvider", "WebauthnCredentials", "FaceIds", "Invitation", "InvitationCode", "Ldap", "Properties", "Groups", "Hash", "PreHash", "AccessKey", "AccessSecret", "Github", "Google", "Qq", "Wechat", "Facebook", "Dingtalk", "Weibo", "Gitee", "Linkedin", "Wecom", "Lark", "Gitlab", "Roles", "Permissions", "LastSigninWrongTime", "SigninWrongTimes", "ManagedAccounts", "X-Hasura-Allowed-Roles", "X-Hasura-Default-Role", "Vd"];
+  return [
+    "Owner",
+    "Name",
+    "CreatedTime",
+    "UpdatedTime",
+    "DeletedTime",
+    "Id",
+    "ExternalId",
+    "Type",
+    "Password",
+    "PasswordSalt",
+    "PasswordType",
+    "DisplayName",
+    "FirstName",
+    "LastName",
+    "Avatar",
+    "AvatarType",
+    "PermanentAvatar",
+    "Email",
+    "EmailVerified",
+    "Phone",
+    "CountryCode",
+    "Location",
+    "Address",
+    "Affiliation",
+    "Title",
+    "IdCardType",
+    "IdCard",
+    "RealName",
+    "IsVerified",
+    "Homepage",
+    "Bio",
+    "Tag",
+    "Region",
+    "Language",
+    "Gender",
+    "Birthday",
+    "Education",
+    "Score",
+    "Karma",
+    "Ranking",
+    "Balance",
+    "BalanceCredit",
+    "Currency",
+    "BalanceCurrency",
+    "IsDefaultAvatar",
+    "IsOnline",
+    "IsAdmin",
+    "IsForbidden",
+    "IsDeleted",
+    "SignupApplication",
+    "RegisterType",
+    "RegisterSource",
+    "CreatedIp",
+    "LastSigninTime",
+    "LastSigninIp",
+    "PreferredMfaType",
+    "TotpSecret",
+    "RecoveryCodes",
+    "MfaPhoneEnabled",
+    "MfaEmailEnabled",
+    "MfaRadiusEnabled",
+    "MfaRadiusUsername",
+    "MfaRadiusProvider",
+    "MfaPushEnabled",
+    "MfaPushReceiver",
+    "MfaPushProvider",
+    "WebauthnCredentials",
+    "FaceIds",
+    "Invitation",
+    "InvitationCode",
+    "Ldap",
+    "Properties",
+    "Groups",
+    "Hash",
+    "PreHash",
+    "AccessKey",
+    "AccessSecret",
+    "Github",
+    "Google",
+    "Qq",
+    "Wechat",
+    "Facebook",
+    "Dingtalk",
+    "Weibo",
+    "Gitee",
+    "Linkedin",
+    "Wecom",
+    "Lark",
+    "Gitlab",
+    "Roles",
+    "Permissions",
+    "LastSigninWrongTime",
+    "SigninWrongTimes",
+    "ManagedAccounts",
+    "X-Hasura-Allowed-Roles",
+    "X-Hasura-Default-Role",
+    "Vd",
+  ];
 }
 
 export function getDefaultFooterContent() {
@@ -2246,7 +2688,14 @@ function getPreferredMfaProp(mfaProps) {
   return mfaProps[0];
 }
 
-export function checkLoginMfa(res, body, params, handleLogin, componentThis, requireRedirect = null) {
+export function checkLoginMfa(
+  res,
+  body,
+  params,
+  handleLogin,
+  componentThis,
+  requireRedirect = null
+) {
   if (res.data === RequiredMfa) {
     if (!requireRedirect) {
       componentThis.props.onLoginSuccess(window.location.href);
@@ -2254,24 +2703,32 @@ export function checkLoginMfa(res, body, params, handleLogin, componentThis, req
       componentThis.props.onLoginSuccess(requireRedirect);
     }
   } else if (res.data === NextMfa) {
-    componentThis.setState({
-      mfaProps: res.data2,
-      selectedMfaProp: getPreferredMfaProp(res.data2),
-    }, () => {
-      body["providerBack"] = body["provider"];
-      body["provider"] = "";
-      componentThis.setState({
-        getVerifyTotp: () => renderMfaAuthVerifyForm(body, params, handleLogin, componentThis),
-      });
-    });
+    componentThis.setState(
+      {
+        mfaProps: res.data2,
+        selectedMfaProp: getPreferredMfaProp(res.data2),
+      },
+      () => {
+        body["providerBack"] = body["provider"];
+        body["provider"] = "";
+        componentThis.setState({
+          getVerifyTotp: () =>
+            renderMfaAuthVerifyForm(body, params, handleLogin, componentThis),
+        });
+      }
+    );
   } else if (res.data === "SelectPlan") {
     // paid-user does not have active or pending subscription, go to application default pricing page to select-plan
     const pricing = res.data2;
-    goToLink(`/select-plan/${pricing.owner}/${pricing.name}?user=${body.username}`);
+    goToLink(
+      `/select-plan/${pricing.owner}/${pricing.name}?user=${body.username}`
+    );
   } else if (res.data === "BuyPlanResult") {
     // paid-user has pending subscription, go to buy-plan/result apge to notify payment result
     const sub = res.data2;
-    goToLink(`/buy-plan/${sub.owner}/${sub.pricing}/result?subscription=${sub.name}`);
+    goToLink(
+      `/buy-plan/${sub.owner}/${sub.pricing}/result?subscription=${sub.name}`
+    );
   } else {
     handleLogin(res);
   }
@@ -2307,41 +2764,76 @@ function renderMfaAuthVerifyForm(values, authParams, onSuccess, componentThis) {
         onSuccess={(res) => onSuccess(res)}
       />
       <div>
-        {
-          componentThis.state.mfaProps.map((mfa) => {
-            if (componentThis.state.selectedMfaProp.mfaType === mfa.mfaType) {return null;}
-            let mfaI18n = "";
-            switch (mfa.mfaType) {
-            case SmsMfaType: mfaI18n = i18next.t("mfa:Use SMS"); break;
-            case TotpMfaType: mfaI18n = i18next.t("mfa:Use Authenticator App"); break ;
-            case EmailMfaType: mfaI18n = i18next.t("mfa:Use Email") ;break;
-            }
-            return <div key={mfa.mfaType}><Button type={"link"} onClick={() => {
-              componentThis.setState({
-                selectedMfaProp: mfa,
-              });
-            }}>{mfaI18n}</Button></div>;
-          })
-        }
+        {componentThis.state.mfaProps.map((mfa) => {
+          if (componentThis.state.selectedMfaProp.mfaType === mfa.mfaType) {
+            return null;
+          }
+          let mfaI18n = "";
+          switch (mfa.mfaType) {
+          case SmsMfaType:
+            mfaI18n = i18next.t("mfa:Use SMS");
+            break;
+          case TotpMfaType:
+            mfaI18n = i18next.t("mfa:Use Authenticator App");
+            break;
+          case EmailMfaType:
+            mfaI18n = i18next.t("mfa:Use Email");
+            break;
+          }
+          return (
+            <div key={mfa.mfaType}>
+              <Button
+                type={"link"}
+                onClick={() => {
+                  componentThis.setState({
+                    selectedMfaProp: mfa,
+                  });
+                }}
+              >
+                {mfaI18n}
+              </Button>
+            </div>
+          );
+        })}
       </div>
-    </div>);
+    </div>
+  );
 }
 
-export function renderLoginPanel(application, getInnerComponent, componentThis) {
+export function renderLoginPanel(
+  application,
+  getInnerComponent,
+  componentThis
+) {
   return (
-    <div className="login-content" style={{margin: componentThis.props.preview ?? parseOffset(application.formOffset)}}>
-      {inIframe() || isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCss}} />}
-      {inIframe() || !isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCssMobile}} />}
-      <div className={isDarkTheme(componentThis.props.themeAlgorithm) ? "login-panel-dark" : "login-panel"}>
-        <div className="side-image" style={{display: application.formOffset !== 4 ? "none" : null}}>
+    <div
+      className="login-content"
+      style={{
+        margin:
+          componentThis.props.preview ?? parseOffset(application.formOffset),
+      }}
+    >
+      {inIframe() || isMobile() ? null : (
+        <div dangerouslySetInnerHTML={{__html: application.formCss}} />
+      )}
+      {inIframe() || !isMobile() ? null : (
+        <div dangerouslySetInnerHTML={{__html: application.formCssMobile}} />
+      )}
+      <div
+        className={
+          isDarkTheme(componentThis.props.themeAlgorithm)
+            ? "login-panel-dark"
+            : "login-panel"
+        }
+      >
+        <div
+          className="side-image"
+          style={{display: application.formOffset !== 4 ? "none" : null}}
+        >
           <div dangerouslySetInnerHTML={{__html: application.formSideHtml}} />
         </div>
         <div className="login-form">
-          <div>
-            {
-              getInnerComponent()
-            }
-          </div>
+          <div>{getInnerComponent()}</div>
         </div>
       </div>
     </div>
@@ -2366,7 +2858,9 @@ export function createFormAndSubmit(url, params) {
 
   document.body.appendChild(form);
   form.submit();
-  setTimeout(() => {form.remove();}, 500);
+  setTimeout(() => {
+    form.remove();
+  }, 500);
 }
 
 export function getFormTypeOptions() {
@@ -2381,53 +2875,178 @@ export function getFormTypeOptions() {
 export function getFormTypeItems(formType) {
   if (formType === "users") {
     return [
-      {name: "owner", label: "general:Organization", visible: true, width: "150"},
-      {name: "signupApplication", label: "general:Application", visible: true, width: "120"},
+      {
+        name: "owner",
+        label: "general:Organization",
+        visible: true,
+        width: "150",
+      },
+      {
+        name: "signupApplication",
+        label: "general:Application",
+        visible: true,
+        width: "120",
+      },
       {name: "name", label: "general:Name", visible: true, width: "110"},
-      {name: "createdTime", label: "general:Created time", visible: true, width: "160"},
-      {name: "displayName", label: "general:Display name", visible: true, width: "150"},
+      {
+        name: "createdTime",
+        label: "general:Created time",
+        visible: true,
+        width: "160",
+      },
+      {
+        name: "displayName",
+        label: "general:Display name",
+        visible: true,
+        width: "150",
+      },
       {name: "avatar", label: "general:Avatar", visible: true, width: "80"},
       {name: "email", label: "general:Email", visible: true, width: "160"},
       {name: "phone", label: "general:Phone", visible: true, width: "120"},
-      {name: "affiliation", label: "user:Affiliation", visible: true, width: "140"},
-      {name: "region", label: "user:Country/Region", visible: true, width: "140"},
+      {
+        name: "affiliation",
+        label: "user:Affiliation",
+        visible: true,
+        width: "140",
+      },
+      {
+        name: "region",
+        label: "user:Country/Region",
+        visible: true,
+        width: "140",
+      },
       {name: "type", label: "general:User type", visible: true, width: "120"},
       {name: "tag", label: "user:Tag", visible: true, width: "110"},
       {name: "isAdmin", label: "user:Is admin", visible: true, width: "120"},
-      {name: "isForbidden", label: "user:Is forbidden", visible: true, width: "110"},
-      {name: "isDeleted", label: "user:Is deleted", visible: true, width: "110"},
+      {
+        name: "isForbidden",
+        label: "user:Is forbidden",
+        visible: true,
+        width: "110",
+      },
+      {
+        name: "isDeleted",
+        label: "user:Is deleted",
+        visible: true,
+        width: "110",
+      },
     ];
   } else if (formType === "providers") {
     return [
       {name: "name", label: "general:Name", visible: true, width: "120"},
-      {name: "owner", label: "general:Organization", visible: true, width: "150"},
-      {name: "createdTime", label: "general:Created time", visible: true, width: "180"},
-      {name: "displayName", label: "general:Display name", visible: true, width: "150"},
-      {name: "category", label: "general:Category", visible: true, width: "110"},
+      {
+        name: "owner",
+        label: "general:Organization",
+        visible: true,
+        width: "150",
+      },
+      {
+        name: "createdTime",
+        label: "general:Created time",
+        visible: true,
+        width: "180",
+      },
+      {
+        name: "displayName",
+        label: "general:Display name",
+        visible: true,
+        width: "150",
+      },
+      {
+        name: "category",
+        label: "general:Category",
+        visible: true,
+        width: "110",
+      },
       {name: "type", label: "general:Type", visible: true, width: "110"},
-      {name: "clientId", label: "provider:Client ID", visible: true, width: "100"},
-      {name: "providerUrl", label: "provider:Provider URL", visible: true, width: "150"},
+      {
+        name: "clientId",
+        label: "provider:Client ID",
+        visible: true,
+        width: "100",
+      },
+      {
+        name: "providerUrl",
+        label: "provider:Provider URL",
+        visible: true,
+        width: "150",
+      },
     ];
   } else if (formType === "applications") {
     return [
       {name: "name", label: "general:Name", visible: true, width: "150"},
-      {name: "createdTime", label: "general:Created time", visible: true, width: "160"},
-      {name: "displayName", label: "general:Display name", visible: true, width: "150"},
+      {
+        name: "createdTime",
+        label: "general:Created time",
+        visible: true,
+        width: "160",
+      },
+      {
+        name: "displayName",
+        label: "general:Display name",
+        visible: true,
+        width: "150",
+      },
       {name: "logo", label: "Logo", visible: true, width: "200"},
-      {name: "organization", label: "general:Organization", visible: true, width: "150"},
-      {name: "providers", label: "application:Providers", visible: true, width: "500"},
+      {
+        name: "organization",
+        label: "general:Organization",
+        visible: true,
+        width: "150",
+      },
+      {
+        name: "providers",
+        label: "application:Providers",
+        visible: true,
+        width: "500",
+      },
     ];
   } else if (formType === "organizations") {
     return [
       {name: "name", label: "general:Name", visible: true, width: "120"},
-      {name: "createdTime", label: "general:Created time", visible: true, width: "160"},
-      {name: "displayName", label: "general:Display name", visible: true, width: "150"},
+      {
+        name: "createdTime",
+        label: "general:Created time",
+        visible: true,
+        width: "160",
+      },
+      {
+        name: "displayName",
+        label: "general:Display name",
+        visible: true,
+        width: "150",
+      },
       {name: "favicon", label: "general:Favicon", visible: true, width: "50"},
-      {name: "websiteUrl", label: "organization:Website URL", visible: true, width: "200"},
-      {name: "passwordType", label: "general:Password type", visible: true, width: "150"},
-      {name: "passwordSalt", label: "general:Password salt", visible: true, width: "150"},
-      {name: "defaultAvatar", label: "general:Default avatar", visible: true, width: "120"},
-      {name: "enableSoftDeletion", label: "organization:Soft deletion", visible: true, width: "140"},
+      {
+        name: "websiteUrl",
+        label: "organization:Website URL",
+        visible: true,
+        width: "200",
+      },
+      {
+        name: "passwordType",
+        label: "general:Password type",
+        visible: true,
+        width: "150",
+      },
+      {
+        name: "passwordSalt",
+        label: "general:Password salt",
+        visible: true,
+        width: "150",
+      },
+      {
+        name: "defaultAvatar",
+        label: "general:Default avatar",
+        visible: true,
+        width: "120",
+      },
+      {
+        name: "enableSoftDeletion",
+        label: "organization:Soft deletion",
+        visible: true,
+        width: "140",
+      },
     ];
   } else {
     return [];
@@ -2439,31 +3058,60 @@ export function filterTableColumns(columns, formItems, actionKey = "op") {
     return columns;
   }
   const visibleColumns = formItems
-    .filter(item => item.visible !== false)
-    .map(item => {
-      const matchedColumn = columns.find(col => col.key === item.name);
+    .filter((item) => item.visible !== false)
+    .map((item) => {
+      const matchedColumn = columns.find((col) => col.key === item.name);
 
       if (matchedColumn) {
         return {
           ...matchedColumn,
-          width: item.width !== undefined ? `${item.width}px` : matchedColumn.width,
-          title: item.width !== undefined ? `${i18next.t(item.label)}` : matchedColumn.title,
+          width:
+            item.width !== undefined ? `${item.width}px` : matchedColumn.width,
+          title:
+            item.width !== undefined
+              ? `${i18next.t(item.label)}`
+              : matchedColumn.title,
         };
       }
       return null;
     })
-    .filter(col => col !== null);
+    .filter((col) => col !== null);
 
-  const actionColumn = columns.find(col => col.key === actionKey);
+  const actionColumn = columns.find((col) => col.key === actionKey);
 
-  return [
-    ...visibleColumns,
-    actionColumn,
-  ].filter(col => col);
+  return [...visibleColumns, actionColumn].filter((col) => col);
 }
 
 export function getApiPaths() {
-  const objects = ["organization", "group", "user", "application", "provider", "resource", "cert", "role", "permission", "model", "adapter", "enforcer", "session", "token", "product", "payment", "plan", "pricing", "subscription", "syncer", "webhook", "form", "invitation", "ldap", "order", "ticket", "transaction"];
+  const objects = [
+    "organization",
+    "group",
+    "user",
+    "application",
+    "provider",
+    "resource",
+    "cert",
+    "role",
+    "permission",
+    "model",
+    "adapter",
+    "enforcer",
+    "session",
+    "token",
+    "product",
+    "payment",
+    "plan",
+    "pricing",
+    "subscription",
+    "syncer",
+    "webhook",
+    "form",
+    "invitation",
+    "ldap",
+    "order",
+    "ticket",
+    "transaction",
+  ];
   const res = [];
 
   // Auth and user session APIs
@@ -2471,8 +3119,8 @@ export function getApiPaths() {
   res.push("new-user"); // Custom event for new user creation
 
   // CRUD operations for objects
-  objects.forEach(obj => {
-    ["add", "update", "delete"].forEach(action => {
+  objects.forEach((obj) => {
+    ["add", "update", "delete"].forEach((action) => {
       res.push(`${action}-${obj}`);
     });
     if (obj === "payment") {
@@ -2531,7 +3179,11 @@ export function getApiPaths() {
   res.push("webauthn/signin/begin", "webauthn/signin/finish");
 
   // OAuth APIs
-  res.push("login/oauth/access_token", "login/oauth/refresh_token", "login/oauth/introspect");
+  res.push(
+    "login/oauth/access_token",
+    "login/oauth/refresh_token",
+    "login/oauth/introspect"
+  );
 
   // Verification and communication APIs
   res.push("send-verification-code", "verify-code", "verify-captcha");
@@ -2564,8 +3216,12 @@ export function getVersionInfo(text, siteName) {
 
   try {
     const versionInfo = JSON.parse(text);
-    const link = versionInfo?.version !== "" ? `${getRepoUrl(siteName)}/releases/tag/${versionInfo?.version}` : "";
-    let versionText = versionInfo?.version !== "" ? versionInfo?.version : "Unknown version";
+    const link =
+      versionInfo?.version !== ""
+        ? `${getRepoUrl(siteName)}/releases/tag/${versionInfo?.version}`
+        : "";
+    let versionText =
+      versionInfo?.version !== "" ? versionInfo?.version : "Unknown version";
     if (versionInfo?.commitOffset > 0) {
       versionText += ` (ahead+${versionInfo?.commitOffset})`;
     }

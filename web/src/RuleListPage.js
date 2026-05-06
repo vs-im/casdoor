@@ -26,21 +26,28 @@ class RuleListPage extends BaseListPage {
       pagination: {
         ...this.state.pagination,
         current: 1,
-        pageSize: 10,
+        pageSize: 100,
       },
     });
     this.fetch({pagination: this.state.pagination});
   }
 
   fetch = (params = {}) => {
-    const sortField = params.sortField, sortOrder = params.sortOrder;
+    const sortField = params.sortField,
+      sortOrder = params.sortOrder;
     if (!params.pagination) {
-      params.pagination = {current: 1, pageSize: 10};
+      params.pagination = {current: 1, pageSize: 100};
     }
     this.setState({
       loading: true,
     });
-    RuleBackend.getRules(this.props.account.owner, params.pagination.current, params.pagination.pageSize, sortField, sortOrder).then((res) => {
+    RuleBackend.getRules(
+      this.props.account.owner,
+      params.pagination.current,
+      params.pagination.pageSize,
+      sortField,
+      sortOrder
+    ).then((res) => {
       this.setState({
         loading: false,
       });
@@ -82,7 +89,10 @@ class RuleListPage extends BaseListPage {
         this.fetch({
           pagination: {
             ...this.state.pagination,
-            current: this.state.pagination.current > 1 && this.state.data.length === 1 ? this.state.pagination.current - 1 : this.state.pagination.current,
+            current:
+              this.state.pagination.current > 1 && this.state.data.length === 1
+                ? this.state.pagination.current - 1
+                : this.state.pagination.current,
           },
         });
       }
@@ -149,11 +159,7 @@ class RuleListPage extends BaseListPage {
         width: "100px",
         sorter: (a, b) => a.type.localeCompare(b.type),
         render: (text, rule, index) => {
-          return (
-            <Tag color="blue">
-              {i18next.t(`rule:${text}`)}
-            </Tag>
-          );
+          return <Tag color="blue">{i18next.t(`rule:${text}`)}</Tag>;
         },
       },
       {
@@ -203,7 +209,19 @@ class RuleListPage extends BaseListPage {
                 title={`Sure to delete rule: ${rule.name} ?`}
                 onConfirm={() => this.deleteRule(index)}
               >
-                <Button style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}} type="primary" onClick={() => this.props.history.push(`/rules/${rule.owner}/${rule.name}`)}>{i18next.t("general:Edit")}</Button>
+                <Button
+                  style={{
+                    marginTop: "10px",
+                    marginBottom: "10px",
+                    marginRight: "10px",
+                  }}
+                  type="primary"
+                  onClick={() =>
+                    this.props.history.push(`/rules/${rule.owner}/${rule.name}`)
+                  }
+                >
+                  {i18next.t("general:Edit")}
+                </Button>
                 <Button type="danger">{i18next.t("general:Delete")}</Button>
               </Popconfirm>
             </div>
@@ -225,7 +243,9 @@ class RuleListPage extends BaseListPage {
         title={() => (
           <div>
             {i18next.t("general:Rules")}&nbsp;&nbsp;&nbsp;&nbsp;
-            <Button type="primary" size="small" onClick={() => this.addRule()}>{i18next.t("general:Add")}</Button>
+            <Button type="primary" size="small" onClick={() => this.addRule()}>
+              {i18next.t("general:Add")}
+            </Button>
           </div>
         )}
       />
