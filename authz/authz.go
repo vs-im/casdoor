@@ -56,7 +56,6 @@ p, *, *, POST, /api/callback, *, *
 p, *, *, POST, /api/device-auth, *, *
 p, *, *, POST, /api/cancel-device-auth, *, *
 p, *, *, POST, /api/device-auth-complete, *, *
-p, *, *, POST, /api/native-sso-complete, *, *
 p, *, *, GET, /api/get-account, *, *
 p, *, *, GET, /api/userinfo, *, *
 p, *, *, GET, /api/user, *, *
@@ -135,6 +134,8 @@ p, *, *, POST, /api/refresh-engines, *, *
 p, *, *, GET, /api/get-invitation-info, *, *
 p, *, *, GET, /api/faceid-signin-begin, *, *
 p, *, *, GET, /api/kerberos-login, *, *
+p, *, *, POST, /api/grant-consent, *, *
+p, *, *, POST, /api/revoke-consent, *, *
 `
 
 		sa := stringadapter.NewAdapter(ruleText)

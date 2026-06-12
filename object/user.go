@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/casbin/casbin/v2"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/faceId"
 	"github.com/casdoor/casdoor/i18n"
@@ -49,7 +50,7 @@ func InitUserManager() {
 		panic(err)
 	}
 
-	userEnforcer = NewUserGroupEnforcer(enforcer.Enforcer)
+	userEnforcer = NewUserGroupEnforcer(&casbin.SyncedEnforcer{Enforcer: enforcer.Enforcer})
 }
 
 type User struct {
@@ -553,9 +554,9 @@ func GetUserByPhone(owner string, phone string) (*User, error) {
 		return nil, nil
 	}
 
-	phone = util.GetSeperatedPhone(phone)
+	nationalPhone, regionCode := util.ParseE164Phone(phone)
 
-	user := User{Owner: owner, Phone: phone}
+	user := User{Owner: owner, Phone: nationalPhone, CountryCode: regionCode}
 	existed, err := ormer.Engine.Get(&user)
 	if err != nil {
 		return nil, err
@@ -573,9 +574,9 @@ func GetUserByPhoneOnly(phone string) (*User, error) {
 		return nil, nil
 	}
 
-	phone = util.GetSeperatedPhone(phone)
+	nationalPhone, regionCode := util.ParseE164Phone(phone)
 
-	user := User{Phone: phone}
+	user := User{Phone: nationalPhone, CountryCode: regionCode}
 	existed, err := ormer.Engine.Get(&user)
 	if err != nil {
 		return nil, err

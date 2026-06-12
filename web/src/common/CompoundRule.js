@@ -113,7 +113,7 @@ class CompoundRule extends React.Component {
           const options = [];
           if (index !== 0) {
             options.push({value: "and", text: i18next.t("rule:and")});
-            options.push({value: "or", text: i18next.t("rule:or")});
+            options.push({value: "or", text: i18next.t("account:or")});
           } else {
             options.push({value: "begin", text: i18next.t("rule:begin")});
           }

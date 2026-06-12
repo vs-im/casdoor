@@ -41,7 +41,6 @@ import * as ProviderButton from "./ProviderButton";
 import {createFormAndSubmit, goToLink} from "../Setting";
 import WeChatLoginPanel from "./WeChatLoginPanel";
 import DeviceLoginPanel from "./DeviceLoginPanel";
-import NativeSsoPanel from "./NativeSsoPanel";
 import {CountryCodeSelect} from "../common/select/CountryCodeSelect";
 const FaceRecognitionCommonModal = lazy(() => import("../common/modal/FaceRecognitionCommonModal"));
 const FaceRecognitionModal = lazy(() => import("../common/modal/FaceRecognitionModal"));
@@ -93,8 +92,6 @@ class LoginPage extends React.Component {
     super(props);
     this.captchaRef = React.createRef();
     const urlParams = new URLSearchParams(this.props.location?.search);
-    const username = urlParams.get('username');
-    const password = urlParams.get('password');
     this.state = {
       loading: false,
       redirected: false,
@@ -121,18 +118,7 @@ class LoginPage extends React.Component {
       userCode: props.userCode ?? (props.match?.params?.userCode ?? null),
       userCodeStatus: "",
       prefilledUsername: urlParams.get("username") || urlParams.get("login_hint"),
-      nativeSsoActive: false,
-      nativeSsoSuppressed: false,
-      nativeSsoFallbackVisible: false,
-      nativeSsoKnownAgent: null,
-      nativeSsoRestartKey: 0,
-      nativeSsoOverlay: "",
-      params: {
-        username: username,
-        password: password,
-      }
     };
-    this.nativeSsoOverlayTimer = null;
 
     if (this.state.type === "cas" && props.match?.params.casApplicationName !== undefined) {
       this.state.owner = props.match?.params?.owner;
@@ -143,13 +129,6 @@ class LoginPage extends React.Component {
 
     this.form = React.createRef();
     this.refreshInlineCaptcha = this.refreshInlineCaptcha.bind(this);
-  }
-
-  componentWillUnmount() {
-    if (this.nativeSsoOverlayTimer !== null) {
-      clearTimeout(this.nativeSsoOverlayTimer);
-      this.nativeSsoOverlayTimer = null;
-    }
   }
 
   refreshInlineCaptcha() {
@@ -456,8 +435,21 @@ class LoginPage extends React.Component {
 
     // Check if consent is required
     if (resp.data?.required === true) {
-      // Consent required, redirect to consent page
-      Setting.goToLinkSoft(ths, `/consent/${application.name}?${window.location.search.substring(1)}`);
+      AuthBackend.getAccount()
+        .then((res) => {
+          if (res.status === "ok") {
+            const account = res.data;
+            account.organization = res.data2;
+            this.onUpdateAccount(account);
+            // Consent required, redirect to consent page after the account state is synced.
+            Setting.goToLinkSoft(ths, `/consent/${application.name}?${window.location.search.substring(1)}`);
+          } else {
+            Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${res.msg}`);
+          }
+        })
+        .catch((err) => {
+          Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${err}`);
+        });
       return;
     }
 
@@ -477,6 +469,9 @@ class LoginPage extends React.Component {
           } else {
             Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${res.msg}`);
           }
+        })
+        .catch((err) => {
+          Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${err}`);
         });
     } else {
       if (noRedirect === "true") {
@@ -1007,7 +1002,6 @@ class LoginPage extends React.Component {
                     signinItem.label ? signinItem.label : i18next.t("login:Sign In")
             }
           </Button>
-          {this.renderNativeSsoFallbackLink()}
           {
             this.state.type === "device" ? (
               <Button
@@ -1341,150 +1335,6 @@ class LoginPage extends React.Component {
     }
   }
 
-  showNativeSsoOverlay(messageText) {
-    if (this.nativeSsoOverlayTimer !== null) {
-      clearTimeout(this.nativeSsoOverlayTimer);
-      this.nativeSsoOverlayTimer = null;
-    }
-
-    this.setState({nativeSsoOverlay: messageText});
-    this.nativeSsoOverlayTimer = setTimeout(() => {
-      this.setState({nativeSsoOverlay: ""});
-      this.nativeSsoOverlayTimer = null;
-    }, 2200);
-  }
-
-  handleNativeSsoFallback(messageText, agent) {
-    this.setState({
-      nativeSsoActive: false,
-      nativeSsoSuppressed: true,
-      nativeSsoFallbackVisible: true,
-      nativeSsoKnownAgent: agent || this.state.nativeSsoKnownAgent,
-    });
-
-    if (messageText) {
-      this.showNativeSsoOverlay(messageText);
-    }
-  }
-
-  retryNativeSso() {
-    this.setState((prevState) => ({
-      nativeSsoSuppressed: false,
-      nativeSsoFallbackVisible: true,
-      nativeSsoRestartKey: prevState.nativeSsoRestartKey + 1,
-    }));
-  }
-
-  handleNativeSsoSuccess(result) {
-    const accessToken = result?.accessToken || result?.token?.access_token || "";
-    if (accessToken === "") {
-      this.handleNativeSsoFallback(i18next.t("login:Invalid Native SSO response"));
-      return;
-    }
-
-    const oAuthParams = Util.getOAuthGetParameters();
-    AuthBackend.completeNativeSso(accessToken, oAuthParams).then((res) => {
-      if (res.status === "ok") {
-        const responseType = oAuthParams?.responseType || "login";
-        const responseTypes = responseType.split(" ");
-        const responseMode = oAuthParams?.responseMode || "query";
-        if (responseType === "login") {
-          if (res.data3) {
-            sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
-            Setting.goToLinkSoft(this, "/account");
-            return;
-          }
-          Setting.showMessage("success", i18next.t("application:Logged in successfully"));
-          this.props.onLoginSuccess();
-        } else if (responseType === "code") {
-          this.postCodeLoginAction(res);
-        } else if (responseType === "device") {
-          Setting.showMessage("success", i18next.t("application:Logged in successfully"));
-          this.setState({
-            userCodeStatus: "success",
-          });
-        } else if (responseTypes.includes("token") || responseTypes.includes("id_token")) {
-          if (res.data3) {
-            sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
-            Setting.goToLinkSoft(this, "/account");
-            return;
-          }
-          const amendatoryResponseType = responseType === "token" ? "access_token" : responseType;
-          const nativeSsoAccessToken = res.data;
-          if (responseMode === "form_post") {
-            const params = {
-              token: responseTypes.includes("token") ? res.data : null,
-              id_token: responseTypes.includes("id_token") ? res.data : null,
-              token_type: "bearer",
-              state: oAuthParams?.state,
-            };
-            createFormAndSubmit(oAuthParams?.redirectUri, params);
-          } else {
-            Setting.goToLink(`${oAuthParams.redirectUri}#${amendatoryResponseType}=${nativeSsoAccessToken}&state=${oAuthParams.state}&token_type=bearer`);
-          }
-        } else {
-          this.handleNativeSsoFallback(i18next.t("login:Invalid Native SSO response"));
-        }
-      } else {
-        this.handleNativeSsoFallback(res.msg || i18next.t("login:Native SSO was denied"));
-      }
-    }).catch((error) => {
-      this.handleNativeSsoFallback(error.message || i18next.t("login:Native SSO was denied"));
-    });
-  }
-
-  renderNativeSsoFallbackLink() {
-    if (!this.state.nativeSsoFallbackVisible) {
-      return null;
-    }
-
-    return (
-      <div style={{marginTop: 20, textAlign: "center", fontSize: 16, lineHeight: "22px"}}>
-        <a onClick={() => this.retryNativeSso()}>{i18next.t("login:Native SSO")}</a>
-      </div>
-    );
-  }
-
-  renderNativeSsoOverlay() {
-    if (this.state.nativeSsoOverlay === "") {
-      return null;
-    }
-
-    return (
-      <div style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        zIndex: 1000,
-        width: 210,
-        height: 205,
-        padding: "0 28px",
-        borderRadius: 10,
-        background: "rgba(0, 0, 0, 0.68)",
-        color: "#fff",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        fontSize: 20,
-        fontWeight: 500,
-        lineHeight: 1.25,
-        pointerEvents: "none",
-      }}>
-        <div style={{fontSize: 58, lineHeight: 1, fontWeight: 200, marginBottom: 34}}>
-          {"×"}
-        </div>
-        <div>{this.state.nativeSsoOverlay}</div>
-      </div>
-    );
-  }
-
-  shouldRenderNativeSso(application) {
-    return this.state.mode === "signin" && this.state.type !== "device" && application?.clientId;
-  }
-
   handleDeviceLoginComplete(deviceCode) {
     const oAuthParams = Util.getOAuthGetParameters();
     AuthBackend.completeDeviceLogin(deviceCode, oAuthParams).then((res) => {
@@ -1573,7 +1423,7 @@ class LoginPage extends React.Component {
           <strong>{application.displayName}</strong>
         </div>
         <div style={{color: "#8c8c8c"}}>
-          {i18next.t("login:Confirmation code")}: {this.state.userCode}
+          {i18next.t("code:Confirmation code")}: {this.state.userCode}
         </div>
       </div>
     );
@@ -1719,6 +1569,7 @@ class LoginPage extends React.Component {
                 method={"login"}
                 onButtonClickArgs={[this.state.username, this.state.validEmail ? "email" : "phone", Setting.getApplicationName(application)]}
                 application={application}
+                countryCode={this.form.current?.getFieldValue("countryCode")}
                 captchaValue={this.state.captchaValues}
                 useInlineCaptcha={Setting.isInlineCaptchaEnabled(application)}
                 refreshCaptcha={this.refreshInlineCaptcha}
@@ -1748,6 +1599,7 @@ class LoginPage extends React.Component {
               method={"login"}
               onButtonClickArgs={[this.state.username, this.state.validEmail ? "email" : "phone", Setting.getApplicationName(application)]}
               application={application}
+              countryCode={this.form.current?.getFieldValue("countryCode")}
               captchaValue={this.state.captchaValues}
               useInlineCaptcha={Setting.isInlineCaptchaEnabled(application)}
               refreshCaptcha={this.refreshInlineCaptcha}
@@ -1966,36 +1818,24 @@ class LoginPage extends React.Component {
       );
     }
 
-    const showNativeSso = this.shouldRenderNativeSso(application);
-
     return (
       <React.Fragment>
         <CustomGithubCorner />
         <div className="login-content" style={{margin: this.props.preview ?? this.parseOffset(application.formOffset)}}>
-          {this.renderNativeSsoOverlay()}
-          {Setting.inIframe() || Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCss}} />}
-          {Setting.inIframe() || !Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCssMobile}} />}
+          {Setting.inIframe() || Setting.isMobile() ? null : <style dangerouslySetInnerHTML={{__html: Setting.getStyleInnerCss(application.formCss)}} />}
+          {Setting.inIframe() || !Setting.isMobile() ? null : <style dangerouslySetInnerHTML={{__html: Setting.getStyleInnerCss(application.formCssMobile)}} />}
           <div className={Setting.isDarkTheme(this.props.themeAlgorithm) ? "login-panel-dark" : "login-panel"}>
             <div className="side-image" style={{display: application.formOffset !== 4 ? "none" : null}}>
               <div dangerouslySetInnerHTML={{__html: application.formSideHtml}} />
             </div>
             <div className="login-form">
               <div>
-                {showNativeSso && !this.state.nativeSsoSuppressed ? (
-                  <NativeSsoPanel
-                    key={`native-sso-${this.state.nativeSsoRestartKey}`}
-                    application={application}
-                    restartKey={this.state.nativeSsoRestartKey}
-                    initialAgent={this.state.nativeSsoKnownAgent}
-                    onActiveChange={(active) => this.setState({nativeSsoActive: active})}
-                    onFallback={(messageText, agent) => this.handleNativeSsoFallback(messageText, agent)}
-                    onSuccess={(result) => this.handleNativeSsoSuccess(result)}
-                  />
-                ) : null}
-                {showNativeSso && this.state.nativeSsoActive ? null : this.renderLoginPanel(application)}
+                {
+                  this.renderLoginPanel(application)
+                }
               </div>
             </div>
-            {sidePanels.length > 0 && !(showNativeSso && this.state.nativeSsoActive) ? (
+            {sidePanels.length > 0 ? (
               <div style={{display: "flex", justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 24}}>
                 {sidePanels}
               </div>

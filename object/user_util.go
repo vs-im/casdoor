@@ -62,6 +62,18 @@ func HasUserByField(organizationName string, field string, value string) bool {
 	return user != nil
 }
 
+func HasUserByPhoneAndCountryCode(organizationName string, phone string, countryCode string) bool {
+	if phone == "" {
+		return false
+	}
+	user := User{Owner: organizationName, Phone: phone, CountryCode: countryCode}
+	existed, err := ormer.Engine.Get(&user)
+	if err != nil {
+		panic(err)
+	}
+	return existed
+}
+
 func GetUserByFields(organization string, field string) (*User, error) {
 	isUsernameLowered := conf.GetConfigBool("isUsernameLowered")
 	if isUsernameLowered {
@@ -86,10 +98,23 @@ func GetUserByFields(organization string, field string) (*User, error) {
 	}
 
 	// check phone
-	phone := util.GetSeperatedPhone(field)
-	user, err = GetUserByField(organization, "phone", phone)
-	if user != nil || err != nil {
-		return user, err
+	nationalPhone, regionCode := util.ParseE164Phone(field)
+	if regionCode != "" {
+		// E.164 number with a recognisable region: query by both phone and country_code
+		// so that two users in different countries sharing the same local number are distinguished.
+		u := User{Owner: organization, Phone: nationalPhone, CountryCode: regionCode}
+		existed, queryErr := ormer.Engine.Get(&u)
+		if queryErr != nil {
+			return nil, queryErr
+		}
+		if existed {
+			return &u, nil
+		}
+	} else {
+		user, err = GetUserByField(organization, "phone", nationalPhone)
+		if user != nil || err != nil {
+			return user, err
+		}
 	}
 
 	// check user ID

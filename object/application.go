@@ -91,6 +91,7 @@ type Application struct {
 	Organization                 string          `xorm:"varchar(100)" json:"organization"`
 	Cert                         string          `xorm:"varchar(100)" json:"cert"`
 	DefaultGroup                 string          `xorm:"varchar(100)" json:"defaultGroup"`
+	DefaultTag                   string          `xorm:"varchar(100)" json:"defaultTag"`
 	HeaderHtml                   string          `xorm:"mediumtext" json:"headerHtml"`
 	PageHtml                     string          `xorm:"mediumtext" json:"pageHtml"`
 	EnablePassword               bool            `json:"enablePassword"`
@@ -389,7 +390,7 @@ func GetApplication(id string) (*Application, error) {
 	return getApplication(owner, name)
 }
 
-func UpdateApplication(id string, application *Application, isGlobalAdmin bool, lang string) (bool, error) {
+func UpdateApplication(id string, application *Application, isGlobalAdmin bool, lang string, columns []string) (bool, error) {
 	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
 	if err != nil {
 		return false, err
@@ -441,7 +442,12 @@ func UpdateApplication(id string, application *Application, isGlobalAdmin bool, 
 		providerItem.Provider = nil
 	}
 
-	session := ormer.Engine.ID(core.PK{owner, name}).Where("organization = ?", oldApplication.Organization).AllCols()
+	session := ormer.Engine.ID(core.PK{owner, name}).Where("organization = ?", oldApplication.Organization)
+	if len(columns) > 0 {
+		session = session.Cols(columns...)
+	} else {
+		session = session.AllCols()
+	}
 	if application.ClientSecret == "***" {
 		session.Omit("client_secret")
 	}

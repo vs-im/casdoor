@@ -37,3 +37,4 @@ server
 # include helm-chart
 !manifests/casdoor
 .env
+.agent/

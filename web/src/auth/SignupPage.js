@@ -32,7 +32,7 @@ import * as PasswordChecker from "../common/PasswordChecker";
 import * as InvitationBackend from "../backend/InvitationBackend";
 import "./AuthButtons.css";
 import {EmailInputGroup} from "../common/EmailInputGroup";
-// import {CheckOutlined} from "@ant-design/icons";
+import {CaptchaModal} from "../common/modal/CaptchaModal";
 
 const formItemLayout = {
   // labelCol: {
@@ -143,10 +143,7 @@ class SignupPage extends React.Component {
       region: "",
       isTermsOfUseVisible: false,
       termsOfUseContent: "",
-      params: {
-        username: username,
-        password: password,
-      },
+      openCaptchaModal: false,
     };
 
     this.form = React.createRef();
@@ -284,9 +281,85 @@ class SignupPage extends React.Component {
     }
   }
 
-  getLanguageSelectorMode(application) {
-    const languagesItem = application.signinItems?.find((item) => item.name === "Languages");
-    return languagesItem?.rule;
+  getLanguagesItem(application) {
+    return application.signupItems?.find((item) => item.name === "Languages");
+  }
+
+  renderLanguageSelect(application) {
+    const languagesItem = this.getLanguagesItem(application);
+    if (languagesItem && !languagesItem.visible) {
+      return null;
+    }
+
+    const languages = application.organizationObj.languages;
+    if (languages && languages.length <= 1) {
+      const language = (languages.length === 1) ? languages[0] : "en";
+      if (Setting.getLanguage() !== language) {
+        Setting.setLanguage(language);
+      }
+      return null;
+    }
+    return (
+      <div className="signup-languages">
+        {languagesItem?.customCss && <div dangerouslySetInnerHTML={{__html: ("<style>" + languagesItem.customCss.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />}
+        <LanguageSelect
+          languages={languages}
+          mode={languagesItem?.rule}
+          style={{top: "55px", right: "5px", position: "absolute"}}
+        />
+      </div>
+    );
+  }
+
+  checkCaptchaStatus(values) {
+    AuthBackend.getCaptchaStatus(values)
+      .then((res) => {
+        if (res.status === "ok") {
+          if (res.data) {
+            this.setState({
+              openCaptchaModal: true,
+              values: values,
+            });
+            return null;
+          }
+        }
+        this.submitSignup(values);
+      });
+  }
+
+  renderCaptchaModal(application) {
+    if (Setting.getCaptchaRule(application) === Setting.CaptchaRule.Never) {
+      return null;
+    }
+    const captchaProviderItems = Setting.getCaptchaProviderItems(application);
+    const captchaRule = Setting.getCaptchaRule(application);
+    let provider = null;
+
+    const ruleProviders = captchaProviderItems.filter(providerItem => providerItem.rule === captchaRule);
+    if (ruleProviders.length > 0) {
+      provider = ruleProviders[0].provider;
+    }
+
+    if (!provider) {
+      return null;
+    }
+
+    return <CaptchaModal
+      owner={provider.owner}
+      name={provider.name}
+      visible={this.state.openCaptchaModal}
+      onOk={(captchaType, captchaToken, clientSecret) => {
+        const values = this.state.values;
+        values["captchaType"] = captchaType;
+        values["captchaToken"] = captchaToken;
+        values["clientSecret"] = clientSecret;
+
+        this.submitSignup(values);
+        this.setState({openCaptchaModal: false});
+      }}
+      onCancel={() => this.setState({openCaptchaModal: false})}
+      isCurrentProvider={true}
+    />;
   }
 
   onFinish(values) {
@@ -327,6 +400,24 @@ class SignupPage extends React.Component {
     const params = new URLSearchParams(window.location.search);
     values.plan = params.get("plan");
     values.pricing = params.get("pricing");
+
+    const captchaRule = Setting.getCaptchaRule(application);
+    if (captchaRule === Setting.CaptchaRule.Always) {
+      this.setState({
+        openCaptchaModal: true,
+        values: values,
+      });
+      return;
+    } else if (captchaRule === Setting.CaptchaRule.Dynamic || captchaRule === Setting.CaptchaRule.InternetOnly) {
+      this.checkCaptchaStatus(values);
+      return;
+    }
+
+    this.submitSignup(values);
+  }
+
+  submitSignup(values) {
+    const application = this.getApplicationObj();
 
     // Get OAuth parameters if present
     const oAuthParams = Util.getOAuthGetParameters();
@@ -647,100 +738,33 @@ class SignupPage extends React.Component {
           }} />
         </Form.Item>
       );
-    } else if (
-      signupItem.name === "Email" ||
-      signupItem.name === "Phone" ||
-      signupItem.name === "Email or Phone" ||
-      signupItem.name === "Phone or Email"
-    ) {
-      /* eslint-disable */
-      const renderEmailItem = () => {
-        return (
-          <React.Fragment>
-            <Form.Item
-              name="email"
-              className="signup-email"
-              label={
-                signupItem.label ? signupItem.label : i18next.t("general:Email")
-              }
-              rules={[
-                {
-                  required: required,
-                  message: i18next.t("login:Please input your Email!"),
-                },
-                {
-                  validator: (_, value) => {
-                    if (
-                      this.state.email !== "" &&
-                      !Setting.isValidEmail(this.state.email)
-                    ) {
-                      this.setState({validEmail: false});
-                      return Promise.reject(i18next.t("login:The input is not valid Email!"));
-                    }
-
-                    if (signupItem.regex) {
-                      const reg = new RegExp(signupItem.regex);
-                      if (!reg.test(this.state.email)) {
-                        this.setState({validEmail: false});
-                        return Promise.reject(
-                          i18next.t(
-                            "signup:The input Email doesn't match the signup item regex!"
-                          )
-                        );
-                      }
-                    }
-
-                    this.setState({validEmail: true});
-                    return Promise.resolve();
-                  },
-                },
-              ]}
-            >
-              <Input
-                className="signup-email-input"
-                placeholder={signupItem.placeholder}
-                disabled={
-                  this.state.invitation !== undefined &&
-                  this.state.invitation.email !== ""
-                }
-                onChange={(e) => this.setState({email: e.target.value})}
-              />
-            </Form.Item>
-            {signupItem.rule !== "No verification" && (
-              <Form.Item
-                name="emailCode"
-                className="signup-email-code"
-                label={
-                  signupItem.label
-                    ? signupItem.label
-                    : i18next.t("code:Confirmation code") || i18next.t("code:Email code")
-                }
-                rules={[
-                  {
-                    required: required,
-                    message: i18next.t(
-                      "code:Please input your verification code!"
-                    ),
-                  },
-                ]}
-              >
-                <SendCodeInput
-                  className="signup-email-code-input"
-                  disabled={!this.state.validEmail}
-                  method={"signup"}
-                  onButtonClickArgs={[
-                    this.state.email,
-                    "email",
-                    Setting.getApplicationName(application),
-                  ]}
-                  application={application}
-                />
-              </Form.Item>
-            )}
-          </React.Fragment>
-        );
-      };
-
+    } else if (signupItem.name === "Tag") {
+      return (
+        <Form.Item
+          name="tag"
+          className="signup-tag"
+          label={signupItem.label ? signupItem.label : i18next.t("general:Tag")}
+          rules={[
+            {
+              required: required,
+              message: i18next.t("signup:Please select your tag!"),
+            },
+          ]}
+        >
+          <Select
+            className="signup-tag-select"
+            placeholder={signupItem.placeholder || i18next.t("signup:Please select your tag!")}
+            allowClear={!required}
+          >
+            {
+              (signupItem.options?.length > 0 ? signupItem.options : application.tags ?? []).map((tag, index) => (
+                <Select.Option key={index} value={tag}>{tag}</Select.Option>
+              ))
+            }
+          </Select>
+        </Form.Item>
+      );
+    } else if (signupItem.name === "Email" || signupItem.name === "Phone" || signupItem.name === "Email or Phone" || signupItem.name === "Phone or Email") {
       const renderPhoneItem = () => {
         return (
           <React.Fragment>
@@ -865,8 +889,7 @@ class SignupPage extends React.Component {
           signupItem={signupItem}
           application={application}
           setState={(...args) => this.setState(...args)}
-       />;
-        // return renderEmailItem();
+        />;
       } else if (signupItem.name === "Phone") {
         return renderPhoneItem();
       } else if (
@@ -915,14 +938,14 @@ class SignupPage extends React.Component {
             </Row>
             {emailOrPhoneMode === "Email"
               ? <EmailInputGroup
-                  email={this.state.email}
-                  required={required}
-                  validEmail={this.state.validEmail}
-                  invitation={this.state.invitation}
-                  signupItem={signupItem}
-                  application={application}
-                  setState={(...args) => this.setState(...args)}
-                />
+                email={this.state.email}
+                required={required}
+                validEmail={this.state.validEmail}
+                invitation={this.state.invitation}
+                signupItem={signupItem}
+                application={application}
+                setState={(...args) => this.setState(...args)}
+              />
               : renderPhoneItem()}
           </React.Fragment>
         );
@@ -930,12 +953,6 @@ class SignupPage extends React.Component {
         return null;
       }
     } else if (signupItem.name === "Password") {
-      const [, map] = PasswordChecker.checkPasswordComplexity(
-        this.state.password ?? "",
-        application.organizationObj.passwordOptions
-      );
-
-      const render = this.state.isPasswordDirty && map.length !== 0 && this.state.isPasswordFocus;
       return (
         <Popover placement={"top"} content={this.state.passwordPopover} open={this.state.passwordPopoverOpen}>
           <Form.Item
@@ -1234,7 +1251,9 @@ class SignupPage extends React.Component {
         ></Form.Item>
         {signupItems.map((signupItem, idx) => {
           const renderedItem = this.renderFormItem(application, signupItem);
-          if (!renderedItem) return null;
+          if (!renderedItem) {
+            return null;
+          }
           return (
             <div key={idx}>
               <div
@@ -1322,8 +1341,8 @@ class SignupPage extends React.Component {
       <React.Fragment>
         <CustomGithubCorner />
         <div className="login-content" style={{margin: this.props.preview ?? this.parseOffset(application.formOffset)}}>
-          {Setting.inIframe() || Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCss}} />}
-          {Setting.inIframe() || !Setting.isMobile() ? null : <div dangerouslySetInnerHTML={{__html: application.formCssMobile}} />}
+          {Setting.inIframe() || Setting.isMobile() ? null : <style dangerouslySetInnerHTML={{__html: Setting.getStyleInnerCss(application.formCss)}} />}
+          {Setting.inIframe() || !Setting.isMobile() ? null : <style dangerouslySetInnerHTML={{__html: Setting.getStyleInnerCss(application.formCssMobile)}} />}
           <div className={Setting.isDarkTheme(this.props.themeAlgorithm) ? "login-panel-dark" : "login-panel"}>
             <div className="side-image" style={{display: application.formOffset !== 4 ? "none" : null}}>
               <div dangerouslySetInnerHTML={{__html: application.formSideHtml}} />
@@ -1335,13 +1354,14 @@ class SignupPage extends React.Component {
               {
                 Setting.renderLogo(application)
               }
-              <LanguageSelect
-                languages={application.organizationObj.languages}
-                mode={this.getLanguageSelectorMode(application)}
-                style={{top: "55px", right: "5px", position: "absolute"}}
-              />
+              {
+                this.renderLanguageSelect(application)
+              }
               {
                 this.renderForm(application)
+              }
+              {
+                this.renderCaptchaModal(application)
               }
             </div>
           </div>

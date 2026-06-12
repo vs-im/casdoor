@@ -679,6 +679,8 @@ func (c *ApiController) SetPassword() {
 
 // CheckUserPassword
 // @Title CheckUserPassword
+// @Description Check if user password is correct
+// @Param   body body object.User true "User object with password to check"
 // @router /check-user-password [post]
 // @Tag User API
 // @Success 200 {object} object.Userinfo The Response object
@@ -790,17 +792,13 @@ func (c *ApiController) ImpersonateUser() {
 		return
 	}
 
-	username := c.Ctx.Request.Form.Get("username")
-	if username == "" {
+	owner := c.Ctx.Request.Form.Get("owner")
+	name := c.Ctx.Request.Form.Get("name")
+	if owner == "" || name == "" {
 		c.ResponseError(c.T("general:Missing parameter"))
 		return
 	}
-
-	owner, _, err := util.GetOwnerAndNameFromIdWithError(username)
-	if err != nil {
-		c.ResponseError(err.Error())
-		return
-	}
+	username := util.GetId(owner, name)
 
 	if !(owner == org || org == "") {
 		c.ResponseError(c.T("auth:Unauthorized operation"))

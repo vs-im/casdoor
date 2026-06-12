@@ -66,7 +66,7 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 				return i18n.Translate(lang, "check:Email already exists")
 			}
 		}
-		if HasUserByField(organization.Name, "phone", authForm.Phone) {
+		if HasUserByPhoneAndCountryCode(organization.Name, authForm.Phone, authForm.CountryCode) {
 			return i18n.Translate(lang, "check:Phone already exists")
 		}
 	}
@@ -99,7 +99,7 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 				return i18n.Translate(lang, "check:Phone cannot be empty")
 			}
 		} else {
-			if HasUserByField(organization.Name, "phone", authForm.Phone) {
+			if HasUserByPhoneAndCountryCode(organization.Name, authForm.Phone, authForm.CountryCode) {
 				return i18n.Translate(lang, "check:Phone already exists")
 			} else if !util.IsPhoneAllowInRegin(authForm.CountryCode, organization.CountryCodes) {
 				return i18n.Translate(lang, "check:Your region is not allow to signup by phone")
@@ -491,9 +491,10 @@ func CheckApiPermission(userId string, organization string, path string, method 
 		}
 
 		userHit := permission.isUserHit(userId)
+		groupHit := permission.isGroupHit(userId)
 		roleHit := permission.isRoleHit(userId)
 
-		if !userHit && !roleHit {
+		if !userHit && !groupHit && !roleHit {
 			if permission.Effect == "Allow" {
 				allowPermissionCount += 1
 			} else {
@@ -510,6 +511,22 @@ func CheckApiPermission(userId string, organization string, path string, method 
 		var isAllowed bool
 
 		if userHit {
+			isAllowed, err = enforcer.Enforce(userId, path, method)
+			if err != nil {
+				return false, err
+			}
+
+			if isAllowed {
+				if permission.Effect == "Allow" {
+					allowCount += 1
+				}
+			} else {
+				if permission.Effect == "Deny" {
+					denyCount += 1
+				}
+			}
+		}
+		if groupHit {
 			isAllowed, err = enforcer.Enforce(userId, path, method)
 			if err != nil {
 				return false, err
@@ -607,9 +624,10 @@ func CheckLoginPermission(userId string, application *Application) (bool, error)
 		}
 
 		userHit := permission.isUserHit(userId)
+		groupHit := permission.isGroupHit(userId)
 		roleHit := permission.isRoleHit(userId)
 
-		if !userHit && !roleHit {
+		if !userHit && !groupHit && !roleHit {
 			if permission.Effect == "Allow" {
 				allowPermissionCount += 1
 			} else {
@@ -626,6 +644,22 @@ func CheckLoginPermission(userId string, application *Application) (bool, error)
 		var isAllowed bool
 
 		if userHit {
+			isAllowed, err = enforcer.Enforce(userId, application.Name, "Read")
+			if err != nil {
+				return false, err
+			}
+
+			if isAllowed {
+				if permission.Effect == "Allow" {
+					allowCount += 1
+				}
+			} else {
+				if permission.Effect == "Deny" {
+					denyCount += 1
+				}
+			}
+		}
+		if groupHit {
 			isAllowed, err = enforcer.Enforce(userId, application.Name, "Read")
 			if err != nil {
 				return false, err
@@ -759,8 +793,8 @@ func CheckUpdateUser(oldUser, user *User, lang string) string {
 			return i18n.Translate(lang, "check:Email already exists")
 		}
 	}
-	if oldUser.Phone != user.Phone {
-		if HasUserByField(user.Owner, "phone", user.Phone) {
+	if oldUser.Phone != user.Phone || oldUser.CountryCode != user.CountryCode {
+		if HasUserByPhoneAndCountryCode(user.Owner, user.Phone, user.CountryCode) {
 			return i18n.Translate(lang, "check:Phone already exists")
 		}
 	}

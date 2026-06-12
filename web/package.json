@@ -9,6 +9,7 @@
     "@crowdin/cli": "^3.7.10",
     "@ctrl/tinycolor": "^3.5.0",
     "@emotion/react": "^11.10.5",
+    "@fontsource-variable/inter": "^5.2.8",
     "@metamask/eth-sig-util": "^6.0.0",
     "@uiw/codemirror-extensions-langs": "^4.23.8",
     "@uiw/codemirror-theme-material": "^4.23.8",
@@ -62,12 +63,12 @@
   },
   "scripts": {
     "start": "cross-env PORT=7001 craco start",
-    "build": "craco build",
+    "build": "cross-env GENERATE_SOURCEMAP=false craco build",
     "postbuild": "node mv.js",
     "test": "craco test",
     "eject": "craco eject",
     "crowdin:sync": "crowdin upload && crowdin download",
-    "preinstall": "node -e \"if (process.env.npm_execpath.indexOf('yarn') === -1) throw new Error('Use yarn for installing: https://yarnpkg.com/en/docs/install')\"",
+    "preinstall": "node -e \"if (!/bun|yarn/.test(process.env.npm_execpath)) throw new Error('Use bun for installing')\"",
     "fix": "eslint --fix src/**/*.{js,jsx,ts,tsx}",
     "lint:css": "stylelint src/**/*.{css,less} --fix"
   },

@@ -144,7 +144,7 @@ class DeviceLoginPanel extends React.Component {
         {
           session?.user_code ? (
             <Typography.Text type="secondary">
-              {i18next.t("login:Confirmation code")}: {session.user_code}
+              {i18next.t("code:Confirmation code")}: {session.user_code}
             </Typography.Text>
           ) : null
         }

@@ -173,23 +173,24 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			return
 		}
 
+		needSigninSession := application.EnableSigninSession || application.HasPromptPage() || consentRequired
+		if needSigninSession {
+			// Prompt and consent pages need the user to be signed in.
+			c.SetSessionUsername(userId)
+		}
+
 		if consentRequired {
 			resp = &Response{Status: "ok", Data: map[string]bool{"required": true}}
 			resp.Data3 = user.NeedUpdatePassword
-			return
-		}
+		} else {
+			code, err := object.GetOAuthCode(userId, clientId, form.Provider, form.SigninMethod, responseType, redirectUri, scope, state, nonce, codeChallenge, resource, c.Ctx.Request.Host, c.GetAcceptLanguage())
+			if err != nil {
+				c.ResponseError(err.Error(), nil)
+				return
+			}
 
-		code, err := object.GetOAuthCode(userId, clientId, form.Provider, form.SigninMethod, responseType, redirectUri, scope, state, nonce, codeChallenge, resource, c.Ctx.Request.Host, c.GetAcceptLanguage())
-		if err != nil {
-			c.ResponseError(err.Error(), nil)
-			return
-		}
-
-		resp = codeToResponse(code)
-		resp.Data3 = user.NeedUpdatePassword
-		if application.EnableSigninSession || application.HasPromptPage() {
-			// The prompt page needs the user to be signed in
-			c.SetSessionUsername(userId)
+			resp = codeToResponse(code)
+			resp.Data3 = user.NeedUpdatePassword
 		}
 	} else if form.Type == ResponseTypeToken || form.Type == ResponseTypeIdToken { // implicit flow
 		if !object.IsGrantTypeValid(form.Type, application.GrantTypes) {
@@ -549,7 +550,7 @@ func linkUserByProvider(user *object.User, provider *object.Provider, providerId
 // @Param nonce     query    string  false nonce
 // @Param code_challenge_method   query    string  false code_challenge_method
 // @Param code_challenge          query    string  false code_challenge
-// @Param   form   body   controllers.AuthForm  true        "Login information"
+// @Param   form   body   form.AuthForm  true        "Login information"
 // @Success 200 {object} controllers.Response The Response object
 // @router /login [post]
 func (c *ApiController) Login() {
@@ -626,7 +627,17 @@ func (c *ApiController) Login() {
 				return
 			}
 
-			if user, err = object.GetUserByFieldsForSharedApp(application, authForm.Organization, authForm.Username); err != nil {
+			// If the username looks like a phone number and a countryCode is provided,
+			// normalise it to E.164 format before looking up the user so that users
+			// from different countries sharing the same local number are distinguished.
+			lookupUsername := authForm.Username
+			if !strings.Contains(authForm.Username, "@") && authForm.CountryCode != "" {
+				if e164, ok := util.GetE164Number(authForm.Username, authForm.CountryCode); ok {
+					lookupUsername = e164
+				}
+			}
+
+			if user, err = object.GetUserByFieldsForSharedApp(application, authForm.Organization, lookupUsername); err != nil {
 				c.ResponseError(err.Error(), nil)
 				return
 			} else if user == nil {
@@ -1042,6 +1053,10 @@ func (c *ApiController) Login() {
 						user.Groups = []string{application.DefaultGroup}
 					}
 
+					if application.DefaultTag != "" && user.Tag == "" {
+						user.Tag = application.DefaultTag
+					}
+
 					var affected bool
 					affected, err = object.AddUser(user, c.GetAcceptLanguage())
 					if err != nil {
@@ -1304,6 +1319,10 @@ func (c *ApiController) HandleSamlLogin() {
 // HandleOfficialAccountEvent ...
 // @Tag System API
 // @Title HandleOfficialAccountEvent
+// @Description Handle WeChat Official Account webhook event
+// @Param   signature query string false "WeChat signature"
+// @Param   timestamp query string false "WeChat timestamp"
+// @Param   nonce     query string false "WeChat nonce"
 // @router /webhook [POST]
 // @Success 200 {object} controllers.Response The Response object
 func (c *ApiController) HandleOfficialAccountEvent() {
@@ -1454,7 +1473,9 @@ func (c *ApiController) GetCaptchaStatus() {
 // Callback
 // @Title Callback
 // @Tag Callback API
-// @Description Get Login Error Counts
+// @Description Handle OAuth callback redirect
+// @Param   code  query string false "OAuth authorization code"
+// @Param   state query string false "OAuth state parameter"
 // @router /Callback [post]
 // @Success 200 {object} object.Userinfo The Response object
 func (c *ApiController) Callback() {
@@ -1469,6 +1490,8 @@ func (c *ApiController) Callback() {
 // @Title DeviceAuth
 // @Tag Device Authorization Endpoint
 // @Description Endpoint for the device authorization flow
+// @Param   client_id query string true  "The OAuth2 client ID"
+// @Param   scope     query string false "The requested scope"
 // @router /device-auth [post]
 // @Success 200 {object} object.DeviceAuthResponse The Response object
 func (c *ApiController) DeviceAuth() {
@@ -1486,8 +1509,8 @@ func (c *ApiController) DeviceAuth() {
 
 	if application == nil {
 		c.Data["json"] = object.TokenError{
-			Error:            c.T("token:Invalid client_id"),
-			ErrorDescription: c.T("token:Invalid client_id"),
+			Error:            c.T("general:Invalid client_id"),
+			ErrorDescription: c.T("general:Invalid client_id"),
 		}
 		c.ServeJSON()
 		return
@@ -1510,7 +1533,7 @@ func (c *ApiController) DeviceAuth() {
 		if generateTime > 5 {
 			c.Data["json"] = object.TokenError{
 				Error:            "userCode gen",
-				ErrorDescription: c.T("token:Invalid client_id"),
+				ErrorDescription: c.T("general:Invalid client_id"),
 			}
 			c.ServeJSON()
 			return
@@ -1563,6 +1586,8 @@ func (c *ApiController) DeviceAuth() {
 // @Title CancelDeviceAuth
 // @Tag Device Authorization Endpoint
 // @Description cancel a pending device authorization flow
+// @Param   userCode    query string true "The user code to cancel"
+// @Param   cancelToken query string true "The cancellation token"
 // @router /cancel-device-auth [post]
 func (c *ApiController) CancelDeviceAuth() {
 	userCode := c.Ctx.Input.Query("userCode")
@@ -1593,6 +1618,7 @@ func (c *ApiController) CancelDeviceAuth() {
 // @Title DeviceAuthComplete
 // @Tag Device Authorization Endpoint
 // @Description Complete device authorization by establishing a browser session after token issuance
+// @Param   deviceCode query string true "The device code to complete"
 // @router /device-auth-complete [post]
 func (c *ApiController) DeviceAuthComplete() {
 	deviceCode := c.Ctx.Input.Query("deviceCode")

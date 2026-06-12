@@ -151,7 +151,7 @@ func getObject(ctx *context.Context) (string, string, error) {
 
 		organization := ctx.Input.Query("organization")
 
-		if !(strings.HasPrefix(ctx.Request.URL.Path, "/api/get-") && strings.HasSuffix(ctx.Request.URL.Path, "s")) {
+		if !(strings.HasPrefix(ctx.Request.URL.Path, "/api/get-") && strings.HasSuffix(ctx.Request.URL.Path, "s")) || ctx.Request.URL.Path == "/api/get-ldap-users" {
 			// query == "?id=built-in/admin"
 			id := ctx.Input.Query("id")
 			if id != "" {
@@ -309,8 +309,12 @@ func getImpersonateUser(ctx *context.Context, subOwner, subName, username string
 				panic(err)
 			}
 
-			if user.IsAdmin && impUserOwner == user.Owner {
+			if user.IsGlobalAdmin() || (user.IsAdmin && impUserOwner == user.Owner) {
 				ctx.Input.SetData("impersonating", true)
+				// For exit-impersonate-user, keep the real admin identity so authz uses admin's permissions
+				if getUrlPath(ctx) == "/api/exit-impersonate-user" {
+					return subOwner, subName, username
+				}
 				return impUserOwner, impUserName, impersonateUser
 			}
 		}

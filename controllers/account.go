@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/beego/beego/v2/core/logs"
+	"github.com/casdoor/casdoor/captcha"
 	"github.com/casdoor/casdoor/form"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
@@ -77,8 +78,7 @@ type LaravelResponse struct {
 // @Tag Login API
 // @Title Signup
 // @Description sign up a new user
-// @Param   username     formData    string  true        "The username to sign up"
-// @Param   password     formData    string  true        "The password"
+// @Param   body    body   form.AuthForm  true        "Signup request"
 // @Success 200 {object} controllers.Response The Response object
 // @router /signup [post]
 func (c *ApiController) Signup() {
@@ -120,6 +120,34 @@ func (c *ApiController) Signup() {
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
+	}
+
+	var enableCaptcha bool
+	if enableCaptcha, err = object.CheckToEnableCaptcha(application, authForm.Organization, authForm.Username, clientIp); err != nil {
+		c.ResponseError(err.Error())
+		return
+	} else if enableCaptcha {
+		captchaProvider, err := object.GetCaptchaProviderByApplication(util.GetId(application.Owner, application.Name), "false", c.GetAcceptLanguage())
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		if captchaProvider.Type != "Default" {
+			authForm.ClientSecret = captchaProvider.ClientSecret
+		}
+
+		var isHuman bool
+		isHuman, err = captcha.VerifyCaptchaByCaptchaType(authForm.CaptchaType, authForm.CaptchaToken, captchaProvider.ClientId, authForm.ClientSecret, captchaProvider.ClientId2)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		if !isHuman {
+			c.ResponseError(c.T("verification:Turing test failed."))
+			return
+		}
 	}
 
 	msg := object.CheckUserSignup(application, organization, &authForm, c.GetAcceptLanguage())
@@ -236,7 +264,7 @@ func (c *ApiController) Signup() {
 		RegisterSource:    fmt.Sprintf("%s/%s", authForm.Organization, application.Name),
 	}
 
-	if len(organization.Tags) > 0 {
+	if user.Tag == "" && len(organization.Tags) > 0 {
 		tokens := strings.Split(organization.Tags[0], "|")
 		if len(tokens) > 0 {
 			user.Tag = tokens[0]
@@ -257,6 +285,10 @@ func (c *ApiController) Signup() {
 
 	if application.DefaultGroup != "" && user.Groups == nil {
 		user.Groups = []string{application.DefaultGroup}
+	}
+
+	if application.DefaultTag != "" && user.Tag == "" {
+		user.Tag = application.DefaultTag
 	}
 
 	affected, err := object.AddUser(user, c.GetAcceptLanguage())
@@ -516,6 +548,10 @@ func (c *ApiController) SsoLogout() {
 		return
 	}
 
+	// Send OIDC Back-Channel Logout notifications BEFORE expiring tokens,
+	// because SendBackchannelLogout calls GetActiveTokensByUser (expires_in > 0).
+	object.SendBackchannelLogout(owner, username, currentSessionId, c.Ctx.Request.Host)
+
 	if logoutAllSessions {
 		// Logout from all sessions: expire all tokens and delete all sessions
 		_, err = object.ExpireTokenByUser(owner, username)
@@ -568,9 +604,6 @@ func (c *ApiController) SsoLogout() {
 		}
 	}
 
-	// Send OIDC Back-Channel Logout notifications (https://openid.net/specs/openid-connect-backchannel-1_0.html)
-	object.SendBackchannelLogout(owner, username, currentSessionId, c.Ctx.Request.Host)
-
 	// Propagate logout to external Custom OAuth2 providers
 	object.InvokeCustomProviderLogout(ssoApplication, ssoSessionToken)
 
@@ -581,6 +614,7 @@ func (c *ApiController) SsoLogout() {
 // @Title GetAccount
 // @Tag Account API
 // @Description get the details of the current account
+// @Param   managedAccounts query string false "Whether to include managed accounts"
 // @Success 200 {object} controllers.Response The Response object
 // @router /get-account [get]
 func (c *ApiController) GetAccount() {
@@ -710,6 +744,9 @@ func (c *ApiController) GetUserinfo2() {
 // GetCaptcha ...
 // @Tag Login API
 // @Title GetCaptcha
+// @Description Get captcha provider information for an application
+// @Param   applicationId     query string true  "The application id (owner/name)"
+// @Param   isCurrentProvider query string false "Whether to get the current provider"
 // @router /get-captcha [get]
 // @Success 200 {object} object.Userinfo The Response object
 func (c *ApiController) GetCaptcha() {

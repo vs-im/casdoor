@@ -46,7 +46,8 @@ type Group struct {
 	HaveChildren bool     `xorm:"-" json:"haveChildren"`
 	Children     []*Group `json:"children,omitempty"`
 
-	IsEnabled bool `json:"isEnabled"`
+	IsEnabled  bool              `json:"isEnabled"`
+	Properties map[string]string `xorm:"mediumtext" json:"properties"`
 }
 
 type GroupNode struct{}
@@ -443,6 +444,10 @@ func GroupChangeTrigger(oldName, newName string) error {
 	for _, user := range users {
 		user.Groups = util.ReplaceVal(user.Groups, oldName, newName)
 		_, err := updateUser(user.GetId(), user, []string{"groups"})
+		if err != nil {
+			return err
+		}
+		_, err = userEnforcer.UpdateGroupsForUser(user.GetId(), user.Groups)
 		if err != nil {
 			return err
 		}

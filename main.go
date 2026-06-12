@@ -43,8 +43,12 @@ func main() {
 		web.BConfig.WebConfig.Session.SessionProvider = "redis"
 		web.BConfig.WebConfig.Session.SessionProviderConfig = conf.GetConfigString("redisEndpoint")
 	}
-	web.BConfig.WebConfig.Session.SessionCookieLifeTime = 3600 * 24 * 30
-	web.BConfig.WebConfig.Session.SessionGCMaxLifetime = 3600 * 24 * 30
+	sessionCookieLifeTime := 3600 * 24 * 30
+	if val, err := conf.GetConfigInt64("sessionCookieLifeTime"); err == nil && val > 0 {
+		sessionCookieLifeTime = int(val)
+	}
+	web.BConfig.WebConfig.Session.SessionCookieLifeTime = sessionCookieLifeTime
+	web.BConfig.WebConfig.Session.SessionGCMaxLifetime = int64(sessionCookieLifeTime)
 	// web.BConfig.WebConfig.Session.SessionCookieSameSite = http.SameSiteNoneMode
 
 	routers.InitAPI()
@@ -88,10 +92,13 @@ func main() {
 	// web.SetStaticPath("/static", "web/build/static")
 
 	web.BConfig.WebConfig.DirectoryIndex = true
-	web.SetStaticPath("/swagger", "swagger")
+	if web.BConfig.RunMode == "dev" {
+		web.SetStaticPath("/swagger", "swagger")
+	}
 	web.SetStaticPath("/files", "files")
 	// https://studygolang.com/articles/2303
 	web.InsertFilter("*", web.BeforeStatic, routers.RequestBodyFilter)
+	web.InsertFilter("*", web.BeforeStatic, routers.ContentTypeFilter)
 	web.InsertFilter("*", web.BeforeRouter, routers.StaticFilter)
 	web.InsertFilter("*", web.BeforeRouter, routers.AutoSigninFilter)
 	web.InsertFilter("*", web.BeforeRouter, routers.CorsFilter)

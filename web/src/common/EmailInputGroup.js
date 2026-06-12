@@ -166,7 +166,7 @@ export function EmailInputGroup(props) {
             validator: (_, value) => {
               const emailValue = withVerification ? email : value;
               if (!emailValue) {
-                return i18next.t("signup:Please input your Email!");
+                return i18next.t("login:Please input your Email!");
               }
 
               if (
@@ -175,7 +175,7 @@ export function EmailInputGroup(props) {
               ) {
                 setState({validEmail: false});
                 return Promise.reject(
-                  i18next.t("signup:The input is not valid Email!")
+                  i18next.t("login:The input is not valid Email!")
                 );
               }
 

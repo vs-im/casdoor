@@ -350,6 +350,9 @@ class AuthCallback extends React.Component {
 
     if (this.state.getVerifyTotp !== undefined) {
       const application = Setting.getApplicationObj(this);
+      if (!application) {
+        return <Loading type="page" tip={i18next.t("login:Signing in...")} />;
+      }
       return renderLoginPanel(application, this.state.getVerifyTotp, this);
     }
 
