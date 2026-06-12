@@ -14,7 +14,7 @@
 
 import React from "react";
 import {Link} from "react-router-dom";
-import {Button, Modal, Switch, Table, Upload} from "antd";
+import {Button, Modal, Switch, Table, Tag, Upload} from "antd";
 import moment from "moment";
 import * as Setting from "./Setting";
 import * as Conf from "./Conf";
@@ -254,6 +254,25 @@ class PermissionListPage extends BaseListPage {
     );
   }
 
+  renderPermissionTags(tags, urlPrefix = null) {
+    if (!tags) {
+      return [];
+    }
+
+    return tags.map((tag) => {
+      const tagNode = <Tag key={tag}>{tag}</Tag>;
+      if (urlPrefix === null) {
+        return tagNode;
+      }
+
+      return (
+        <Link key={tag} to={`/${urlPrefix}/${tag}`}>
+          {tagNode}
+        </Link>
+      );
+    });
+  }
+
   renderTable(permissions) {
     const columns = [
       // https://github.com/ant-design/ant-design/issues/22184
@@ -324,7 +343,7 @@ class PermissionListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("users"),
         render: (text, record, index) => {
-          return Setting.getTags(text, "users");
+          return this.renderPermissionTags(text, "users");
         },
       },
       {
@@ -335,7 +354,7 @@ class PermissionListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("groups"),
         render: (text, record, index) => {
-          return Setting.getTags(text, "groups");
+          return this.renderPermissionTags(text, "groups");
         },
       },
       {
@@ -346,7 +365,7 @@ class PermissionListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("roles"),
         render: (text, record, index) => {
-          return Setting.getTags(text, "roles");
+          return this.renderPermissionTags(text, "roles");
         },
       },
       {
@@ -356,7 +375,7 @@ class PermissionListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("domains"),
         render: (text, record, index) => {
-          return Setting.getTags(text);
+          return this.renderPermissionTags(text);
         },
       },
       {
@@ -376,7 +395,7 @@ class PermissionListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("resources"),
         render: (text, record, index) => {
-          return Setting.getTags(text);
+          return this.renderPermissionTags(text);
         },
       },
       {
@@ -399,7 +418,7 @@ class PermissionListPage extends BaseListPage {
               return tag || null;
             }
           });
-          return Setting.getTags(tags);
+          return this.renderPermissionTags(tags);
         },
       },
       {
