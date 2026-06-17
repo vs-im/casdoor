@@ -38,3 +38,4 @@ server
 !manifests/casdoor
 .env
 .agent/
+tasks/
