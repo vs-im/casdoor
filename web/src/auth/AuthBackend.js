@@ -133,6 +133,29 @@ export function login(values, oAuthParams) {
   }).then(res => res.json());
 }
 
+export function sendMagicLink(values, oAuthParams) {
+  return fetch(`${authConfig.serverUrl}/api/send-magic-link${oAuthParamsToQuery(oAuthParams)}`, {
+    method: "POST",
+    credentials: "include",
+    body: JSON.stringify(values),
+    headers: {
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
+  }).then(res => res.json());
+}
+
+export function verifyMagicLink(token, oAuthParams) {
+  const query = oAuthParamsToQuery(oAuthParams);
+  const joiner = query === "" ? "?" : "&";
+  return fetch(`${authConfig.serverUrl}/api/verify-magic-link${query}${joiner}token=${encodeURIComponent(token)}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
+  }).then(res => res.json());
+}
+
 export function loginCas(values, params) {
   return fetch(`${authConfig.serverUrl}/api/login?service=${params.service}`, {
     method: "POST",

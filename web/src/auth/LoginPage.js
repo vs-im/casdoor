@@ -118,6 +118,7 @@ class LoginPage extends React.Component {
       userCode: props.userCode ?? (props.match?.params?.userCode ?? null),
       userCodeStatus: "",
       prefilledUsername: urlParams.get("username") || urlParams.get("login_hint"),
+      magicLinkSent: false,
     };
 
     if (this.state.type === "cas" && props.match?.params.casApplicationName !== undefined) {
@@ -285,6 +286,7 @@ class LoginPage extends React.Component {
       case "WebAuthn": return "webAuthn";
       case "LDAP": return "ldap";
       case "Face ID": return "faceId";
+      case "Magic link": return "magicLink";
       case "Device login":
         if (application?.signinMethods[0]?.rule === "Tab") {
           return "device";
@@ -307,6 +309,8 @@ class LoginPage extends React.Component {
       return "LDAP";
     } else if (this.state.loginMethod === "faceId") {
       return "Face ID";
+    } else if (this.state.loginMethod === "magicLink") {
+      return "Magic link";
     } else if (this.state.loginMethod === "device") {
       return "Device login";
     } else {
@@ -322,6 +326,7 @@ class LoginPage extends React.Component {
     case "verificationCode": return i18next.t("login:Email or phone");
     case "verificationCodeEmail": return i18next.t("general:Email");
     case "verificationCodePhone": return i18next.t("general:Phone");
+    case "magicLink": return i18next.t("general:Email");
     case "ldap": return i18next.t("login:LDAP username, Email or phone");
     default: return i18next.t("login:username, Email or phone");
     }
@@ -499,6 +504,10 @@ class LoginPage extends React.Component {
 
   onFinish(values) {
     this.setState({loginLoading: true, loading: true});
+    if (this.state.loginMethod === "magicLink") {
+      this.requestMagicLink(values);
+      return;
+    }
     if (this.state.loginMethod === "webAuthn") {
       let username = this.state.username;
       if (username === null || username === "") {
@@ -570,6 +579,36 @@ class LoginPage extends React.Component {
       }
     }
     this.login(values);
+  }
+
+  requestMagicLink(values) {
+    const oAuthParams = Util.getOAuthGetParameters();
+    values["email"] = values["username"];
+    values["application"] = this.getApplicationObj()?.name;
+    values["organization"] = this.getApplicationObj()?.organization;
+    AuthBackend.sendMagicLink(values, oAuthParams)
+      .then((res) => {
+        if (res.status === "ok") {
+          this.setState({magicLinkSent: true});
+        } else if (res.data === "captchaRequired") {
+          this.setState({
+            openCaptchaModal: true,
+            forceCaptchaModal: true,
+            values: values,
+          });
+        } else {
+          Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${res.msg}`);
+        }
+      })
+      .catch((error) => {
+        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}${error}`);
+      })
+      .finally(() => {
+        this.setState({
+          loginLoading: false,
+          loading: false
+        });
+      });
   }
 
   login(values) {
@@ -914,7 +953,7 @@ class LoginPage extends React.Component {
                     } else {
                       this.setState({validEmail: false});
                     }
-                  } else if (this.state.loginMethod === "verificationCodeEmail") {
+                  } else if (this.state.loginMethod === "verificationCodeEmail" || this.state.loginMethod === "magicLink") {
                     if (!Setting.isValidEmail(value)) {
                       this.setState({validEmail: false});
                       this.setState({validEmailOrPhone: false});
@@ -998,6 +1037,7 @@ class LoginPage extends React.Component {
             {
               this.state.loginMethod === "webAuthn" ? i18next.t("login:Sign in with WebAuthn") :
                 this.state.loginMethod === "faceId" ? i18next.t("login:Sign in with Face ID") :
+                  this.state.loginMethod === "magicLink" ? i18next.t("login:Send Magic Link") :
                   this.state.type === "device" ? i18next.t("login:Approve and sign in") :
                     signinItem.label ? signinItem.label : i18next.t("login:Sign In")
             }
@@ -1057,7 +1097,7 @@ class LoginPage extends React.Component {
         </Form.Item>
       );
     } else if (signinItem.name === "Providers") {
-      const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application);
+      const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application) || Setting.isMagicLinkEnabled(application);
       if (signinItem.rule === "None" || signinItem.rule === "") {
         signinItem.rule = showForm ? "small" : "big";
       }
@@ -1177,7 +1217,17 @@ class LoginPage extends React.Component {
       );
     }
 
-    const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application) || Setting.isFaceIdEnabled(application);
+    if (this.state.magicLinkSent) {
+      return (
+        <Result
+          status="success"
+          title={i18next.t("login:Check your email")}
+          subTitle={i18next.t("login:We sent you a magic link to sign in")}
+        />
+      );
+    }
+
+    const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application) || Setting.isFaceIdEnabled(application) || Setting.isMagicLinkEnabled(application);
     if (showForm) {
       let loginWidth = 320;
       if (Setting.getLanguage() === "fr") {
@@ -1256,7 +1306,7 @@ class LoginPage extends React.Component {
   }
 
   renderCaptchaModal(application, noModal) {
-    if (Setting.getCaptchaRule(this.getApplicationObj()) === Setting.CaptchaRule.Never) {
+    if (!this.state.forceCaptchaModal && Setting.getCaptchaRule(this.getApplicationObj()) === Setting.CaptchaRule.Never) {
       return null;
     }
     const captchaProviderItems = Setting.getCaptchaProviderItems(application);
@@ -1268,7 +1318,9 @@ class LoginPage extends React.Component {
     const captchaRule = Setting.getCaptchaRule(this.getApplicationObj());
     let provider = null;
 
-    if (captchaRule === Setting.CaptchaRule.Always && alwaysProviderItems.length > 0) {
+    if (this.state.forceCaptchaModal && captchaProviderItems.length > 0) {
+      provider = captchaProviderItems[0].provider;
+    } else if (captchaRule === Setting.CaptchaRule.Always && alwaysProviderItems.length > 0) {
       provider = alwaysProviderItems[0].provider;
     } else if (captchaRule === Setting.CaptchaRule.Dynamic && dynamicProviderItems.length > 0) {
       provider = dynamicProviderItems[0].provider;
@@ -1298,10 +1350,15 @@ class LoginPage extends React.Component {
         values["captchaToken"] = captchaToken;
         values["clientSecret"] = clientSecret;
 
-        this.login(values);
-        this.setState({openCaptchaModal: false});
+        if (this.state.loginMethod === "magicLink") {
+          this.setState({loginLoading: true, loading: true});
+          this.requestMagicLink(values);
+        } else {
+          this.login(values);
+        }
+        this.setState({openCaptchaModal: false, forceCaptchaModal: false});
       }}
-      onCancel={() => this.setState({openCaptchaModal: false, loginLoading: false})}
+      onCancel={() => this.setState({openCaptchaModal: false, forceCaptchaModal: false, loginLoading: false})}
       isCurrentProvider={true}
       innerRef={this.captchaRef}
     />;
@@ -1629,6 +1686,7 @@ class LoginPage extends React.Component {
       [generateItemKey("WebAuthn", "None"), {label: i18next.t("login:WebAuthn"), key: "webAuthn"}],
       [generateItemKey("LDAP", "None"), {label: i18next.t("login:LDAP"), key: "ldap"}],
       [generateItemKey("Face ID", "None"), {label: i18next.t("login:Face ID"), key: "faceId"}],
+      [generateItemKey("Magic link", "None"), {label: i18next.t("login:Magic link"), key: "magicLink"}],
       [generateItemKey("Device login", "Tab"), {label: i18next.t("login:Device login"), key: "device"}],
       [generateItemKey("WeChat", "Tab"), {label: i18next.t("login:WeChat"), key: "wechat"}],
       [generateItemKey("WeChat", "None"), {label: i18next.t("login:WeChat"), key: "wechat"}],

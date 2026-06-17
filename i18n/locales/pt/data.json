@@ -24,6 +24,7 @@
     "The login method: login with email is not enabled for the application": "O método de login com e-mail não está habilitado para o aplicativo",
     "The login method: login with face is not enabled for the application": "O método de login com reconhecimento facial não está habilitado para o aplicativo",
     "The login method: login with password is not enabled for the application": "O método de login com senha não está habilitado para o aplicativo",
+    "The login method: magic link is not enabled for the application": "O metodo de login: link magico nao esta habilitado para o aplicativo",
     "The order: %s does not exist": "O pedido: %s não existe",
     "The organization: %s does not exist": "A organização: %s não existe",
     "The organization: %s has disabled users to signin": "A organização: %s desativou o login de usuários",

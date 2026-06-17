@@ -156,9 +156,16 @@ type Application struct {
 	FormBackgroundUrl       string     `xorm:"varchar(200)" json:"formBackgroundUrl"`
 	FormBackgroundUrlMobile string     `xorm:"varchar(200)" json:"formBackgroundUrlMobile"`
 
-	FailedSigninLimit      int `json:"failedSigninLimit"`
-	FailedSigninFrozenTime int `json:"failedSigninFrozenTime"`
-	CodeResendTimeout      int `json:"codeResendTimeout"`
+	FailedSigninLimit               int    `json:"failedSigninLimit"`
+	FailedSigninFrozenTime          int    `json:"failedSigninFrozenTime"`
+	CodeResendTimeout               int    `json:"codeResendTimeout"`
+	MagicLinkExpireMinutes          int    `json:"magicLinkExpireMinutes"`
+	MagicLinkPermission             string `xorm:"varchar(200)" json:"magicLinkPermission"`
+	MagicLinkRateLimitWindowMinutes int    `json:"magicLinkRateLimitWindowMinutes"`
+	MagicLinkRateLimitEmail         int    `json:"magicLinkRateLimitEmail"`
+	MagicLinkRateLimitIP            int    `json:"magicLinkRateLimitIp"`
+	MagicLinkRateLimitApplication   int    `json:"magicLinkRateLimitApplication"`
+	MagicLinkCaptchaThreshold       int    `json:"magicLinkCaptchaThreshold"`
 
 	CustomScopes []*ScopeDescription `xorm:"mediumtext" json:"customScopes"`
 

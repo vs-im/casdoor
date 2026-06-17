@@ -1920,6 +1920,48 @@ paths:
             type: array
             items:
               $ref: '#/definitions/object.Ldap'
+  /api/get-magic-links:
+    get:
+      tags:
+      - Magic Link API
+      description: get Magic Link records for admin UI
+      operationId: ApiController.GetMagicLinks
+      parameters:
+      - in: query
+        name: owner
+        description: The owner of Magic Link records
+        type: string
+      - in: query
+        name: p
+        description: The page number
+        type: string
+      - in: query
+        name: pageSize
+        description: The page size
+        type: string
+      - in: query
+        name: field
+        description: The search field
+        type: string
+      - in: query
+        name: value
+        description: The search value
+        type: string
+      - in: query
+        name: sortField
+        description: The sort field
+        type: string
+      - in: query
+        name: sortOrder
+        description: The sort order
+        type: string
+      responses:
+        "200":
+          description: The Response object
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/object.MagicLink'
   /api/get-model:
     get:
       tags:
@@ -3413,6 +3455,40 @@ paths:
           description: The Response object
           schema:
             $ref: '#/definitions/object.Userinfo'
+  /api/revoke-magic-link:
+    post:
+      tags:
+      - Magic Link API
+      description: revoke an unused Magic Link
+      operationId: ApiController.RevokeMagicLink
+      parameters:
+      - in: query
+        name: id
+        description: The id (owner/name) of the Magic Link
+        required: true
+        type: string
+      responses:
+        "200":
+          description: The Response object
+          schema:
+            $ref: '#/definitions/controllers.Response'
+  /api/delete-magic-link:
+    post:
+      tags:
+      - Magic Link API
+      description: delete a Magic Link record
+      operationId: ApiController.DeleteMagicLink
+      parameters:
+      - in: query
+        name: id
+        description: The id (owner/name) of the Magic Link
+        required: true
+        type: string
+      responses:
+        "200":
+          description: The Response object
+          schema:
+            $ref: '#/definitions/controllers.Response'
   /api/run-casbin-command:
     get:
       tags:
@@ -3536,6 +3612,61 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/controllers.SmsForm'
+      responses:
+        "200":
+          description: The Response object
+          schema:
+            $ref: '#/definitions/controllers.Response'
+  /api/send-magic-link:
+    post:
+      tags:
+      - Magic Link API
+      description: send a Magic Link to an email address for a validated application,
+        organization, and permission context
+      operationId: ApiController.SendMagicLink
+      parameters:
+      - in: query
+        name: clientId
+        description: OAuth client ID
+        type: string
+      - in: query
+        name: responseType
+        description: OAuth response type
+        type: string
+      - in: query
+        name: redirectUri
+        description: OAuth redirect URI
+        type: string
+      - in: query
+        name: scope
+        description: OAuth scope
+        type: string
+      - in: query
+        name: state
+        description: OAuth state
+        type: string
+      - in: query
+        name: nonce
+        description: OAuth nonce
+        type: string
+      - in: query
+        name: code_challenge_method
+        description: OAuth PKCE code challenge method
+        type: string
+      - in: query
+        name: code_challenge
+        description: OAuth PKCE code challenge
+        type: string
+      - in: query
+        name: resource
+        description: OAuth resource indicator
+        type: string
+      - in: body
+        name: form
+        description: Magic Link request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.MagicLinkRequestForm'
       responses:
         "200":
           description: The Response object
@@ -4412,6 +4543,60 @@ paths:
           description: The Response object
           schema:
             $ref: '#/definitions/object.Userinfo'
+  /api/verify-magic-link:
+    get:
+      tags:
+      - Magic Link API
+      description: verify a one-time Magic Link token and continue the login or OAuth
+        flow
+      operationId: ApiController.VerifyMagicLink
+      parameters:
+      - in: query
+        name: token
+        description: Magic Link token
+        required: true
+        type: string
+      - in: query
+        name: clientId
+        description: OAuth client ID
+        type: string
+      - in: query
+        name: responseType
+        description: OAuth response type
+        type: string
+      - in: query
+        name: redirectUri
+        description: OAuth redirect URI
+        type: string
+      - in: query
+        name: scope
+        description: OAuth scope
+        type: string
+      - in: query
+        name: state
+        description: OAuth state
+        type: string
+      - in: query
+        name: nonce
+        description: OAuth nonce
+        type: string
+      - in: query
+        name: code_challenge_method
+        description: OAuth PKCE code challenge method
+        type: string
+      - in: query
+        name: code_challenge
+        description: OAuth PKCE code challenge
+        type: string
+      - in: query
+        name: resource
+        description: OAuth resource indicator
+        type: string
+      responses:
+        "200":
+          description: The Response object
+          schema:
+            $ref: '#/definitions/controllers.Response'
   /api/verify-identification:
     post:
       tags:
@@ -4612,6 +4797,24 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/object.LdapUser'
+  controllers.MagicLinkRequestForm:
+    title: MagicLinkRequestForm
+    type: object
+    properties:
+      application:
+        type: string
+      captchaToken:
+        type: string
+      captchaType:
+        type: string
+      clientSecret:
+        type: string
+      email:
+        type: string
+      organization:
+        type: string
+      permission:
+        type: string
   controllers.NotificationForm:
     title: NotificationForm
     type: object
@@ -4789,6 +4992,26 @@ definitions:
         type: integer
         format: int64
       failedSigninLimit:
+        type: integer
+        format: int64
+      magicLinkExpireMinutes:
+        type: integer
+        format: int64
+      magicLinkPermission:
+        type: string
+      magicLinkRateLimitWindowMinutes:
+        type: integer
+        format: int64
+      magicLinkRateLimitEmail:
+        type: integer
+        format: int64
+      magicLinkRateLimitIp:
+        type: integer
+        format: int64
+      magicLinkRateLimitApplication:
+        type: integer
+        format: int64
+      magicLinkCaptchaThreshold:
         type: integer
         format: int64
       favicon:
@@ -5901,6 +6124,8 @@ definitions:
         type: string
       issuerUrl:
         type: string
+      magicLinkContent:
+        type: string
       metadata:
         type: string
       method:
@@ -6285,6 +6510,83 @@ definitions:
       text:
         type: string
       timestamp:
+        type: string
+  object.MagicLink:
+    title: MagicLink
+    type: object
+    properties:
+      actions:
+        type: array
+        items:
+          type: string
+      application:
+        type: string
+      clientId:
+        type: string
+      codeChallenge:
+        type: string
+      codeChallengeMethod:
+        type: string
+      createdTime:
+        type: string
+      email:
+        type: string
+      expireAt:
+        type: string
+        format: datetime
+      expiryTime:
+        type: string
+      lastError:
+        type: string
+      name:
+        type: string
+      nonce:
+        type: string
+      openedTime:
+        type: string
+      owner:
+        type: string
+      permission:
+        type: string
+      redirectUri:
+        type: string
+      remoteAddr:
+        type: string
+      requester:
+        type: string
+      resource:
+        type: string
+      resources:
+        type: array
+        items:
+          type: string
+      responseType:
+        type: string
+      scope:
+        type: string
+      state:
+        type: string
+      status:
+        type: string
+      subDomains:
+        type: array
+        items:
+          type: string
+      subGroups:
+        type: array
+        items:
+          type: string
+      subRoles:
+        type: array
+        items:
+          type: string
+      subUsers:
+        type: array
+        items:
+          type: string
+      tokenHash:
+        type: string
+      usedTime:
         type: string
   object.Token:
     title: Token

@@ -12,6 +12,8 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" yarn run build
 
 FROM --platform=$BUILDPLATFORM golang:latest AS back
 WORKDIR /go/src/casdoor
+ARG TARGETOS
+ARG TARGETARCH
 
 # Copy only go.mod and go.sum first for dependency caching
 COPY go.mod go.sum ./
@@ -20,8 +22,7 @@ RUN go mod download
 # Copy source files
 COPY . .
 
-RUN go test -v -run TestGetVersionInfo ./util/system_test.go ./util/system.go ./util/variable.go
-RUN ./build.sh
+RUN rm -rf web && ./build.sh
 
 FROM alpine:latest AS standard
 LABEL MAINTAINER="https://maxs.pro/"

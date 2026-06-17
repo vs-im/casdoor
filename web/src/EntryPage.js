@@ -28,6 +28,7 @@ import ForgetPage from "./auth/ForgetPage";
 import PromptPage from "./auth/PromptPage";
 import ConsentPage from "./auth/ConsentPage";
 import ResultPage from "./auth/ResultPage";
+import MagicLinkCallback from "./auth/MagicLinkCallback";
 import CasLogout from "./auth/CasLogout";
 import {authConfig} from "./auth/Auth";
 import ProductBuyPage from "./ProductBuyPage";
@@ -112,7 +113,7 @@ class EntryPage extends React.Component {
         <div className={`${isDarkMode ? "loginBackgroundDark" : "loginBackground"}`}
           style={{backgroundImage: Setting.inIframe() ? null : (Setting.isMobile() ? `url(${this.state.application?.formBackgroundUrlMobile})` : `url(${this.state.application?.formBackgroundUrl})`)}}>
           <Loading
-            spinning={this.state.application === undefined && this.state.pricing === undefined}
+            spinning={this.state.application === undefined && this.state.pricing === undefined && !window.location.pathname.startsWith("/magic-link/callback")}
             tip={i18next.t("login:Loading")}
             style={{position: "absolute", width: "100%", top: 0, bottom: 0}}
           />
@@ -132,6 +133,7 @@ class EntryPage extends React.Component {
             <Route exact path="/consent/:applicationName" render={(props) => this.renderLoginIfNotLoggedIn(<ConsentPage {...this.props} application={this.state.application} onUpdateApplication={onUpdateApplication} {...props} />)} />
             <Route exact path="/result" render={(props) => this.renderHomeIfLoggedIn(<ResultPage {...this.props} application={this.state.application} onUpdateApplication={onUpdateApplication} {...props} />)} />
             <Route exact path="/result/:applicationName" render={(props) => this.renderHomeIfLoggedIn(<ResultPage {...this.props} application={this.state.application} onUpdateApplication={onUpdateApplication} {...props} />)} />
+            <Route exact path="/magic-link/callback" render={(props) => <MagicLinkCallback {...this.props} {...props} />} />
             <Route exact path="/cas/:owner/:casApplicationName/logout" render={(props) => this.renderHomeIfLoggedIn(<CasLogout {...this.props} application={this.state.application} onUpdateApplication={onUpdateApplication} {...props} />)} />
             <Route exact path="/cas/:owner/:casApplicationName/login" render={(props) => {return (<LoginPage {...this.props} application={this.state.application} type={"cas"} mode={"signin"} onUpdateApplication={onUpdateApplication} {...props} />);}} />
             <Route exact path="/select-plan/:owner/:pricingName" render={(props) => <PricingPage {...this.props} pricing={this.state.pricing} onUpdatePricing={onUpdatePricing} {...props} />} />

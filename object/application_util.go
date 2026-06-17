@@ -491,6 +491,59 @@ func (application *Application) IsCodeSigninViaSmsEnabled() bool {
 	}
 }
 
+func (application *Application) IsMagicLinkEnabled() bool {
+	if len(application.SigninMethods) > 0 {
+		for _, signinMethod := range application.SigninMethods {
+			if signinMethod.Name == "Magic link" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (application *Application) GetMagicLinkExpireMinutes() int {
+	if application == nil || application.MagicLinkExpireMinutes <= 0 {
+		return MagicLinkDefaultExpireMinutes
+	}
+	return application.MagicLinkExpireMinutes
+}
+
+func (application *Application) GetMagicLinkRateLimitWindowMinutes() int {
+	if application == nil || application.MagicLinkRateLimitWindowMinutes <= 0 {
+		return 15
+	}
+	return application.MagicLinkRateLimitWindowMinutes
+}
+
+func (application *Application) GetMagicLinkRateLimitEmail() int {
+	if application == nil || application.MagicLinkRateLimitEmail <= 0 {
+		return 3
+	}
+	return application.MagicLinkRateLimitEmail
+}
+
+func (application *Application) GetMagicLinkRateLimitIP() int {
+	if application == nil || application.MagicLinkRateLimitIP <= 0 {
+		return 10
+	}
+	return application.MagicLinkRateLimitIP
+}
+
+func (application *Application) GetMagicLinkRateLimitApplication() int {
+	if application == nil || application.MagicLinkRateLimitApplication <= 0 {
+		return 100
+	}
+	return application.MagicLinkRateLimitApplication
+}
+
+func (application *Application) GetMagicLinkCaptchaThreshold() int {
+	if application == nil || application.MagicLinkCaptchaThreshold <= 0 {
+		return 1
+	}
+	return application.MagicLinkCaptchaThreshold
+}
+
 func (application *Application) IsLdapEnabled() bool {
 	if len(application.SigninMethods) > 0 {
 		for _, signinMethod := range application.SigninMethods {

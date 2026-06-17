@@ -326,6 +326,7 @@ class ProviderTable extends React.Component {
                 <Option key="all" value="all">{"All"}</Option>
                 <Option key="signup" value="signup">{"Signup"}</Option>
                 <Option key="login" value="login">{"Login"}</Option>
+                <Option key="magicLink" value="Magic link">{"Magic Link"}</Option>
                 <Option key="forget" value="forget">{"Forget Password"}</Option>
                 <Option key="reset" value="reset">{"Reset Password"}</Option>
                 <Option key="mfaSetup" value="mfaSetup">{"Set MFA"}</Option>

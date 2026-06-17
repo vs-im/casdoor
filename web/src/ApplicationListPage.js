@@ -108,6 +108,13 @@ class ApplicationListPage extends BaseListPage {
       expireInHours: 24 * 7,
       refreshExpireInHours: 24 * 7,
       cookieExpireInHours: 24 * 30,
+      magicLinkExpireMinutes: 10,
+      magicLinkPermission: "",
+      magicLinkRateLimitWindowMinutes: 15,
+      magicLinkRateLimitEmail: 3,
+      magicLinkRateLimitIp: 10,
+      magicLinkRateLimitApplication: 100,
+      magicLinkCaptchaThreshold: 1,
       formOffset: 2,
     };
   }

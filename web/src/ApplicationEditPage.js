@@ -56,6 +56,7 @@ import CustomScopeTable from "./table/CustomScopeTable";
 import PromptPage from "./auth/PromptPage";
 import copy from "copy-to-clipboard";
 import ThemeEditor from "./common/theme/ThemeEditor";
+import {shadcnThemeToken} from "./shadcnTheme";
 
 import SigninTable from "./table/SigninTable";
 import Editor from "./common/Editor";
@@ -1090,6 +1091,76 @@ class ApplicationEditPage extends React.Component {
           </Row>
           <Row style={{marginTop: "20px"}} >
             <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
+              {Setting.getLabel(i18next.t("application:Magic link expire"), i18next.t("application:Magic link expire - Tooltip"))} :
+            </Col>
+            <Col span={21} >
+              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkExpireMinutes || 10} min={1} step={1} precision={0} addonAfter="Minutes" onChange={value => {
+                this.updateApplicationField("magicLinkExpireMinutes", value);
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
+              {Setting.getLabel(i18next.t("application:Magic link permission"), i18next.t("application:Magic link permission - Tooltip"))} :
+            </Col>
+            <Col span={21} >
+              <Input value={this.state.application.magicLinkPermission} placeholder="owner/name" onChange={e => {
+                this.updateApplicationField("magicLinkPermission", e.target.value);
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
+              {Setting.getLabel(i18next.t("application:Magic link rate limit window"), i18next.t("application:Magic link rate limit window - Tooltip"))} :
+            </Col>
+            <Col span={21} >
+              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkRateLimitWindowMinutes || 15} min={1} step={1} precision={0} addonAfter="Minutes" onChange={value => {
+                this.updateApplicationField("magicLinkRateLimitWindowMinutes", value);
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
+              {Setting.getLabel(i18next.t("application:Magic link email limit"), i18next.t("application:Magic link email limit - Tooltip"))} :
+            </Col>
+            <Col span={21} >
+              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkRateLimitEmail || 3} min={1} step={1} precision={0} onChange={value => {
+                this.updateApplicationField("magicLinkRateLimitEmail", value);
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
+              {Setting.getLabel(i18next.t("application:Magic link IP limit"), i18next.t("application:Magic link IP limit - Tooltip"))} :
+            </Col>
+            <Col span={21} >
+              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkRateLimitIp || 10} min={1} step={1} precision={0} onChange={value => {
+                this.updateApplicationField("magicLinkRateLimitIp", value);
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
+              {Setting.getLabel(i18next.t("application:Magic link application limit"), i18next.t("application:Magic link application limit - Tooltip"))} :
+            </Col>
+            <Col span={21} >
+              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkRateLimitApplication || 100} min={1} step={1} precision={0} onChange={value => {
+                this.updateApplicationField("magicLinkRateLimitApplication", value);
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
+              {Setting.getLabel(i18next.t("application:Magic link captcha threshold"), i18next.t("application:Magic link captcha threshold - Tooltip"))} :
+            </Col>
+            <Col span={21} >
+              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkCaptchaThreshold || 1} min={1} step={1} precision={0} onChange={value => {
+                this.updateApplicationField("magicLinkCaptchaThreshold", value);
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
               {Setting.getLabel(i18next.t("provider:Signup HTML"), i18next.t("provider:Signup HTML - Tooltip"))} :
             </Col>
             <Col span={21} >
@@ -1696,7 +1767,7 @@ class ApplicationEditPage extends React.Component {
           <ConfigProvider theme={{
             token: {
               colorPrimary: themeData.colorPrimary,
-              colorInfo: themeData.colorPrimary,
+              colorInfo: shadcnThemeToken.colorInfo,
               borderRadius: themeData.borderRadius,
               fontSize: 16,
             },
@@ -1729,7 +1800,7 @@ class ApplicationEditPage extends React.Component {
           <ConfigProvider theme={{
             token: {
               colorPrimary: themeData.colorPrimary,
-              colorInfo: themeData.colorPrimary,
+              colorInfo: shadcnThemeToken.colorInfo,
               borderRadius: themeData.borderRadius,
               fontSize: 16,
             },
@@ -1763,7 +1834,7 @@ class ApplicationEditPage extends React.Component {
         <ConfigProvider theme={{
           token: {
             colorPrimary: themeData.colorPrimary,
-            colorInfo: themeData.colorPrimary,
+            colorInfo: shadcnThemeToken.colorInfo,
             borderRadius: themeData.borderRadius,
             fontSize: 16,
           },
@@ -1780,7 +1851,7 @@ class ApplicationEditPage extends React.Component {
   submitApplicationEdit(exitAfterSave) {
     const application = Setting.deepCopy(this.state.application);
     application.providers = application.providers?.filter(provider => this.state.providers.map(provider => provider.name).includes(provider.name));
-    application.signinMethods = application.signinMethods?.filter(signinMethod => ["Password", "Verification code", "WebAuthn", "LDAP", "Face ID", "Device login", "WeChat"].includes(signinMethod.name));
+    application.signinMethods = application.signinMethods?.filter(signinMethod => ["Password", "Verification code", "WebAuthn", "LDAP", "Face ID", "Magic link", "Device login", "WeChat"].includes(signinMethod.name));
     const customScopeValidation = this.validateCustomScopes(application.customScopes);
     application.customScopes = customScopeValidation.scopes;
     if (!customScopeValidation.ok) {

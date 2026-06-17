@@ -125,6 +125,7 @@ import {clearWeb3AuthToken} from "./auth/Web3Auth";
 import TransactionListPage from "./TransactionListPage";
 import TransactionEditPage from "./TransactionEditPage";
 import VerificationListPage from "./VerificationListPage";
+import MagicLinkListPage from "./MagicLinkListPage";
 import TicketListPage from "./TicketListPage";
 import TicketEditPage from "./TicketEditPage";
 import * as Cookie from "cookie";
@@ -161,6 +162,7 @@ function getMenuParentKey(uri) {
   }
   if (
     uri.includes("/applications") ||
+    uri.includes("/magic-links") ||
     uri.includes("/providers") ||
     uri.includes("/resources") ||
     uri.includes("/certs") ||
@@ -673,6 +675,10 @@ function ManagementPage(props) {
           Setting.getItem(
             <Link to="/applications">{i18next.t("general:Applications")}</Link>,
             "/applications"
+          ),
+          Setting.getItem(
+            <Link to="/magic-links">{i18next.t("general:Magic Links")}</Link>,
+            "/magic-links"
           ),
           Setting.getItem(
             <Link to="/providers">{i18next.t("application:Providers")}</Link>,
@@ -1367,6 +1373,15 @@ function ManagementPage(props) {
           render={(props) =>
             renderLoginIfNotLoggedIn(
               <VerificationListPage account={account} {...props} />
+            )
+          }
+        />
+        <Route
+          exact
+          path="/magic-links"
+          render={(props) =>
+            renderLoginIfNotLoggedIn(
+              <MagicLinkListPage account={account} {...props} />
             )
           }
         />

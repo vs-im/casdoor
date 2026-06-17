@@ -46,6 +46,7 @@ const RESOURCE_LABELS = {
   "records": "general:Records",
   "tokens": "general:Tokens",
   "verifications": "general:Verifications",
+  "magic-links": "general:Magic Links",
   "product-store": "general:Product Store",
   "products": "general:Products",
   "cart": "general:Cart",

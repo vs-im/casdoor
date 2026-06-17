@@ -178,6 +178,9 @@ func StaticFilter(ctx *context.Context) {
 	if serveAuthCallbackPage(ctx) {
 		return
 	}
+	if serveMagicLinkCallbackPage(ctx) {
+		return
+	}
 
 	webBuildFolder := getWebBuildFolder()
 	path := webBuildFolder

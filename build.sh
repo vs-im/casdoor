@@ -9,8 +9,15 @@ else
     export GOPROXY="https://goproxy.cn,direct"
 fi
 
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o server_linux_amd64 .
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-w -s" -o server_linux_arm64 .
+TARGETOS=${TARGETOS:-linux}
+TARGETARCH=${TARGETARCH:-amd64}
+GO_BUILD_P=${GO_BUILD_P:-1}
+export GOCACHE=${GOCACHE:-/tmp/go-cache}
+export GOTMPDIR=${GOTMPDIR:-/tmp/go-tmp}
+mkdir -p "$GOCACHE" "$GOTMPDIR"
+
+CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -p "$GO_BUILD_P" -ldflags="-w -s" -o server_${TARGETOS}_${TARGETARCH} .
+rm -rf "$GOCACHE" "$GOTMPDIR"
 
 # old develop
 # CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-w -s" -o server .

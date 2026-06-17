@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React from "react";
-import {Button, Col, Input, InputNumber, Row, Select, Switch} from "antd";
+import {Button, Col, Input, InputNumber, Row, Select, Switch, Tabs} from "antd";
 import {LinkOutlined} from "@ant-design/icons";
 import * as Setting from "../Setting";
 import i18next from "i18next";
@@ -24,6 +24,44 @@ import HttpHeaderTable from "../table/HttpHeaderTable";
 const {Option} = Select;
 
 export function renderEmailProviderFields(provider, updateProviderField, renderEmailMappingInput, account) {
+  const verificationContent = provider.content || Setting.getDefaultHtmlEmailContent();
+  const invitationContent = provider.metadata || Setting.getDefaultInvitationHtmlEmailContent();
+  const magicLinkContent = provider.magicLinkContent || Setting.getDefaultMagicLinkHtmlEmailContent();
+  const magicLinkPreviewUrl = `${Setting.ServerUrl}/magic-link/callback?token=example`;
+  const renderEmailContentEditor = (field, value, resetText, resetHtml, previewHtml) => (
+    <React.Fragment>
+      <Row style={{marginTop: "20px"}} >
+        <Button style={{marginLeft: "10px", marginBottom: "5px"}} onClick={() => updateProviderField(field, resetText)} >
+          {i18next.t("general:Reset to Default")} (Text)
+        </Button>
+        <Button style={{marginLeft: "10px", marginBottom: "5px"}} type="primary" onClick={() => updateProviderField(field, resetHtml)} >
+          {i18next.t("general:Reset to Default")} (HTML)
+        </Button>
+      </Row>
+      <Row>
+        <Col span={Setting.isMobile() ? 22 : 11}>
+          <div style={{height: "300px", margin: "10px"}}>
+            <Editor
+              value={value}
+              fillHeight
+              dark
+              lang="html"
+              onChange={value => {
+                updateProviderField(field, value);
+              }}
+            />
+          </div>
+        </Col>
+        <Col span={1} />
+        <Col span={Setting.isMobile() ? 22 : 11}>
+          <div style={{margin: "10px"}}>
+            <div dangerouslySetInnerHTML={{__html: previewHtml}} />
+          </div>
+        </Col>
+      </Row>
+    </React.Fragment>
+  );
+
   return (
     <React.Fragment>
       {
@@ -164,71 +202,43 @@ export function renderEmailProviderFields(provider, updateProviderField, renderE
           {Setting.getLabel(i18next.t("provider:Email content"), i18next.t("provider:Email content - Tooltip"))} :
         </Col>
         <Col span={22} >
-          <Row style={{marginTop: "20px"}} >
-            <Button style={{marginLeft: "10px", marginBottom: "5px"}} onClick={() => updateProviderField("content", "You have requested a verification code at Casdoor. Here is your code: %s, please enter in 5 minutes. <reset-link>Or click %link to reset</reset-link>")} >
-              {i18next.t("general:Reset to Default")} (Text)
-            </Button>
-            <Button style={{marginLeft: "10px", marginBottom: "5px"}} type="primary" onClick={() => updateProviderField("content", Setting.getDefaultHtmlEmailContent())} >
-              {i18next.t("general:Reset to Default")} (HTML)
-            </Button>
-          </Row>
-          <Row>
-            <Col span={Setting.isMobile() ? 22 : 11}>
-              <div style={{height: "300px", margin: "10px"}}>
-                <Editor
-                  value={provider.content}
-                  fillHeight
-                  dark
-                  lang="html"
-                  onChange={value => {
-                    updateProviderField("content", value);
-                  }}
-                />
-              </div>
-            </Col>
-            <Col span={1} />
-            <Col span={Setting.isMobile() ? 22 : 11}>
-              <div style={{margin: "10px"}}>
-                <div dangerouslySetInnerHTML={{__html: provider.content.replace("%s", "123456").replace("%{user.friendlyName}", Setting.getFriendlyUserName(account))}} />
-              </div>
-            </Col>
-          </Row>
-        </Col>
-      </Row>
-      <Row style={{marginTop: "20px"}} >
-        <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-          {Setting.getLabel(`${i18next.t("provider:Email content")}-${i18next.t("general:Invitations")}`, i18next.t("provider:Email content - Tooltip"))} :
-        </Col>
-        <Col span={22} >
-          <Row style={{marginTop: "20px"}} >
-            <Button style={{marginLeft: "10px", marginBottom: "5px"}} onClick={() => updateProviderField("metadata", "You have invited to join Casdoor. Here is your invitation code: %s, please enter in 5 minutes. Or click %link to signup")} >
-              {i18next.t("general:Reset to Default")} (Text)
-            </Button>
-            <Button style={{marginLeft: "10px", marginBottom: "5px"}} type="primary" onClick={() => updateProviderField("metadata", Setting.getDefaultInvitationHtmlEmailContent())} >
-              {i18next.t("general:Reset to Default")} (HTML)
-            </Button>
-          </Row>
-          <Row>
-            <Col span={Setting.isMobile() ? 22 : 11}>
-              <div style={{height: "300px", margin: "10px"}}>
-                <Editor
-                  value={provider.metadata}
-                  fillHeight
-                  dark
-                  lang="html"
-                  onChange={value => {
-                    updateProviderField("metadata", value);
-                  }}
-                />
-              </div>
-            </Col>
-            <Col span={1} />
-            <Col span={Setting.isMobile() ? 22 : 11}>
-              <div style={{margin: "10px"}}>
-                <div dangerouslySetInnerHTML={{__html: provider.metadata.replace("%code", "123456").replace("%s", "123456")}} />
-              </div>
-            </Col>
-          </Row>
+          <Tabs
+            items={[
+              {
+                key: "verification",
+                label: i18next.t("provider:Verification code"),
+                children: renderEmailContentEditor(
+                  "content",
+                  verificationContent,
+                  "You have requested a verification code at Casdoor. Here is your code: %s, please enter in 5 minutes. <reset-link>Or click %link to reset</reset-link>",
+                  Setting.getDefaultHtmlEmailContent(),
+                  verificationContent.replace("%s", "123456").replace("%{user.friendlyName}", Setting.getFriendlyUserName(account))
+                ),
+              },
+              {
+                key: "invitation",
+                label: i18next.t("general:Invitations"),
+                children: renderEmailContentEditor(
+                  "metadata",
+                  invitationContent,
+                  "You have invited to join Casdoor. Here is your invitation code: %s, please enter in 5 minutes. Or click %link to signup",
+                  Setting.getDefaultInvitationHtmlEmailContent(),
+                  invitationContent.replace(/%code/g, "123456").replace(/%s/g, "123456").replace(/%link/g, `${Setting.ServerUrl}/signup?code=123456`)
+                ),
+              },
+              {
+                key: "magicLink",
+                label: i18next.t("provider:Magic Link"),
+                children: renderEmailContentEditor(
+                  "magicLinkContent",
+                  magicLinkContent,
+                  "Use this Magic Link to sign in: %link",
+                  Setting.getDefaultMagicLinkHtmlEmailContent(),
+                  magicLinkContent.replace(/%link/g, magicLinkPreviewUrl)
+                ),
+              },
+            ]}
+          />
         </Col>
       </Row>
       <Row style={{marginTop: "20px"}}>

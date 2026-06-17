@@ -1913,6 +1913,10 @@ export function isFaceIdEnabled(application) {
   return isSigninMethodEnabled(application, "Face ID");
 }
 
+export function isMagicLinkEnabled(application) {
+  return isSigninMethodEnabled(application, "Magic link");
+}
+
 export function getLoginLink(application) {
   let url;
   if (application === null) {
@@ -2113,7 +2117,7 @@ export function getNewRowNameForTable(table, rowName) {
 }
 
 export function getTagColor(s) {
-  return "processing";
+  return "default";
 }
 
 export function getTags(tags, urlPrefix = null) {
@@ -2621,6 +2625,133 @@ export function getDefaultInvitationHtmlEmailContent() {
         <p>Casdoor is a brand operated by Casbin organization. For more info please refer to <a href="https://casdoor.org">https://casdoor.org</a></p>
     </div>
 </div>
+</body>
+</html>`;
+}
+
+export function getDefaultMagicLinkHtmlEmailContent() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Magic Link</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', Arial, sans-serif;
+      background: #ffffff;
+      color: #1a1a1a;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .logo img {
+      max-width: 260px;
+      height: auto;
+    }
+
+    .greeting {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .message {
+      font-size: 14px;
+      margin-bottom: 20px;
+      color: #333;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    .button-box {
+      text-align: center;
+      margin: 28px 0;
+    }
+
+    .button-box a {
+      display: inline-block;
+      background: #6366f1;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 8px;
+    }
+
+    .link-box {
+      text-align: center;
+      margin-top: 12px;
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    .link-box a {
+      color: #6366f1;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .footer {
+      font-size: 12px;
+      text-align: center;
+      color: #777;
+      margin-top: 36px;
+      line-height: 1.4;
+    }
+
+    .footer a {
+      color: #6366f1;
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <img src="https://auth.corprightline.com/files/resource/built-in/admin/ReceiptHunter_RGB_logo_deepgraypurpletag.png" alt="RH Logo">
+    </div>
+
+    <div class="greeting">
+      Sign in to RH
+    </div>
+
+    <div class="message">
+      Use the secure Magic Link below to complete your sign in.
+    </div>
+
+    <div class="button-box">
+      <a href="%link">Sign in with Magic Link</a>
+    </div>
+
+    <div class="link-box">
+      Or open this <a href="%link">link</a>
+    </div>
+
+    <div class="message" style="margin-top: 24px;">
+      This link can be used once and will expire soon.<br>
+      Thanks,<br>
+      Receipt Hunter
+    </div>
+
+    <div class="footer">
+      For help, visit.<br>
+      Learn more at <a href="https://example.com">example.com</a>
+    </div>
+  </div>
 </body>
 </html>`;
 }
@@ -3194,7 +3325,7 @@ export function getApiPaths() {
   );
 
   // Verification and communication APIs
-  res.push("send-verification-code", "verify-code", "verify-captcha");
+  res.push("send-verification-code", "send-magic-link", "verify-magic-link", "verify-code", "verify-captcha");
   res.push("send-email", "send-sms", "send-notification");
 
   // SAML APIs

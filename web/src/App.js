@@ -211,6 +211,7 @@ class App extends Component {
       "/users",
       "/invitations", // User Management
       "/applications",
+      "/magic-links",
       "/providers",
       "/resources",
       "/certs",
@@ -280,12 +281,15 @@ class App extends Component {
       }
     } else if (
       uri.includes("/applications") ||
+      uri.includes("/magic-links") ||
       uri.includes("/providers") ||
       uri.includes("/resources") ||
       uri.includes("/certs")
     ) {
       if (uri.includes("/applications")) {
         return "/applications";
+      } else if (uri.includes("/magic-links")) {
+        return "/magic-links";
       } else if (uri.includes("/providers")) {
         return "/providers";
       } else if (uri.includes("/resources")) {
@@ -429,6 +433,7 @@ class App extends Component {
       this.setState({selectedMenuKey: "/orgs"});
     } else if (
       uri.includes("/applications") ||
+      uri.includes("/magic-links") ||
       uri.includes("/providers") ||
       uri.includes("/resources") ||
       uri.includes("/certs") ||
@@ -1075,7 +1080,7 @@ class App extends Component {
             token: {
               ...shadcnThemeToken,
               colorPrimary: this.state.themeData.colorPrimary,
-              colorInfo: this.state.themeData.colorPrimary,
+              colorInfo: shadcnThemeToken.colorInfo,
               borderRadius: this.state.themeData.borderRadius,
               fontSize: 16,
             },

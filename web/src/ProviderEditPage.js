@@ -820,6 +820,7 @@ class ProviderEditPage extends React.Component {
                 this.updateProviderField("title", "Casdoor Verification Code");
                 this.updateProviderField("content", Setting.getDefaultHtmlEmailContent());
                 this.updateProviderField("metadata", Setting.getDefaultInvitationHtmlEmailContent());
+                this.updateProviderField("magicLinkContent", Setting.getDefaultMagicLinkHtmlEmailContent());
                 this.updateProviderField("receiver", this.props.account.email);
               } else if (value === "SMS") {
                 defaultType = "Twilio SMS";
