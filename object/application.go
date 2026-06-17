@@ -161,6 +161,8 @@ type Application struct {
 	CodeResendTimeout               int    `json:"codeResendTimeout"`
 	MagicLinkExpireMinutes          int    `json:"magicLinkExpireMinutes"`
 	MagicLinkPermission             string `xorm:"varchar(200)" json:"magicLinkPermission"`
+	MagicLinkSigninEnabled          bool   `json:"magicLinkSigninEnabled"`
+	EnableMagicLinkSignup           bool   `json:"enableMagicLinkSignup"`
 	MagicLinkRateLimitWindowMinutes int    `json:"magicLinkRateLimitWindowMinutes"`
 	MagicLinkRateLimitEmail         int    `json:"magicLinkRateLimitEmail"`
 	MagicLinkRateLimitIP            int    `json:"magicLinkRateLimitIp"`
@@ -444,6 +446,10 @@ func UpdateApplication(id string, application *Application, isGlobalAdmin bool, 
 	if err != nil {
 		return false, err
 	}
+	err = ValidateMagicLinkConfig(application)
+	if err != nil {
+		return false, err
+	}
 
 	for _, providerItem := range application.Providers {
 		providerItem.Provider = nil
@@ -506,6 +512,10 @@ func AddApplication(application *Application) (bool, error) {
 	}
 
 	err = validateCustomScopes(application.CustomScopes, "en")
+	if err != nil {
+		return false, err
+	}
+	err = ValidateMagicLinkConfig(application)
 	if err != nil {
 		return false, err
 	}

@@ -3621,8 +3621,10 @@ paths:
     post:
       tags:
       - Magic Link API
-      description: send a Magic Link to an email address for a validated application,
-        organization, and permission context
+      description: send a one-time Magic Link for sign-in (existing user) or sign-up
+        (new user when Magic link sign-up is enabled); optional OAuth query parameters
+        allow redirecting to external frontend callback; group/permission/custom TTL
+        are trusted parameters and require clientId/clientSecret in request body
       operationId: ApiController.SendMagicLink
       parameters:
       - in: query
@@ -4547,8 +4549,10 @@ paths:
     get:
       tags:
       - Magic Link API
-      description: verify a one-time Magic Link token and continue the login or OAuth
-        flow
+      description: verify a one-time Magic Link token and continue sign-in or sign-up
+        flow; if user does not exist and application allows Magic link sign-up, user
+        will be created and authenticated; if OAuth query parameters are present, flow
+        continues with OAuth callback redirect
       operationId: ApiController.VerifyMagicLink
       parameters:
       - in: query
@@ -4802,18 +4806,38 @@ definitions:
     type: object
     properties:
       application:
+        description: Application name where Magic Link flow is executed
         type: string
+      applicationClientSecret:
+        description: Optional captcha/application secret from frontend challenge integration
+        type: string
+      expireTime:
+        description: Absolute RFC3339 expiration timestamp (trusted requests only)
+        type: string
+      expiresInMinutes:
+        description: Relative TTL in minutes (trusted requests only, max 43200)
+        type: integer
+        format: int64
       captchaToken:
+        description: Captcha token
         type: string
       captchaType:
+        description: Captcha provider type
         type: string
       clientSecret:
+        description: Application clientSecret for trusted Magic Link requests
         type: string
       email:
+        description: Target email to receive the Magic Link
+        type: string
+      group:
+        description: Group assignment for signup flow (trusted requests only)
         type: string
       organization:
+        description: Organization where application belongs
         type: string
       permission:
+        description: Permission used for authorization context (trusted requests only)
         type: string
   controllers.NotificationForm:
     title: NotificationForm
@@ -4997,6 +5021,10 @@ definitions:
       magicLinkExpireMinutes:
         type: integer
         format: int64
+      magicLinkSigninEnabled:
+        type: boolean
+      enableMagicLinkSignup:
+        type: boolean
       magicLinkPermission:
         type: string
       magicLinkRateLimitWindowMinutes:
@@ -6520,6 +6548,9 @@ definitions:
         items:
           type: string
       application:
+        type: string
+      authAction:
+        description: Magic Link intent (signin_existing_user or signup_new_user)
         type: string
       clientId:
         type: string

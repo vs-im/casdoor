@@ -77,3 +77,66 @@ func TestRedirectUriMatchesPattern(t *testing.T) {
 		}
 	}
 }
+
+func TestIsMagicLinkEnabledRequiresSigninFlag(t *testing.T) {
+	application := &Application{
+		SigninMethods: []*SigninMethod{
+			{Name: "Magic link"},
+		},
+		MagicLinkSigninEnabled: false,
+	}
+	if application.IsMagicLinkEnabled() {
+		t.Fatal("magic link should be disabled when magicLinkSigninEnabled is false")
+	}
+	application.MagicLinkSigninEnabled = true
+	if !application.IsMagicLinkEnabled() {
+		t.Fatal("magic link should be enabled when method exists and magicLinkSigninEnabled is true")
+	}
+}
+
+func TestIsMagicLinkSignupEnabledDependsOnSigninFlag(t *testing.T) {
+	application := &Application{
+		MagicLinkSigninEnabled: false,
+		EnableMagicLinkSignup:  true,
+	}
+	if application.IsMagicLinkSignupEnabled() {
+		t.Fatal("signup should be disabled when sign-in is disabled")
+	}
+	application.MagicLinkSigninEnabled = true
+	if !application.IsMagicLinkSignupEnabled() {
+		t.Fatal("signup should be enabled only when both flags are true")
+	}
+}
+
+func TestApplicationIsMagicLinkEnabled(t *testing.T) {
+	application := &Application{}
+	if application.IsMagicLinkEnabled() {
+		t.Fatal("magic link should be disabled when no signin method is configured")
+	}
+	application.SigninMethods = []*SigninMethod{
+		{Name: "Password", Rule: "All"},
+	}
+	if application.IsMagicLinkEnabled() {
+		t.Fatal("magic link should be disabled when signin methods do not include magic link")
+	}
+	application.SigninMethods = append(application.SigninMethods, &SigninMethod{Name: "Magic link", Rule: "None"})
+	application.MagicLinkSigninEnabled = true
+	if !application.IsMagicLinkEnabled() {
+		t.Fatal("magic link should be enabled when signin methods include magic link")
+	}
+}
+
+func TestGetMagicLinkExpireMinutes(t *testing.T) {
+	var nilApplication *Application
+	if nilApplication.GetMagicLinkExpireMinutes() != MagicLinkDefaultExpireMinutes {
+		t.Fatalf("nil application default ttl = %d, want %d", nilApplication.GetMagicLinkExpireMinutes(), MagicLinkDefaultExpireMinutes)
+	}
+	application := &Application{}
+	if application.GetMagicLinkExpireMinutes() != MagicLinkDefaultExpireMinutes {
+		t.Fatalf("empty application default ttl = %d, want %d", application.GetMagicLinkExpireMinutes(), MagicLinkDefaultExpireMinutes)
+	}
+	application.MagicLinkExpireMinutes = 17
+	if application.GetMagicLinkExpireMinutes() != 17 {
+		t.Fatalf("configured ttl = %d, want 17", application.GetMagicLinkExpireMinutes())
+	}
+}

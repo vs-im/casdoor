@@ -287,6 +287,22 @@ class ApplicationEditPage extends React.Component {
     });
   }
 
+  updateMagicLinkSignupProvider(providerName) {
+    const application = this.state.application;
+    application.providers = (application.providers || []).map(providerItem => {
+      if (providerItem.name === providerName) {
+        return {...providerItem, rule: "Magic link"};
+      }
+      if (providerItem.rule === "Magic link" && providerItem.provider?.category === "Email") {
+        return {...providerItem, rule: "All"};
+      }
+      return providerItem;
+    });
+    this.setState({
+      application: application,
+    });
+  }
+
   handleUpload(info) {
     if (info.file.type !== "text/html") {
       Setting.showMessage("error", i18next.t("application:Please select a HTML file"));
@@ -598,6 +614,32 @@ class ApplicationEditPage extends React.Component {
             <Col span={1} >
               <Switch checked={this.state.application.enableSignUp} onChange={checked => {
                 this.updateApplicationField("enableSignUp", checked);
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+              {Setting.getLabel(i18next.t("application:Magic link sign-in enabled"), i18next.t("application:Magic link sign-in enabled - Tooltip"))} :
+            </Col>
+            <Col span={1} >
+              <Switch checked={this.state.application.magicLinkSigninEnabled ?? Setting.isMagicLinkEnabled(this.state.application)} onChange={checked => {
+                this.updateApplicationField("magicLinkSigninEnabled", checked);
+                if (!checked) {
+                  this.updateApplicationField("enableMagicLinkSignup", false);
+                }
+              }} />
+            </Col>
+          </Row>
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+              {Setting.getLabel(i18next.t("application:Magic link sign-up"), i18next.t("application:Magic link sign-up - Tooltip"))} :
+            </Col>
+            <Col span={1} >
+              <Switch checked={this.state.application.enableMagicLinkSignup ?? false} onChange={checked => {
+                if (checked && !(this.state.application.magicLinkSigninEnabled ?? Setting.isMagicLinkEnabled(this.state.application))) {
+                  this.updateApplicationField("magicLinkSigninEnabled", true);
+                }
+                this.updateApplicationField("enableMagicLinkSignup", checked);
               }} />
             </Col>
           </Row>
@@ -1091,10 +1133,10 @@ class ApplicationEditPage extends React.Component {
           </Row>
           <Row style={{marginTop: "20px"}} >
             <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
-              {Setting.getLabel(i18next.t("application:Magic link expire"), i18next.t("application:Magic link expire - Tooltip"))} :
+              {Setting.getLabel(i18next.t("application:Magic link default TTL"), i18next.t("application:Magic link default TTL - Tooltip"))} :
             </Col>
             <Col span={21} >
-              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkExpireMinutes || 10} min={1} step={1} precision={0} addonAfter="Minutes" onChange={value => {
+              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkExpireMinutes || 10} min={2} max={43200} step={1} precision={0} addonAfter="Minutes" onChange={value => {
                 this.updateApplicationField("magicLinkExpireMinutes", value);
               }} />
             </Col>
@@ -1221,6 +1263,10 @@ class ApplicationEditPage extends React.Component {
                     <SignupTable
                       title={i18next.t("application:Signup items")}
                       table={this.state.application.signupItems}
+                      applicationProviders={this.state.application.providers}
+                      onUpdateMagicLinkProvider={(value) => {
+                        this.updateMagicLinkSignupProvider(value);
+                      }}
                       onUpdateTable={(value) => {
                         this.updateApplicationField("signupItems", value);
                       }}

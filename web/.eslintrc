@@ -25,6 +25,14 @@
   },
   "plugins": ["unused-imports"],
   "extends": ["eslint:recommended", "plugin:react/recommended"],
+  "overrides": [
+    {
+      "files": ["src/**/*.test.js", "src/**/*.test.jsx", "src/**/__tests__/**/*.js", "src/**/__tests__/**/*.jsx"],
+      "env": {
+        "jest": true
+      }
+    }
+  ],
   "rules": {
     "semi": ["error", "always"],
     "indent": ["error", 2],

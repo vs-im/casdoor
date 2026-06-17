@@ -67,6 +67,21 @@ var (
 		Name: "casdoor_total_throughput",
 		Help: "The total throughput of casdoor",
 	})
+
+	MagicLinkVerifySuccess = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "magic_link_verify_success",
+		Help: "Total successful magic link verify logins",
+	})
+
+	MagicLinkSignupCreated = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "magic_link_signup_created",
+		Help: "Total users created by magic link verify",
+	})
+
+	MagicLinkSignupFailed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "magic_link_signup_failed",
+		Help: "Total failed signup attempts during magic link verify",
+	})
 )
 
 func ClearThroughputPerSecond() {

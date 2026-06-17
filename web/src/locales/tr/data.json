@@ -892,6 +892,10 @@
     "username, Email or phone": "kullanıcı adınız, Eposta adresiniz ve telefon numaranız"
   },
   "magicLink": {
+    "Existing user": "Existing user",
+    "Expired": "Expired",
+    "New user": "New user",
+    "Remaining time": "Remaining time",
     "Expiry time": "Son kullanma zamani",
     "Last error": "Son hata",
     "Revoke": "Iptal et",

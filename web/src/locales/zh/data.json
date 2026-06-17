@@ -892,6 +892,10 @@
     "username, Email or phone": "用户名、Email或手机号"
   },
   "magicLink": {
+    "Existing user": "Existing user",
+    "Expired": "Expired",
+    "New user": "New user",
+    "Remaining time": "Remaining time",
     "Expiry time": "过期时间",
     "Last error": "最近错误",
     "Revoke": "撤销",

@@ -136,6 +136,8 @@
  * @property {boolean} enableSigninSession
  * @property {boolean} enableAutoSignin
  * @property {boolean} enableCodeSignin
+ * @property {boolean} magicLinkSigninEnabled
+ * @property {boolean} enableMagicLinkSignup
  * @property {boolean} enableSamlCompress
  * @property {boolean} enableSamlC14n10
  * @property {boolean} enableSamlPostBinding
@@ -180,4 +182,5 @@
  * @property {string} formBackgroundUrl
  * @property {number} failedSigninLimit
  * @property {number} failedSigninFrozenTime
+ * @property {number} magicLinkExpireMinutes
  */

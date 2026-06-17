@@ -124,13 +124,13 @@ class App extends Component {
   constructor(props) {
     super(props);
     this.setThemeAlgorithm();
-    let storageThemeAlgorithm = ["default"];
+    let storageThemeAlgorithm = Setting.getAlgorithmNames(Conf.ThemeDefault);
     try {
       storageThemeAlgorithm = localStorage.getItem("themeAlgorithm")
         ? JSON.parse(localStorage.getItem("themeAlgorithm"))
-        : ["default"];
+        : Setting.getAlgorithmNames(Conf.ThemeDefault);
     } catch {
-      storageThemeAlgorithm = ["default"];
+      storageThemeAlgorithm = Setting.getAlgorithmNames(Conf.ThemeDefault);
     }
     this.state = {
       classes: props,
@@ -532,7 +532,7 @@ class App extends Component {
     const url = new URL(currentUrl);
     const themeType = url.searchParams.get("theme");
     if (themeType === "dark" || themeType === "default") {
-      localStorage.setItem("themeAlgorithm", JSON.stringify(["default"]));
+      localStorage.setItem("themeAlgorithm", JSON.stringify([themeType]));
     }
   }
 
@@ -550,13 +550,13 @@ class App extends Component {
 
     if (initThemeAlgorithm) {
       if (localStorage.getItem("themeAlgorithm")) {
-        let storageThemeAlgorithm = ["default"];
+        let storageThemeAlgorithm = Setting.getAlgorithmNames(Conf.ThemeDefault);
         try {
           storageThemeAlgorithm = JSON.parse(
             localStorage.getItem("themeAlgorithm")
           );
         } catch {
-          storageThemeAlgorithm = ["default"];
+          storageThemeAlgorithm = Setting.getAlgorithmNames(Conf.ThemeDefault);
         }
         this.setState({
           logo: this.getLogo(storageThemeAlgorithm),

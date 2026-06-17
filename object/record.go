@@ -29,11 +29,13 @@ import (
 var (
 	logPostOnly   bool
 	passwordRegex *regexp.Regexp
+	secretRegex   *regexp.Regexp
 )
 
 func init() {
 	logPostOnly = conf.GetConfigBool("logPostOnly")
-	passwordRegex = regexp.MustCompile("\"password\":\"([^\"]*?)\"")
+	passwordRegex = regexp.MustCompile("\"password\"\\s*:\\s*\"([^\"]*?)\"")
+	secretRegex = regexp.MustCompile("\"(clientSecret|client_secret|applicationClientSecret)\"\\s*:\\s*\"([^\"]*?)\"")
 }
 
 type Record struct {
@@ -69,6 +71,44 @@ func maskPassword(recordString string) string {
 	return passwordRegex.ReplaceAllString(recordString, "\"password\":\"***\"")
 }
 
+func maskSensitiveFields(recordString string) string {
+	var value interface{}
+	err := json.Unmarshal([]byte(recordString), &value)
+	if err == nil {
+		redactSensitiveValue(value)
+		bytes, err := json.Marshal(value)
+		if err == nil {
+			return string(bytes)
+		}
+	}
+	recordString = maskPassword(recordString)
+	return secretRegex.ReplaceAllString(recordString, "\"$1\":\"***\"")
+}
+
+func redactSensitiveValue(value interface{}) {
+	switch value := value.(type) {
+	case map[string]interface{}:
+		for key, item := range value {
+			if isSensitiveRecordField(key) {
+				value[key] = "***"
+			} else {
+				redactSensitiveValue(item)
+			}
+		}
+	case []interface{}:
+		for _, item := range value {
+			redactSensitiveValue(item)
+		}
+	}
+}
+
+func isSensitiveRecordField(key string) bool {
+	return strings.EqualFold(key, "password") ||
+		strings.EqualFold(key, "clientSecret") ||
+		strings.EqualFold(key, "client_secret") ||
+		strings.EqualFold(key, "applicationClientSecret")
+}
+
 func NewRecord(ctx *context.Context) (*Record, error) {
 	clientIp := strings.Replace(util.GetClientIpFromRequest(ctx.Request), ": ", "", -1)
 	action := strings.Replace(ctx.Request.URL.Path, "/api/", "", -1)
@@ -76,7 +116,7 @@ func NewRecord(ctx *context.Context) (*Record, error) {
 		action = "notify-payment"
 	}
 
-	requestUri := util.FilterQuery(ctx.Request.RequestURI, []string{"accessToken"})
+	requestUri := util.FilterQuery(ctx.Request.RequestURI, []string{"accessToken", "clientSecret", "client_secret", "applicationClientSecret"})
 	if len(requestUri) > 1000 {
 		requestUri = requestUri[0:1000]
 	}
@@ -84,7 +124,7 @@ func NewRecord(ctx *context.Context) (*Record, error) {
 	object := ""
 	if ctx.Input.RequestBody != nil && len(ctx.Input.RequestBody) != 0 {
 		object = string(ctx.Input.RequestBody)
-		object = maskPassword(object)
+		object = maskSensitiveFields(object)
 	}
 
 	respBytes, err := json.Marshal(ctx.Input.Data()["json"])

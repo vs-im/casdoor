@@ -286,7 +286,11 @@ class LoginPage extends React.Component {
       case "WebAuthn": return "webAuthn";
       case "LDAP": return "ldap";
       case "Face ID": return "faceId";
-      case "Magic link": return "magicLink";
+      case "Magic link":
+        if (Setting.isMagicLinkEnabled(application)) {
+          return "magicLink";
+        }
+        break;
       case "Device login":
         if (application?.signinMethods[0]?.rule === "Tab") {
           return "device";
@@ -583,9 +587,25 @@ class LoginPage extends React.Component {
 
   requestMagicLink(values) {
     const oAuthParams = Util.getOAuthGetParameters();
+    const expiresInMinutes = values["expiresInMinutes"];
+    const requestApplication = values["magicLinkApplication"] || this.getApplicationObj()?.name;
     values["email"] = values["username"];
-    values["application"] = this.getApplicationObj()?.name;
+    values["application"] = requestApplication;
     values["organization"] = this.getApplicationObj()?.organization;
+    if (expiresInMinutes !== undefined && expiresInMinutes !== null && expiresInMinutes !== "") {
+      values["expiresInMinutes"] = Number(expiresInMinutes);
+    } else {
+      delete values["expiresInMinutes"];
+    }
+    if (!values["group"]) {
+      delete values["group"];
+    }
+    if (!values["permission"]) {
+      delete values["permission"];
+    }
+    if (!values["magicLinkApplication"]) {
+      delete values["magicLinkApplication"];
+    }
     AuthBackend.sendMagicLink(values, oAuthParams)
       .then((res) => {
         if (res.status === "ok") {
@@ -1694,6 +1714,10 @@ class LoginPage extends React.Component {
 
     application?.signinMethods?.forEach((signinMethod) => {
       if (signinMethod.rule === "Hide password") {
+        return;
+      }
+
+      if (signinMethod.name === "Magic link" && !Setting.isMagicLinkEnabled(application)) {
         return;
       }
 

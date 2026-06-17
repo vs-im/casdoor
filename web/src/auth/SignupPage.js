@@ -144,6 +144,10 @@ class SignupPage extends React.Component {
       isTermsOfUseVisible: false,
       termsOfUseContent: "",
       openCaptchaModal: false,
+      magicLinkEmail: "",
+      magicLinkSent: false,
+      magicLinkLoading: false,
+      captchaAction: "signup",
     };
 
     this.form = React.createRef();
@@ -349,17 +353,70 @@ class SignupPage extends React.Component {
       name={provider.name}
       visible={this.state.openCaptchaModal}
       onOk={(captchaType, captchaToken, clientSecret) => {
-        const values = this.state.values;
-        values["captchaType"] = captchaType;
-        values["captchaToken"] = captchaToken;
-        values["clientSecret"] = clientSecret;
+        const values = {
+          ...(this.state.values || {}),
+          captchaType: captchaType,
+          captchaToken: captchaToken,
+          clientSecret: clientSecret,
+        };
 
-        this.submitSignup(values);
-        this.setState({openCaptchaModal: false});
+        if (this.state.captchaAction === "magicLink") {
+          this.submitMagicLink(values);
+        } else {
+          this.submitSignup(values);
+        }
+        this.setState({openCaptchaModal: false, captchaAction: "signup"});
       }}
       onCancel={() => this.setState({openCaptchaModal: false})}
       isCurrentProvider={true}
     />;
+  }
+
+  submitMagicLink(values) {
+    const application = this.getApplicationObj();
+    const oAuthParams = Util.getOAuthGetParameters();
+    const payload = {
+      email: (values.magicLinkEmail || this.state.magicLinkEmail || "").trim(),
+      organization: application.organization,
+      application: application.name,
+    };
+
+    if (values.captchaType) {
+      payload.captchaType = values.captchaType;
+    }
+    if (values.captchaToken) {
+      payload.captchaToken = values.captchaToken;
+    }
+    if (values.clientSecret) {
+      payload.clientSecret = values.clientSecret;
+    }
+
+    if (!Setting.isValidEmail(payload.email)) {
+      Setting.showMessage("error", i18next.t("login:The input is not valid Email!"));
+      return;
+    }
+
+    this.setState({magicLinkLoading: true});
+    AuthBackend.sendMagicLink(payload, oAuthParams)
+      .then((res) => {
+        if (res.status === "ok") {
+          this.setState({magicLinkSent: true});
+        } else if (res.data === "captchaRequired") {
+          this.setState({
+            openCaptchaModal: true,
+            captchaAction: "magicLink",
+            values: {magicLinkEmail: payload.email},
+          });
+        } else {
+          Setting.showMessage("error", res.msg);
+        }
+      })
+      .catch((error) => {
+        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}${error}`);
+      })
+      .finally(() => {
+        this.setState({magicLinkLoading: false});
+      });
   }
 
   onFinish(values) {
@@ -493,8 +550,33 @@ class SignupPage extends React.Component {
     return Setting.isProviderVisibleForSignUp(providerItem);
   }
 
+  isSignupSubmitItem(signupItem) {
+    if (signupItem?.visible === false) {
+      return false;
+    }
+    if (signupItem?.name?.startsWith("Text ")) {
+      return false;
+    }
+    return !["Signup title", "Signup button", "Magic link", "Providers", "Languages", "Agreement"].includes(signupItem?.name);
+  }
+
+  shouldRenderSignupButton(signupItems) {
+    const signupButtonItem = signupItems.find(signupItem => signupItem.name === "Signup button");
+    if (signupButtonItem?.visible === false) {
+      return false;
+    }
+    return signupItems.some(signupItem => this.isSignupSubmitItem(signupItem));
+  }
+
   renderFormItem(application, signupItem) {
     const validItems = ["Gender", "Bio", "Tag", "Education"];
+    if (signupItem.name === "Signup title") {
+      return (
+        <div className="form-header">
+          {signupItem.visible ? <span>{signupItem.label || i18next.t("account:Sign Up")}</span> : null}
+        </div>
+      );
+    }
     if (!signupItem.visible) {
       return null;
     }
@@ -1135,6 +1217,65 @@ class SignupPage extends React.Component {
             </span>
           );
         });
+    } else if (signupItem.name === "Magic link") {
+      if (!Setting.isMagicLinkEnabled(application) || !application.enableMagicLinkSignup) {
+        return null;
+      }
+      return (
+        <div key="magic-link" className="signup-magic-link" style={{marginBottom: "16px"}}>
+          {
+            signupItem.label ? (
+              <div style={{fontWeight: 600, marginBottom: "8px"}}>
+                {signupItem.label}
+              </div>
+            ) : null
+          }
+          <Form.Item
+            name="magicLinkEmail"
+            style={{marginBottom: "12px"}}
+            rules={[
+              {
+                required: true,
+                message: i18next.t("login:Please input your Email!"),
+              },
+              {
+                validator: (_, value) => {
+                  if (!value || Setting.isValidEmail(value)) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(i18next.t("login:The input is not valid Email!"));
+                },
+              },
+            ]}
+          >
+            <Input
+              placeholder={signupItem.placeholder || i18next.t("general:Email")}
+              onChange={(e) => {
+                this.setState({magicLinkEmail: e.target.value});
+              }}
+              onPressEnter={(e) => {
+                e.preventDefault();
+                this.form.current.validateFields(["magicLinkEmail"]).then((fields) => {
+                  this.submitMagicLink(fields);
+                });
+              }}
+            />
+          </Form.Item>
+          <Button
+            htmlType="button"
+            type="primary"
+            block
+            loading={this.state.magicLinkLoading}
+            onClick={() => {
+              this.form.current.validateFields(["magicLinkEmail"]).then((fields) => {
+                this.submitMagicLink(fields);
+              });
+            }}
+          >
+            {i18next.t("login:Send Magic Link")}
+          </Button>
+        </div>
+      );
     } else if (signupItem.name === "Signup button") {
       return null;
     } else if (validItems.includes(signupItem.name)) {
@@ -1152,6 +1293,27 @@ class SignupPage extends React.Component {
           subTitle={i18next.t(
             "application:The application does not allow to sign up new account"
           )}
+          extra={[
+            <Button
+              style={{borderRadius}}
+              type="primary"
+              key="signin"
+              onClick={() =>
+                Setting.redirectToLoginPage(application, this.props.history)
+              }
+            >
+              {i18next.t("login:Sign In")}
+            </Button>,
+          ]}
+        />
+      );
+    }
+    if (this.state.magicLinkSent) {
+      return (
+        <Result
+          status="success"
+          title={i18next.t("login:Check your email")}
+          subTitle={i18next.t("login:We sent you a magic link to sign in")}
           extra={[
             <Button
               style={{borderRadius}}
@@ -1199,6 +1361,7 @@ class SignupPage extends React.Component {
     const showProviders = avaliableProviders.length > 0;
 
     const signupItems = Array.isArray(application.signupItems) ? [...application.signupItems] : [];
+    const showSignupButton = this.shouldRenderSignupButton(signupItems);
 
     return (
       <Form
@@ -1226,9 +1389,6 @@ class SignupPage extends React.Component {
         style={{width: "100%"}}
         // style={{width: Setting.isMobile() ? "300px" : "400px"}}
       >
-        <div className="form-header">
-          <span>Create account</span>
-        </div>
         <Form.Item
           name="application"
           hidden={true}
@@ -1266,10 +1426,12 @@ class SignupPage extends React.Component {
           );
         })}
         <Form.Item {...tailFormItemLayout}>
-          <Button disabled={this.state.loading} type="primary" htmlType="submit" style={{width: "100%"}}>
-            {i18next.t("account:Sign Up")}
-          </Button>
-          <div style={{padding: "30px 0px 0px 0px"}}>
+          {showSignupButton ? (
+            <Button className="signup-button" disabled={this.state.loading} type="primary" htmlType="submit" style={{width: "100%"}}>
+              {i18next.t("account:Sign Up")}
+            </Button>
+          ) : null}
+          <div className="signup-link" style={{padding: showSignupButton ? "30px 0px 0px 0px" : "0px"}}>
             &nbsp;&nbsp;{i18next.t("signup:Have account?")}&nbsp;
             <a
               onClick={() => {
@@ -1317,10 +1479,21 @@ class SignupPage extends React.Component {
       return null;
     }
 
+    let existSignupTitle = false;
     let existSignupButton = false;
     application.signupItems?.map((item) => {
+      item.name === "Signup title" ? (existSignupTitle = true) : null;
       item.name === "Signup button" ? (existSignupButton = true) : null;
     });
+    if (!existSignupTitle) {
+      application.signupItems?.unshift({
+        customCss: "",
+        label: "",
+        name: "Signup title",
+        placeholder: "",
+        visible: true,
+      });
+    }
     if (!existSignupButton) {
       application.signupItems?.push({
         customCss: "",

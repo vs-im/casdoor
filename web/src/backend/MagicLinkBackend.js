@@ -1,7 +1,22 @@
 import * as Setting from "../Setting";
 
-export function getMagicLinks(owner, page = "", pageSize = "", field = "", value = "", sortField = "", sortOrder = "") {
-  return fetch(`${Setting.ServerUrl}/api/get-magic-links?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${value}&sortField=${sortField}&sortOrder=${sortOrder}`, {
+export function getMagicLinks(owner, page = "", pageSize = "", field = "", value = "", sortField = "", sortOrder = "", filters = {}) {
+  const searchParams = new URLSearchParams({
+    owner,
+    p: page,
+    pageSize,
+    field,
+    value,
+    sortField,
+    sortOrder,
+  });
+  ["status", "user", "email", "application", "organization", "group", "permission"].forEach((key) => {
+    const filterValue = filters[key];
+    if (filterValue !== undefined && filterValue !== null && filterValue !== "") {
+      searchParams.set(key, filterValue);
+    }
+  });
+  return fetch(`${Setting.ServerUrl}/api/get-magic-links?${searchParams.toString()}`, {
     method: "GET",
     credentials: "include",
     headers: {

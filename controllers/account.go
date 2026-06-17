@@ -39,13 +39,15 @@ const (
 )
 
 type Response struct {
-	Status string      `json:"status"`
-	Msg    string      `json:"msg"`
-	Sub    string      `json:"sub"`
-	Name   string      `json:"name"`
-	Data   interface{} `json:"data"`
-	Data2  interface{} `json:"data2"`
-	Data3  interface{} `json:"data3"`
+	Status     string      `json:"status"`
+	Msg        string      `json:"msg"`
+	Sub        string      `json:"sub"`
+	Name       string      `json:"name"`
+	Data       interface{} `json:"data"`
+	Data2      interface{} `json:"data2"`
+	Data3      interface{} `json:"data3"`
+	IsNewUser  *bool       `json:"isNewUser,omitempty"`
+	AuthAction string      `json:"authAction,omitempty"`
 }
 
 type Captcha struct {
@@ -205,14 +207,7 @@ func (c *ApiController) Signup() {
 		return
 	}
 
-	username := authForm.Username
-	if !application.IsSignupItemVisible("Username") {
-		if organization.UseEmailAsUsername && application.IsSignupItemVisible("Email") {
-			username = authForm.Email
-		} else {
-			username = id
-		}
-	}
+	username := resolveSignupUsername(application, organization, authForm.Username, authForm.Email, id)
 
 	initScore, err := organization.GetInitScore()
 	if err != nil {
@@ -291,18 +286,7 @@ func (c *ApiController) Signup() {
 		user.Tag = application.DefaultTag
 	}
 
-	affected, err := object.AddUser(user, c.GetAcceptLanguage())
-	if err != nil {
-		c.ResponseError(err.Error())
-		return
-	}
-
-	if !affected {
-		c.ResponseError(c.T("account:Failed to add user"), util.StructToJson(user))
-		return
-	}
-
-	err = object.AddUserToOriginalDatabase(user)
+	user, _, err = c.createSignupUser(user, false)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return

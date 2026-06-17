@@ -376,7 +376,6 @@ func getUserFieldValue(user *User, fieldName string) (interface{}, bool) {
 	return nil, false
 }
 
-
 func updateClaimsWithRoles(baseClaims jwt.MapClaims, roleNames []string, tokenAttributes []string) jwt.MapClaims {
 
 	for _, tokenAttribute := range tokenAttributes {

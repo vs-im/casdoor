@@ -5,6 +5,7 @@ import * as AuthBackend from "./AuthBackend";
 import * as Util from "./Util";
 import * as Setting from "../Setting";
 import {createFormAndSubmit} from "../Setting";
+import {getMagicLinkConsentApplication, getMagicLinkVerifyResult, isMagicLinkSignupAction} from "./magicLinkVerifyResult";
 
 class MagicLinkCallback extends React.Component {
   constructor(props) {
@@ -31,10 +32,22 @@ class MagicLinkCallback extends React.Component {
           return;
         }
 
+        const verifyResult = getMagicLinkVerifyResult(res);
+        if (verifyResult.authAction || verifyResult.isNewUser) {
+          sessionStorage.setItem("magicLinkVerifyResult", JSON.stringify(verifyResult));
+          window.dispatchEvent(new CustomEvent("casdoor:magic-link-verify", {detail: verifyResult}));
+          if (isMagicLinkSignupAction(verifyResult)) {
+            window.dispatchEvent(new CustomEvent("casdoor:magic-link-signup-first-login", {detail: verifyResult}));
+          }
+        }
+
         const responseType = oAuthParams?.responseType || "login";
         if (res.data?.required === true) {
+          const consentApplication = getMagicLinkConsentApplication(res);
           params.delete("token");
-          Setting.goToLinkSoft(this, `/consent/${res.data2}?${params.toString()}`);
+          const consentPath = consentApplication ? `/consent/${consentApplication}` : "/consent";
+          const consentQuery = params.toString();
+          Setting.goToLinkSoft(this, consentQuery ? `${consentPath}?${consentQuery}` : consentPath);
           return;
         }
 

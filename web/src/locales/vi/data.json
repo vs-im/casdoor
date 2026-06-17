@@ -892,6 +892,10 @@
     "username, Email or phone": "Tên đăng nhập, Email hoặc điện thoại"
   },
   "magicLink": {
+    "Existing user": "Existing user",
+    "Expired": "Expired",
+    "New user": "New user",
+    "Remaining time": "Remaining time",
     "Expiry time": "Thoi diem het han",
     "Last error": "Loi cuoi cung",
     "Revoke": "Thu hoi",

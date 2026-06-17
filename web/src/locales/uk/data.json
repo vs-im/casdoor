@@ -892,6 +892,10 @@
     "username, Email or phone": "ім'я користувача, електронну пошту або телефон"
   },
   "magicLink": {
+    "Existing user": "Existing user",
+    "Expired": "Expired",
+    "New user": "New user",
+    "Remaining time": "Remaining time",
     "Expiry time": "Час закінчення дії",
     "Last error": "Остання помилка",
     "Revoke": "Відкликати",

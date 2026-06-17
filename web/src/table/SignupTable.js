@@ -36,7 +36,9 @@ export const SignupTableDefaultCssMap = {
   "Phone or Email": EmailCss + PhoneCss,
   "Invitation code": ".signup-invitation-code{}\n.signup-invitation-code-input{}",
   "Agreement": ".login-agreement{}",
+  "Signup title": ".form-header span {\n  font-size: 1.5rem;\n  color: rgb(0 0 0 / 60%);\n  font-weight: bold;\n}",
   "Signup button": ".signup-button{}\n.signup-link{}",
+  "Magic link": ".signup-magic-link{}",
   "Providers": ".provider-img {\n width: 30px;\n margin: 5px;\n }\n .provider-big-img {\n margin-bottom: 10px;\n }\n ",
   "Languages": ".signup-languages {\n    top: 55px;\n    right: 5px;\n    position: absolute;\n}",
 };
@@ -84,6 +86,14 @@ class SignupTable extends React.Component {
     this.updateTable(table);
   }
 
+  getMagicLinkProviderItems() {
+    return (this.props.applicationProviders || []).filter(providerItem => providerItem.provider?.category === "Email");
+  }
+
+  getMagicLinkProviderName() {
+    return this.getMagicLinkProviderItems().find(providerItem => providerItem.rule === "Magic link")?.name;
+  }
+
   renderTable(table) {
     const columns = [
       {
@@ -112,7 +122,9 @@ class SignupTable extends React.Component {
             {name: "Phone or Email", displayName: i18next.t("general:Phone or Email")},
             {name: "Invitation code", displayName: i18next.t("application:Invitation code")},
             {name: "Agreement", displayName: i18next.t("signup:Agreement")},
+            {name: "Signup title", displayName: i18next.t("signup:Signup title")},
             {name: "Signup button", displayName: i18next.t("signup:Signup button")},
+            {name: "Magic link", displayName: i18next.t("login:Magic link")},
             {name: "Providers", displayName: i18next.t("application:Providers")},
             {name: "Languages", displayName: i18next.t("general:Languages")},
             {name: "Text 1", displayName: i18next.t("signup:Text 1")},
@@ -139,6 +151,32 @@ class SignupTable extends React.Component {
               }} >
               {
                 Setting.getDeduplicatedArray(items, table, "name").map((item, index) => <Option key={index} value={item.name}>{item.displayName}</Option>)
+              }
+            </Select>
+          );
+        },
+      },
+      {
+        title: i18next.t("application:Magic link provider"),
+        dataIndex: "magicLinkProvider",
+        key: "magicLinkProvider",
+        width: "220px",
+        render: (text, record, index) => {
+          if (record.name !== "Magic link") {
+            return null;
+          }
+          const providerItems = this.getMagicLinkProviderItems();
+          return (
+            <Select virtual={false} style={{width: "100%"}}
+              value={this.getMagicLinkProviderName()}
+              placeholder={i18next.t("application:Please select a provider")}
+              onChange={value => {
+                this.props.onUpdateMagicLinkProvider?.(value);
+              }} >
+              {
+                providerItems.map((providerItem, index) => (
+                  <Option key={index} value={providerItem.name}>{providerItem.name}</Option>
+                ))
               }
             </Select>
           );
@@ -172,7 +210,7 @@ class SignupTable extends React.Component {
         key: "required",
         width: "80px",
         render: (text, record, index) => {
-          if (!record.visible || ["Signup button", "Providers", "Languages"].includes(record.name)) {
+          if (!record.visible || ["Signup title", "Signup button", "Magic link", "Providers", "Languages"].includes(record.name)) {
             return null;
           }
 
@@ -189,7 +227,7 @@ class SignupTable extends React.Component {
         key: "prompted",
         width: "80px",
         render: (text, record, index) => {
-          if (["ID", "Signup button", "Providers", "Languages"].includes(record.name)) {
+          if (["ID", "Signup title", "Signup button", "Magic link", "Providers", "Languages"].includes(record.name)) {
             return null;
           }
 
@@ -210,6 +248,9 @@ class SignupTable extends React.Component {
         key: "type",
         width: "160px",
         render: (text, record, index) => {
+          if (!["Gender", "Bio", "Tag", "Education"].includes(record.name)) {
+            return null;
+          }
           const options = [
             {id: "Input", name: i18next.t("application:Input")},
             {id: "Single Choice", name: i18next.t("application:Single Choice")},
@@ -322,7 +363,7 @@ class SignupTable extends React.Component {
         key: "regex",
         width: "180px",
         render: (text, record, index) => {
-          if (record.name.startsWith("Text ") || ["Password", "Confirm password", "Signup button", "Provider", "Providers", "Languages"].includes(record.name)) {
+          if (record.name.startsWith("Text ") || ["Password", "Confirm password", "Signup title", "Signup button", "Magic link", "Provider", "Providers", "Languages"].includes(record.name)) {
             return null;
           }
 
@@ -404,7 +445,7 @@ class SignupTable extends React.Component {
                 <Button style={{marginRight: "5px"}} disabled={index === table.length - 1} icon={<DownOutlined />} size="small" onClick={() => this.downRow(table, index)} />
               </Tooltip>
               <Tooltip placement="topLeft" title={i18next.t("general:Delete")}>
-                <Button disabled={record.name === "Signup button"} icon={<DeleteOutlined />} size="small" onClick={() => this.deleteRow(table, index)} />
+                <Button disabled={["Signup title", "Signup button"].includes(record.name)} icon={<DeleteOutlined />} size="small" onClick={() => this.deleteRow(table, index)} />
               </Tooltip>
             </div>
           );

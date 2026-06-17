@@ -492,6 +492,9 @@ func (application *Application) IsCodeSigninViaSmsEnabled() bool {
 }
 
 func (application *Application) IsMagicLinkEnabled() bool {
+	if application == nil || !application.MagicLinkSigninEnabled {
+		return false
+	}
 	if len(application.SigninMethods) > 0 {
 		for _, signinMethod := range application.SigninMethods {
 			if signinMethod.Name == "Magic link" {
@@ -500,6 +503,10 @@ func (application *Application) IsMagicLinkEnabled() bool {
 		}
 	}
 	return false
+}
+
+func (application *Application) IsMagicLinkSignupEnabled() bool {
+	return application != nil && application.MagicLinkSigninEnabled && application.EnableMagicLinkSignup
 }
 
 func (application *Application) GetMagicLinkExpireMinutes() int {

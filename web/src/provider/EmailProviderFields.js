@@ -27,6 +27,7 @@ export function renderEmailProviderFields(provider, updateProviderField, renderE
   const verificationContent = provider.content || Setting.getDefaultHtmlEmailContent();
   const invitationContent = provider.metadata || Setting.getDefaultInvitationHtmlEmailContent();
   const magicLinkContent = provider.magicLinkContent || Setting.getDefaultMagicLinkHtmlEmailContent();
+  const magicLinkSignupContent = provider.magicLinkSignupContent || Setting.getDefaultMagicLinkSignupHtmlEmailContent();
   const magicLinkPreviewUrl = `${Setting.ServerUrl}/magic-link/callback?token=example`;
   const renderEmailContentEditor = (field, value, resetText, resetHtml, previewHtml) => (
     <React.Fragment>
@@ -228,13 +229,24 @@ export function renderEmailProviderFields(provider, updateProviderField, renderE
               },
               {
                 key: "magicLink",
-                label: i18next.t("provider:Magic Link"),
+                label: i18next.t("provider:Magic Link sign-in"),
                 children: renderEmailContentEditor(
                   "magicLinkContent",
                   magicLinkContent,
                   "Use this Magic Link to sign in: %link",
                   Setting.getDefaultMagicLinkHtmlEmailContent(),
-                  magicLinkContent.replace(/%link/g, magicLinkPreviewUrl)
+                  magicLinkContent.replace(/%link/g, magicLinkPreviewUrl).replace(/%expireTime/g, "2026-06-17 12:00:00")
+                ),
+              },
+              {
+                key: "magicLinkSignup",
+                label: i18next.t("provider:Magic Link sign-up"),
+                children: renderEmailContentEditor(
+                  "magicLinkSignupContent",
+                  magicLinkSignupContent,
+                  "Use this Magic Link to create your account: %link",
+                  Setting.getDefaultMagicLinkSignupHtmlEmailContent(),
+                  magicLinkSignupContent.replace(/%link/g, magicLinkPreviewUrl).replace(/%expireTime/g, "2026-06-17 12:00:00")
                 ),
               },
             ]}

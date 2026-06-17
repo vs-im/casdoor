@@ -892,6 +892,10 @@
     "username, Email or phone": "nazwa użytkownika, e-mail lub telefon"
   },
   "magicLink": {
+    "Existing user": "Existing user",
+    "Expired": "Expired",
+    "New user": "New user",
+    "Remaining time": "Remaining time",
     "Expiry time": "Czas wygasniecia",
     "Last error": "Ostatni blad",
     "Revoke": "Uniewaznij",

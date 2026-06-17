@@ -26,10 +26,10 @@ export let StaticBaseUrl = "https://cdn.casbin.org";
 
 export const InitThemeAlgorithm = true;
 export const ThemeDefault = {
-  themeType: "default",
+  themeType: "dark",
   colorPrimary: "#262626",
   borderRadius: 10,
-  isCompact: false,
+  isCompact: true,
 };
 
 export const CustomFooter = null;

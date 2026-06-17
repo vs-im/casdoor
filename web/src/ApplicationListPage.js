@@ -71,6 +71,7 @@ class ApplicationListPage extends BaseListPage {
         {name: "Face ID", displayName: "Face ID", rule: "None"},
       ],
       signupItems: [
+        {name: "Signup title", visible: true, required: true, rule: "None"},
         {name: "ID", visible: false, required: true, rule: "Random"},
         {name: "Username", visible: true, required: true, rule: "None"},
         {name: "Display name", visible: true, required: true, rule: "None"},
@@ -108,6 +109,8 @@ class ApplicationListPage extends BaseListPage {
       expireInHours: 24 * 7,
       refreshExpireInHours: 24 * 7,
       cookieExpireInHours: 24 * 30,
+      magicLinkSigninEnabled: false,
+      enableMagicLinkSignup: false,
       magicLinkExpireMinutes: 10,
       magicLinkPermission: "",
       magicLinkRateLimitWindowMinutes: 15,
