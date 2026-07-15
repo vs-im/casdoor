@@ -41,7 +41,7 @@ import {Route, Switch, withRouter} from "react-router-dom";
 import CustomGithubCorner from "./common/CustomGithubCorner";
 import CustomHead from "./basic/CustomHead";
 import * as Conf from "./Conf";
-import {shadcnThemeComponents, shadcnThemeToken} from "./shadcnTheme";
+import {shadcnDarkThemeComponents, shadcnDarkThemeToken, shadcnThemeComponents, shadcnThemeToken} from "./shadcnTheme";
 
 import * as Auth from "./auth/Auth";
 import EntryPage from "./EntryPage";
@@ -231,7 +231,10 @@ class App extends Component {
       "/records",
       "/tokens",
       "/verifications", // Auditing
+      "/product-store",
       "/products",
+      "/coupons",
+      "/cart",
       "/orders",
       "/payments",
       "/plans",
@@ -964,7 +967,6 @@ class App extends Component {
         {/* { */}
         {/*   this.renderBanner() */}
         {/* } */}
-        <CustomHead id="page" headerHtml={this.state.application?.pageHtml} />
         <FloatButton.BackTop />
         <CustomGithubCorner />
         {
@@ -1078,13 +1080,13 @@ class App extends Component {
           spin={{indicator: <AiDots />}}
           theme={{
             token: {
-              ...shadcnThemeToken,
+              ...(Setting.isDarkTheme(this.state.themeAlgorithm) ? shadcnDarkThemeToken : shadcnThemeToken),
               colorPrimary: this.state.themeData.colorPrimary,
               colorInfo: shadcnThemeToken.colorInfo,
               borderRadius: this.state.themeData.borderRadius,
               fontSize: 16,
             },
-            components: shadcnThemeComponents,
+            components: Setting.isDarkTheme(this.state.themeAlgorithm) ? shadcnDarkThemeComponents : shadcnThemeComponents,
             algorithm: Setting.getAlgorithm(this.state.themeAlgorithm),
           }}
         >

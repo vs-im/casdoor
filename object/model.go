@@ -28,7 +28,7 @@ type Model struct {
 	Name        string `xorm:"varchar(100) notnull pk" json:"name"`
 	CreatedTime string `xorm:"varchar(100)" json:"createdTime"`
 	DisplayName string `xorm:"varchar(100)" json:"displayName"`
-	Description string `xorm:"varchar(100)" json:"description"`
+	Description string `xorm:"mediumtext" json:"description"`
 
 	ModelText string `xorm:"mediumtext" json:"modelText"`
 
@@ -199,6 +199,26 @@ func HasRoleDefinition(m model.Model) bool {
 		return false
 	}
 	return m["g"] != nil
+}
+
+// HasDomainDefinition returns true if the model's request_definition contains a "dom" token,
+// e.g. "r = sub, dom, obj, act". Permissions with Domains set but built on a model without
+// this token would silently break, because the domain value ends up misaligned with the
+// resource/action columns during matching.
+func HasDomainDefinition(m model.Model) bool {
+	if m == nil {
+		return false
+	}
+	r, ok := m["r"]["r"]
+	if !ok {
+		return false
+	}
+	for _, token := range r.Tokens {
+		if token == "r_dom" {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Model) initModel() error {

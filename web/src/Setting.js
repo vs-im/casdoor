@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React from "react";
+import {useEffect, useRef} from "react";
 import {Link} from "react-router-dom";
 import {Button, Select, Tag, Tooltip, message, theme} from "antd";
 import {QuestionCircleOutlined} from "@ant-design/icons";
@@ -452,6 +453,10 @@ export const OtherProviderInfo = {
     "Alibaba Cloud Facebody": {
       logo: `${StaticBaseUrl}/img/social_aliyun.png`,
       url: "https://vision.aliyun.com/facebody",
+    },
+    "Local UniFace": {
+      logo: `${StaticBaseUrl}/img/social_default.png`,
+      url: "https://github.com/yakhyo/uniface",
     },
   },
   MFA: {
@@ -1765,7 +1770,10 @@ export function getProviderTypeOptions(category) {
       {id: "WeCom", name: "WeCom"},
     ];
   } else if (category === "Face ID") {
-    return [{id: "Alibaba Cloud Facebody", name: "Alibaba Cloud Facebody"}];
+    return [
+      {id: "Alibaba Cloud Facebody", name: "Alibaba Cloud Facebody"},
+      {id: "Local UniFace", name: "Local UniFace"},
+    ];
   } else if (category === "MFA") {
     return [{id: "RADIUS", name: "RADIUS"}];
   } else if (category === "ID Verification") {
@@ -2062,6 +2070,30 @@ export function renderForgetLink(application, text) {
   };
 
   return renderLink(url, text, storeSigninUrl);
+}
+
+export function RenderCustomHtml({html}) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    // <script> tags inserted via dangerouslySetInnerHTML are not executed by the browser,
+    // so we need to re-create them manually to make embedded scripts run.
+    const oldScripts = containerRef.current.querySelectorAll("script");
+    oldScripts.forEach(oldScript => {
+      const newScript = document.createElement("script");
+      Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+      newScript.textContent = oldScript.textContent;
+      oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+  }, [html]);
+
+  return (
+    <div ref={containerRef} dangerouslySetInnerHTML={{__html: html}} />
+  );
 }
 
 export function renderHelmet(application) {
@@ -3108,7 +3140,7 @@ export function renderLoginPanel(
           className="side-image"
           style={{display: application.formOffset !== 4 ? "none" : null}}
         >
-          <div dangerouslySetInnerHTML={{__html: application.formSideHtml}} />
+          <RenderCustomHtml html={application.formSideHtml} />
         </div>
         <div className="login-form">
           <div>{getInnerComponent()}</div>
@@ -3395,6 +3427,8 @@ export function getApiPaths() {
   // Auth and user session APIs
   res.push("signup", "login", "logout", "sso-logout", "unlink");
   res.push("new-user"); // Custom event for new user creation
+  res.push("new-user-ldap"); // Custom event for new user creation via LDAP sync
+  res.push("new-user-syncer"); // Custom event for new user creation via syncer
 
   // CRUD operations for objects
   objects.forEach((obj) => {

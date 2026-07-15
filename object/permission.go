@@ -29,7 +29,7 @@ type Permission struct {
 	Name        string `xorm:"varchar(100) notnull pk" json:"name"`
 	CreatedTime string `xorm:"varchar(100)" json:"createdTime"`
 	DisplayName string `xorm:"varchar(100)" json:"displayName"`
-	Description string `xorm:"varchar(100)" json:"description"`
+	Description string `xorm:"mediumtext" json:"description"`
 
 	Users   []string `xorm:"mediumtext" json:"users"`
 	Groups  []string `xorm:"mediumtext" json:"groups"`
@@ -118,7 +118,10 @@ func checkPermissionValid(permission *Permission) error {
 
 	if !HasRoleDefinition(enforcer.GetModel()) {
 		permission.Roles = []string{}
-		return nil
+	}
+
+	if !HasDomainDefinition(enforcer.GetModel()) {
+		permission.Domains = []string{}
 	}
 
 	return nil
@@ -185,6 +188,11 @@ func UpdatePermission(id string, permission *Permission) (bool, error) {
 }
 
 func AddPermission(permission *Permission) (bool, error) {
+	err := checkPermissionValid(permission)
+	if err != nil {
+		return false, err
+	}
+
 	affected, err := ormer.Engine.Insert(permission)
 	if err != nil {
 		return false, err

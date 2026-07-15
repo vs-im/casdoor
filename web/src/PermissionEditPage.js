@@ -151,6 +151,16 @@ class PermissionEditPage extends React.Component {
     return false;
   }
 
+  hasDomainDefinition(model) {
+    if (model !== null) {
+      const match = model.modelText.match(/request_definition\s*\]\s*r\s*=\s*([^\r\n]+)/);
+      if (match) {
+        return match[1].split(",").map((token) => token.trim()).includes("dom");
+      }
+    }
+    return false;
+  }
+
   renderPermission() {
     return (
       <Card size="small" title={
@@ -336,6 +346,7 @@ class PermissionEditPage extends React.Component {
           </Col>
           <Col span={22} >
             <Select virtual={false} mode="tags" style={{width: "100%"}} value={this.state.permission.domains}
+              disabled={!this.hasDomainDefinition(this.state.model)}
               onChange={(value => {
                 this.updatePermissionField("domains", value);
               })}
@@ -550,7 +561,7 @@ class PermissionEditPage extends React.Component {
         {
           this.state.permission !== null ? this.renderPermission() : <Loading type="page" tip={i18next.t("login:Loading")} />
         }
-        <div style={{marginTop: "20px", marginLeft: "40px"}}>
+        <div style={{margin: "20px 40px"}}>
           <Button size="large" onClick={() => this.submitPermissionEdit(false)}>{i18next.t("general:Save")}</Button>
           <Button style={{marginLeft: "20px"}} type="primary" size="large" onClick={() => this.submitPermissionEdit(true)}>{i18next.t("general:Save & Exit")}</Button>
           {this.state.mode === "add" ? <Button style={{marginLeft: "20px"}} size="large" onClick={() => this.deletePermission()}>{i18next.t("general:Cancel")}</Button> : null}

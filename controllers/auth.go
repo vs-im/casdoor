@@ -19,6 +19,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -596,6 +597,7 @@ func (c *ApiController) Login() {
 			faceIdProvider, err := object.GetFaceIdProviderByApplication(util.GetId(application.Owner, application.Name), "false", c.GetAcceptLanguage())
 			if err != nil {
 				c.ResponseError(err.Error())
+				return
 			}
 
 			if faceIdProvider == nil {
@@ -604,13 +606,19 @@ func (c *ApiController) Login() {
 					return
 				}
 			} else {
+				if !user.HasFaceIdImage() {
+					c.ResponseError(i18n.Translate(c.GetAcceptLanguage(), "check:Face data does not exist, cannot log in"))
+					return
+				}
+
 				ok, err := user.CheckUserFace(authForm.FaceIdImage, faceIdProvider)
 				if err != nil {
 					c.ResponseError(err.Error(), nil)
+					return
 				}
 
 				if !ok {
-					c.ResponseError(i18n.Translate(c.GetAcceptLanguage(), "check:Face data does not exist, cannot log in"))
+					c.ResponseError(i18n.Translate(c.GetAcceptLanguage(), "check:Face data mismatch"))
 					return
 				}
 			}
@@ -779,6 +787,10 @@ func (c *ApiController) Login() {
 		}
 
 		if err != nil {
+			var signinErr *object.SigninError
+			if errors.As(err, &signinErr) {
+				c.Ctx.Input.SetParam("recordDetail", signinErr.Reason)
+			}
 			c.ResponseError(err.Error())
 			return
 		} else {
@@ -1203,6 +1215,7 @@ func (c *ApiController) Login() {
 			if !passed {
 				err = mfaUtil.Verify(authForm.Passcode)
 				if err != nil {
+					c.Ctx.Input.SetParam("recordDetail", object.SigninReasonMfaFailed)
 					c.ResponseError(err.Error())
 					return
 				}
@@ -1223,6 +1236,7 @@ func (c *ApiController) Login() {
 		} else if authForm.RecoveryCode != "" {
 			err = object.MfaRecover(user, authForm.RecoveryCode)
 			if err != nil {
+				c.Ctx.Input.SetParam("recordDetail", object.SigninReasonMfaFailed)
 				c.ResponseError(err.Error())
 				return
 			}

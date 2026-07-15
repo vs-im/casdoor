@@ -39,3 +39,6 @@ server
 .env
 .agent/
 tasks/
+
+web/cypress/videos/
+web/cypress/screenshots/
