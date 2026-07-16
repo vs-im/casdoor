@@ -176,6 +176,39 @@ func NewRecord(ctx *context.Context) (*Record, error) {
 	return &record, nil
 }
 
+// recordObjectOrgField maps user/organization management actions to the JSON
+// field of record.Object that contains the target organization name.
+var recordObjectOrgField = map[string]string{
+	"add-user":            "owner",
+	"update-user":         "owner",
+	"delete-user":         "owner",
+	"add-organization":    "name",
+	"update-organization": "name",
+	"delete-organization": "name",
+}
+
+// getRecordTargetOrganization resolves the organization of the object affected
+// by a client-credential API call (record.Organization == "app"). It returns ""
+// for actions that are not user/organization management or when the target
+// organization cannot be determined, in which case the record is dropped as
+// before.
+func getRecordTargetOrganization(record *Record) string {
+	field, ok := recordObjectOrgField[record.Action]
+	if !ok {
+		return ""
+	}
+
+	var object map[string]interface{}
+	if err := json.Unmarshal([]byte(record.Object), &object); err != nil {
+		return ""
+	}
+
+	if value, ok := object[field].(string); ok {
+		return value
+	}
+	return ""
+}
+
 func addRecord(record *Record) (int64, error) {
 	affected, err := ormer.Engine.Insert(record)
 	return affected, err
@@ -189,7 +222,15 @@ func AddRecord(record *Record) bool {
 	}
 
 	if record.Organization == "app" {
-		return false
+		// API calls authenticated with client credentials produce records with
+		// organization == "app". Most of them are noise and are dropped, but
+		// user/organization management actions must keep triggering provisioning
+		// webhooks, so re-attribute them to the organization of the target object.
+		targetOrganization := getRecordTargetOrganization(record)
+		if targetOrganization == "" {
+			return false
+		}
+		record.Organization = targetOrganization
 	}
 
 	record.Owner = record.Organization
