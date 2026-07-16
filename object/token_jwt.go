@@ -528,6 +528,25 @@ func refineUser(user *User) *User {
 	return user
 }
 
+// getTokenAudience computes the "aud" claim for access/refresh/id tokens.
+// RFC 8707: when a resource indicator is provided, it becomes the sole audience.
+// For shared applications (owned by the built-in organization), tokens of users
+// from a non-native organization carry both the plain client_id and the
+// org-suffixed variant "<client_id>-org-<org>", so that verifiers configured
+// with either form accept the token. Users of the native (built-in)
+// organization keep the plain client_id audience.
+func getTokenAudience(application *Application, user *User, resource string) jwt.ClaimStrings {
+	if resource != "" {
+		return jwt.ClaimStrings{resource}
+	}
+
+	if application.IsShared && user.Owner != "built-in" {
+		return jwt.ClaimStrings{application.ClientId, application.ClientId + "-org-" + user.Owner}
+	}
+
+	return jwt.ClaimStrings{application.ClientId}
+}
+
 func generateJwtToken(application *Application, user *User, provider string, signinMethod string, nonce string, scope string, resource string, host string) (string, string, string, error) {
 	nowTime := time.Now()
 	expireTime := nowTime.Add(time.Duration(application.ExpireInHours * float64(time.Hour)))
@@ -569,19 +588,12 @@ func generateJwtToken(application *Application, user *User, provider string, sig
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    originBackend,
 			Subject:   user.Id,
-			Audience:  []string{application.ClientId},
+			Audience:  getTokenAudience(application, user, resource),
 			ExpiresAt: jwt.NewNumericDate(expireTime),
 			NotBefore: jwt.NewNumericDate(nowTime),
 			IssuedAt:  jwt.NewNumericDate(nowTime),
 			ID:        jti,
 		},
-	}
-
-	// RFC 8707: Use resource as audience when provided
-	if resource != "" {
-		claims.Audience = []string{resource}
-	} else if application.IsShared {
-		claims.Audience = []string{application.ClientId + "-org-" + user.Owner}
 	}
 
 	var token *jwt.Token
