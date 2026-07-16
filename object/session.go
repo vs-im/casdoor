@@ -77,9 +77,21 @@ func GetUserAppSessions(owner string, name string, application string) ([]*Sessi
 	return sessions, nil
 }
 
+// normalizeSessionFilterField maps API filter fields to session table columns:
+// the session table has no "user" column — the session's user is the "name"
+// primary key, so filtering by field=user must hit "name" (before the column
+// quoting fix the bare "user" resolved to the PostgreSQL current_user keyword
+// and silently matched nothing).
+func normalizeSessionFilterField(field string) string {
+	if field == "user" {
+		return "name"
+	}
+	return field
+}
+
 func GetPaginationSessions(owner string, offset, limit int, field, value, sortField, sortOrder string) ([]*Session, error) {
 	sessions := []*Session{}
-	session := GetSession(owner, offset, limit, field, value, sortField, sortOrder)
+	session := GetSession(owner, offset, limit, normalizeSessionFilterField(field), value, sortField, sortOrder)
 	err := session.Find(&sessions)
 	if err != nil {
 		return sessions, err
@@ -89,7 +101,7 @@ func GetPaginationSessions(owner string, offset, limit int, field, value, sortFi
 }
 
 func GetSessionCount(owner, field, value string) (int64, error) {
-	session := GetSession(owner, -1, -1, field, value, "", "")
+	session := GetSession(owner, -1, -1, normalizeSessionFilterField(field), value, "", "")
 	return session.Count(&Session{})
 }
 
