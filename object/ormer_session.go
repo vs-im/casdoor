@@ -32,7 +32,10 @@ func GetSession(owner string, offset, limit int, field, value, sortField, sortOr
 	}
 	if field != "" && value != "" {
 		if util.FilterField(field) {
-			session = session.And(fmt.Sprintf("%s like ?", util.CamelToSnakeCase(field)), fmt.Sprintf("%%%s%%", value))
+			// Quote the column: unquoted reserved words break the filter, e.g. in
+			// PostgreSQL bare "user" resolves to the current_user keyword, so
+			// "user like ?" silently matches nothing (field=user returned 0 rows).
+			session = session.And(fmt.Sprintf("%s like ?", ormer.Engine.Quote(util.CamelToSnakeCase(field))), fmt.Sprintf("%%%s%%", value))
 		}
 	}
 	if sortField == "" || sortOrder == "" || !util.FilterField(sortField) {
@@ -60,10 +63,13 @@ func GetSessionForUser(owner string, offset, limit int, field, value, sortField,
 	}
 	if field != "" && value != "" {
 		if util.FilterField(field) {
+			// Quote the column (reserved words, see GetSession); the alias prefix
+			// stays outside the quotes.
+			quotedField := ormer.Engine.Quote(util.CamelToSnakeCase(field))
 			if offset != -1 {
-				field = fmt.Sprintf("a.%s", field)
+				quotedField = "a." + quotedField
 			}
-			session = session.And(fmt.Sprintf("%s like ?", util.CamelToSnakeCase(field)), fmt.Sprintf("%%%s%%", value))
+			session = session.And(fmt.Sprintf("%s like ?", quotedField), fmt.Sprintf("%%%s%%", value))
 		}
 	}
 	if sortField == "" || sortOrder == "" || !util.FilterField(sortField) {
