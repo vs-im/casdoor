@@ -246,6 +246,24 @@ func initBuiltInApplication() {
 
 		CookieExpireInHours: 720,
 	}
+	// Harness supplies stable OAuth credentials and bootstrap defaults through
+	// the container environment.  Seed them directly so the first-run
+	// application is already usable; bootstrap must not update hasura through
+	// the API with non-admin client credentials.
+	if clientID := os.Getenv("CASDOOR_CLIENT_ID"); clientID != "" {
+		application.ClientId = clientID
+	}
+	if clientSecret := os.Getenv("CASDOOR_CLIENT_SECRET"); clientSecret != "" {
+		application.ClientSecret = clientSecret
+	}
+	application.GrantTypes = []string{"password", "authorization_code", "refresh_token"}
+	application.TokenFields = []string{"Properties.workspaceId"}
+	application.IsShared = true
+	application.ExpireInHours = 1
+	application.RefreshExpireInHours = 720
+	if redirectURI := os.Getenv("HASURA_REDIRECT_URI"); redirectURI != "" {
+		application.RedirectUris = []string{redirectURI}
+	}
 	_, err = AddApplication(application)
 	if err != nil {
 		panic(err)
