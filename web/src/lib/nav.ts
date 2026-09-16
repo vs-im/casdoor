@@ -70,6 +70,7 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
     to: "/applications",
     items: [
       {key: "/applications", label: i18next.t("general:Applications")},
+      {key: "/magic-links", label: i18next.t("general:Magic Links")},
       {key: "/providers", label: i18next.t("application:Providers")},
       {key: "/resources", label: i18next.t("general:Resources")},
       {key: "/certs", label: i18next.t("general:Certs")},

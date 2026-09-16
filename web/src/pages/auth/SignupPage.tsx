@@ -1,7 +1,7 @@
 import * as React from "react";
 import i18next from "i18next";
 import {Link, useNavigate, useParams, useSearchParams} from "react-router-dom";
-import {Alert, AlertDescription} from "@/components/ui/alert";
+import {Alert, AlertDescription, AlertTitle} from "@/components/ui/alert";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Input} from "@/components/ui/input";
@@ -75,6 +75,12 @@ export default function SignupPage({application: applicationProp}: {application?
   const [invitation, setInvitation] = React.useState<any>(undefined);
   const [passwordFocused, setPasswordFocused] = React.useState(false);
   const [userLang, setUserLang] = React.useState("");
+  // sign-up by magic link: the email is mailed a link instead of filling the form
+  const [magicLinkEmail, setMagicLinkEmail] = React.useState("");
+  const [magicLinkSent, setMagicLinkSent] = React.useState(false);
+  const [magicLinkLoading, setMagicLinkLoading] = React.useState(false);
+  // which request the captcha dialog is guarding
+  const [captchaAction, setCaptchaAction] = React.useState<"signup" | "magicLink">("signup");
 
   const applicationName = params.applicationName ?? authConfig.appName;
 
@@ -288,6 +294,47 @@ export default function SignupPage({application: applicationProp}: {application?
     }
 
     submitSignup(payload);
+  };
+
+  /**
+   * Sends the magic link that creates the account. The backend answers
+   * "captchaRequired" once the email or the IP has asked too often, in which
+   * case the captcha dialog reruns this with the token.
+   */
+  const submitMagicLink = (captcha?: {captchaType: string; captchaToken: string; clientSecret: string}) => {
+    const email = magicLinkEmail.trim();
+    if (email === "") {
+      setErrors((prev) => ({...prev, magicLinkEmail: i18next.t("login:Please input your Email!")}));
+      return;
+    }
+    if (!Setting.isValidEmail(email)) {
+      setErrors((prev) => ({...prev, magicLinkEmail: i18next.t("login:The input is not valid Email!")}));
+      return;
+    }
+    if (!checkAgreement()) {
+      return;
+    }
+
+    const payload: Record<string, any> = {
+      email,
+      organization: application.organization,
+      application: application.name,
+      ...(captcha ?? {}),
+    };
+    setMagicLinkLoading(true);
+    AuthBackend.sendMagicLink(payload, Util.getOAuthGetParameters())
+      .then((res: any) => {
+        if (res.status === "ok") {
+          setMagicLinkSent(true);
+        } else if (res.data === "captchaRequired") {
+          setCaptchaAction("magicLink");
+          setCaptchaVisible(true);
+        } else {
+          Setting.showMessage("error", res.msg);
+        }
+      })
+      .catch((error) => Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}${error}`))
+      .finally(() => setMagicLinkLoading(false));
   };
 
   const getResultPath = (payload: Record<string, any>, username: string) => {
@@ -615,6 +662,39 @@ export default function SignupPage({application: applicationProp}: {application?
           {item.label || i18next.t("account:Sign Up")}
         </Button>
       );
+    case "Magic link":
+      if (!Setting.isMagicLinkSignupEnabled(application)) {
+        return null;
+      }
+      return (
+        <div key={item.name} className="signup-magic-link space-y-3">
+          {item.label ? <div className="text-sm font-semibold">{item.label}</div> : null}
+          <div className="space-y-2">
+            <Input
+              id="magicLinkEmail"
+              className="signup-magic-link-input"
+              autoComplete="email"
+              placeholder={item.placeholder || i18next.t("general:Email")}
+              value={magicLinkEmail}
+              onChange={(e) => {
+                setMagicLinkEmail(e.target.value);
+                setErrors((prev) => (prev.magicLinkEmail ? {...prev, magicLinkEmail: ""} : prev));
+              }}
+              onKeyDown={(e) => {
+                // Enter here sends the link rather than submitting the whole form
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submitMagicLink();
+                }
+              }}
+            />
+            {fieldError("magicLinkEmail")}
+          </div>
+          <Button type="button" className="w-full" loading={magicLinkLoading} onClick={() => submitMagicLink()}>
+            {i18next.t("login:Send Magic Link")}
+          </Button>
+        </div>
+      );
     case "ID":
     case "Languages":
       return null;
@@ -655,6 +735,22 @@ export default function SignupPage({application: applicationProp}: {application?
   // The whole page can be replaced by the application's own markup.
   if (application.signupHtml) {
     return <CustomHtml html={application.signupHtml} />;
+  }
+
+  if (magicLinkSent) {
+    return (
+      <AuthLayout preview={!!applicationProp} application={application}>
+        <div className="space-y-4">
+          <Alert variant="success">
+            <AlertTitle>{i18next.t("login:Check your email")}</AlertTitle>
+            <AlertDescription>{i18next.t("login:We sent you a magic link to sign in")}</AlertDescription>
+          </Alert>
+          <Button className="w-full" onClick={() => Setting.goToLink(signinLink)}>
+            {i18next.t("login:Sign In")}
+          </Button>
+        </div>
+      </AuthLayout>
+    );
   }
 
   // an application that lists no signup button at all still gets the default one
@@ -704,9 +800,17 @@ export default function SignupPage({application: applicationProp}: {application?
             isCurrentProvider
             onOk={(captchaType, captchaToken, clientSecret) => {
               setCaptchaVisible(false);
+              if (captchaAction === "magicLink") {
+                setCaptchaAction("signup");
+                submitMagicLink({captchaType, captchaToken, clientSecret});
+                return;
+              }
               submitSignup({...pendingValues, captchaType, captchaToken, clientSecret});
             }}
-            onCancel={() => setCaptchaVisible(false)}
+            onCancel={() => {
+              setCaptchaVisible(false);
+              setCaptchaAction("signup");
+            }}
           />
         ) : null}
       </form>

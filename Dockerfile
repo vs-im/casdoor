@@ -1,13 +1,13 @@
-# Фронт собирается из web-old (наш Ant Design UI с magic link); новый upstream web/ (shadcn) пока не используется — см. OQ-CAS-2-1
+# Фронт — новая shadcn-консоль upstream'а из web/ (с нашими правками: magic link и т.д.); web-old/ в образ не попадает
 FROM --platform=$BUILDPLATFORM node:20-alpine AS front
 WORKDIR /web
 
 # Copy only dependency files first for better caching
-COPY ./web-old/package.json ./web-old/yarn.lock ./
+COPY ./web/package.json ./web/yarn.lock ./
 RUN yarn install --frozen-lockfile --network-timeout 1000000
 
 # Copy source files and build
-COPY ./web-old .
+COPY ./web .
 RUN NODE_OPTIONS="--max-old-space-size=4096" yarn run build
 
 

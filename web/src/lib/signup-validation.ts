@@ -189,6 +189,7 @@ export function validateSignupItem(item: any, values: Record<string, any>, appli
   case "Languages":
   case "Providers":
   case "Signup button":
+  case "Magic link":
   case "Text 1":
   case "Text 2":
   case "Text 3":

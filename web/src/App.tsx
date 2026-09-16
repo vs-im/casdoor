@@ -80,6 +80,7 @@ const RecordListPage = React.lazy(() => import("@/pages/RecordListPage"));
 const TokenListPage = React.lazy(() => import("@/pages/TokenListPage"));
 const TokenEditPage = React.lazy(() => import("@/pages/TokenEditPage"));
 const VerificationListPage = React.lazy(() => import("@/pages/VerificationListPage"));
+const MagicLinkListPage = React.lazy(() => import("@/pages/MagicLinkListPage"));
 
 const ProductListPage = React.lazy(() => import("@/pages/ProductListPage"));
 const ProductStorePage = React.lazy(() => import("@/pages/ProductStorePage"));
@@ -129,6 +130,7 @@ const PromptPage = React.lazy(() => import("@/pages/auth/PromptPage"));
 const TelegramLogin = React.lazy(() => import("@/pages/auth/TelegramLogin"));
 const CasLogout = React.lazy(() => import("@/pages/auth/CasLogout"));
 const CaptchaPage = React.lazy(() => import("@/pages/auth/CaptchaPage"));
+const MagicLinkCallback = React.lazy(() => import("@/pages/auth/MagicLinkCallback"));
 const OidcDiscoveryPage = React.lazy(() => import("@/pages/auth/OidcDiscoveryPage"));
 
 Setting.initServerUrl();
@@ -222,6 +224,7 @@ export default function App() {
         <Route path="/callback/saml" element={<SamlCallback />} />
         <Route path="/telegram-login" element={<TelegramLogin />} />
         <Route path="/captcha" element={<CaptchaPage />} />
+        <Route path="/magic-link/callback" element={<MagicLinkCallback />} />
         <Route path="/.well-known/openid-configuration" element={<OidcDiscoveryPage />} />
         <Route path="/consent/:applicationName" element={<ConsentPage />} />
         <Route path="/prompt" element={<PromptPage />} />
@@ -266,6 +269,7 @@ export default function App() {
 
           <Route path="/applications" element={<ApplicationListPage />} />
           <Route path="/applications/:organizationName/:applicationName" element={<ApplicationEditPage />} />
+          <Route path="/magic-links" element={<MagicLinkListPage />} />
           <Route path="/providers" element={<ProviderListPage />} />
           <Route path="/providers/:organizationName/:providerName" element={<ProviderEditPage />} />
           <Route path="/resources" element={<ResourceListPage />} />

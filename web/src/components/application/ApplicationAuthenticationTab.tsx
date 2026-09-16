@@ -23,6 +23,29 @@ export function ApplicationAuthenticationTab({application, updateField}: Applica
       <FormRow labelKey="application:Enable signup">
         <Switch checked={!!application.enableSignUp} onCheckedChange={(v) => updateField("enableSignUp", v)} />
       </FormRow>
+      <FormRow labelKey="application:Magic link sign-in enabled">
+        <Switch
+          checked={Setting.isMagicLinkEnabled(application)}
+          onCheckedChange={(v) => {
+            updateField("magicLinkSigninEnabled", v);
+            // sign-up by magic link needs sign-in by magic link
+            if (!v) {
+              updateField("enableMagicLinkSignup", false);
+            }
+          }}
+        />
+      </FormRow>
+      <FormRow labelKey="application:Magic link sign-up">
+        <Switch
+          checked={!!application.enableMagicLinkSignup}
+          onCheckedChange={(v) => {
+            if (v && !Setting.isMagicLinkEnabled(application)) {
+              updateField("magicLinkSigninEnabled", true);
+            }
+            updateField("enableMagicLinkSignup", v);
+          }}
+        />
+      </FormRow>
       <FormRow labelKey="application:Disable signin">
         <Switch checked={!!application.disableSignin} onCheckedChange={(v) => updateField("disableSignin", v)} />
       </FormRow>
@@ -67,6 +90,63 @@ export function ApplicationAuthenticationTab({application, updateField}: Applica
         <Switch
           checked={!!application.enableLinkWithEmail}
           onCheckedChange={(v) => updateField("enableLinkWithEmail", v)}
+        />
+      </FormRow>
+      {/* the magic link limits mirror object.ValidateMagicLinkConfig() in the backend */}
+      <FormRow labelKey="application:Magic link default TTL">
+        <Input
+          type="number"
+          min={2}
+          max={43200}
+          value={application.magicLinkExpireMinutes || 10}
+          onChange={(e) => updateField("magicLinkExpireMinutes", Setting.myParseInt(e.target.value))}
+        />
+      </FormRow>
+      <FormRow labelKey="application:Magic link permission">
+        <Input
+          value={application.magicLinkPermission ?? ""}
+          placeholder="owner/name"
+          onChange={(e) => updateField("magicLinkPermission", e.target.value)}
+        />
+      </FormRow>
+      <FormRow labelKey="application:Magic link rate limit window">
+        <Input
+          type="number"
+          min={1}
+          value={application.magicLinkRateLimitWindowMinutes || 15}
+          onChange={(e) => updateField("magicLinkRateLimitWindowMinutes", Setting.myParseInt(e.target.value))}
+        />
+      </FormRow>
+      <FormRow labelKey="application:Magic link email limit">
+        <Input
+          type="number"
+          min={1}
+          value={application.magicLinkRateLimitEmail || 3}
+          onChange={(e) => updateField("magicLinkRateLimitEmail", Setting.myParseInt(e.target.value))}
+        />
+      </FormRow>
+      <FormRow labelKey="application:Magic link IP limit">
+        <Input
+          type="number"
+          min={1}
+          value={application.magicLinkRateLimitIp || 10}
+          onChange={(e) => updateField("magicLinkRateLimitIp", Setting.myParseInt(e.target.value))}
+        />
+      </FormRow>
+      <FormRow labelKey="application:Magic link application limit">
+        <Input
+          type="number"
+          min={1}
+          value={application.magicLinkRateLimitApplication || 100}
+          onChange={(e) => updateField("magicLinkRateLimitApplication", Setting.myParseInt(e.target.value))}
+        />
+      </FormRow>
+      <FormRow labelKey="application:Magic link captcha threshold">
+        <Input
+          type="number"
+          min={1}
+          value={application.magicLinkCaptchaThreshold || 1}
+          onChange={(e) => updateField("magicLinkCaptchaThreshold", Setting.myParseInt(e.target.value))}
         />
       </FormRow>
       <FormRow labelKey="general:Signup URL">

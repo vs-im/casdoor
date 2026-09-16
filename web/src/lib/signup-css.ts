@@ -18,6 +18,7 @@ export const SignupTableDefaultCssMap: Record<string, string> = {
   "Invitation code": ".signup-invitation-code{}\n.signup-invitation-code-input{}",
   "Agreement": ".login-agreement{}",
   "Signup button": ".signup-button{}\n.signup-link{}",
+  "Magic link": ".signup-magic-link{}",
   "Providers": ".provider-img {\n width: 30px;\n margin: 5px;\n }\n .provider-big-img {\n margin-bottom: 10px;\n }\n ",
   "Languages": ".signup-languages {\n    top: 55px;\n    right: 5px;\n    position: absolute;\n}",
 };

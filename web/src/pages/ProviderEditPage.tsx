@@ -691,6 +691,8 @@ export default function ProviderEditPage() {
       patch.title = "Casdoor Verification Code";
       patch.content = Setting.getDefaultHtmlEmailContent();
       patch.metadata = Setting.getDefaultInvitationHtmlEmailContent();
+      patch.magicLinkContent = Setting.getDefaultMagicLinkHtmlEmailContent();
+      patch.magicLinkSignupContent = Setting.getDefaultMagicLinkSignupHtmlEmailContent();
       patch.receiver = account?.email ?? "";
     } else if (value === "SMS") {
       defaultType = "Twilio SMS";
@@ -975,6 +977,9 @@ export default function ProviderEditPage() {
     </React.Fragment>
   );
 
+  // the sample link the magic link mail previews are rendered with
+  const magicLinkPreviewUrl = `${Setting.ServerUrl}/magic-link/callback?token=example`;
+
   const renderEmailFields = () => (
     <React.Fragment>
       {["Custom HTTP Email", "SendGrid"].includes(provider.type) ? (
@@ -1079,6 +1084,71 @@ export default function ProviderEditPage() {
             <div
               className="overflow-auto rounded-md border bg-background p-3"
               dangerouslySetInnerHTML={{__html: String(provider.metadata ?? "").replace("%code", "123456").replace("%s", "123456")}}
+            />
+          </div>
+        </div>
+      </FormRow>
+      {/* the mails a magic link goes out in; "%link" is the sign-in URL the backend fills in */}
+      <FormRow
+        label={`${i18next.t("provider:Email content")}-${i18next.t("provider:Magic Link sign-in")}`}
+        tooltip={i18next.t("provider:Email content - Tooltip")}
+        block
+      >
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => updateProviderField("magicLinkContent", "You have requested a magic link at Casdoor. Click %link to sign in. The link can be used once and expires soon.")}
+            >
+              {i18next.t("general:Reset to Default")} (Text)
+            </Button>
+            <Button size="sm" onClick={() => updateProviderField("magicLinkContent", Setting.getDefaultMagicLinkHtmlEmailContent())}>
+              {i18next.t("general:Reset to Default")} (HTML)
+            </Button>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <CodeEditor
+              language="html"
+              height={300}
+              value={provider.magicLinkContent ?? ""}
+              onChange={(v) => updateProviderField("magicLinkContent", v)}
+            />
+            <div
+              className="overflow-auto rounded-md border bg-background p-3"
+              dangerouslySetInnerHTML={{__html: String(provider.magicLinkContent ?? "").split("%link").join(magicLinkPreviewUrl)}}
+            />
+          </div>
+        </div>
+      </FormRow>
+      <FormRow
+        label={`${i18next.t("provider:Email content")}-${i18next.t("provider:Magic Link sign-up")}`}
+        tooltip={i18next.t("provider:Email content - Tooltip")}
+        block
+      >
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => updateProviderField("magicLinkSignupContent", "Welcome to Casdoor. Click %link to create your account. The link can be used once and expires soon.")}
+            >
+              {i18next.t("general:Reset to Default")} (Text)
+            </Button>
+            <Button size="sm" onClick={() => updateProviderField("magicLinkSignupContent", Setting.getDefaultMagicLinkSignupHtmlEmailContent())}>
+              {i18next.t("general:Reset to Default")} (HTML)
+            </Button>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <CodeEditor
+              language="html"
+              height={300}
+              value={provider.magicLinkSignupContent ?? ""}
+              onChange={(v) => updateProviderField("magicLinkSignupContent", v)}
+            />
+            <div
+              className="overflow-auto rounded-md border bg-background p-3"
+              dangerouslySetInnerHTML={{__html: String(provider.magicLinkSignupContent ?? "").split("%link").join(magicLinkPreviewUrl)}}
             />
           </div>
         </div>

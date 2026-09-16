@@ -106,9 +106,12 @@ const SIGNIN_ITEM_NAMES: {name: string; labelKey: string}[] = [
 const SIGNUP_ITEM_NAMES = [
   "Username", "ID", "Display name", "First name", "Last name", "Affiliation", "Gender", "Bio", "Tag",
   "Education", "Country/Region", "ID card", "Password", "Confirm password", "Email", "Phone",
-  "Email or Phone", "Phone or Email", "Invitation code", "Agreement", "Signup button", "Providers",
+  "Email or Phone", "Phone or Email", "Invitation code", "Agreement", "Signup button", "Magic link", "Providers",
   "Languages", "Text 1", "Text 2", "Text 3", "Text 4", "Text 5",
 ];
+
+/** the items that are a button or a block rather than a field the user fills in */
+const SIGNUP_ITEMS_WITHOUT_INPUT = ["Signup button", "Magic link", "Providers", "Languages"];
 
 /** Only a few signin items take a rule, and each has its own option set. */
 function getSigninItemRuleOptions(name: string) {
@@ -140,6 +143,25 @@ function getSigninItemRuleOptions(name: string) {
 
 /** The "UI Customization" tab: the blocks the sign-in and sign-up pages are built from. */
 export function ApplicationUiCustomizationTab({application, updateField}: ApplicationTabProps) {
+  // the Email providers of the application; the one carrying the "Magic link"
+  // rule is the one the backend picks for sending magic links
+  const emailProviderItems = (application.providers ?? []).filter((item: any) => item.provider?.category === "Email");
+  const magicLinkProviderName = emailProviderItems.find((item: any) => item.rule === "Magic link")?.name ?? "";
+  const updateMagicLinkSignupProvider = (providerName: string) => {
+    updateField(
+      "providers",
+      (application.providers ?? []).map((item: any) => {
+        if (item.name === providerName) {
+          return {...item, rule: "Magic link"};
+        }
+        if (item.rule === "Magic link" && item.provider?.category === "Email") {
+          return {...item, rule: "All"};
+        }
+        return item;
+      }),
+    );
+  };
+
   return (
     <>
       <FormRow block labelKey="application:Org choice mode">
@@ -167,7 +189,7 @@ export function ApplicationUiCustomizationTab({application, updateField}: Applic
                 <SelectField
                   value={row.name}
                   onChange={(v) => patch({name: v, displayName: v})}
-                  options={["Password", "Verification code", "WebAuthn", "LDAP", "Face ID", "Device login"].map(
+                  options={["Password", "Verification code", "WebAuthn", "LDAP", "Face ID", "Magic link", "Device login"].map(
                     (item) => ({id: item, name: item}),
                   )}
                 />
@@ -319,6 +341,21 @@ export function ApplicationUiCustomizationTab({application, updateField}: Applic
               ),
             },
             {
+              key: "magicLinkProvider",
+              title: i18next.t("application:Magic link provider"),
+              width: 200,
+              // the Email provider whose rule is "Magic link" sends the sign-up links
+              render: (row: any) =>
+                row.name === "Magic link" ? (
+                  <SelectField
+                    value={magicLinkProviderName}
+                    placeholder={i18next.t("application:Please select a provider")}
+                    onChange={updateMagicLinkSignupProvider}
+                    options={emailProviderItems.map((item: any) => ({id: item.name, name: item.name}))}
+                  />
+                ) : null,
+            },
+            {
               key: "visible",
               title: i18next.t("organization:Visible"),
               width: 90,
@@ -330,25 +367,27 @@ export function ApplicationUiCustomizationTab({application, updateField}: Applic
               key: "required",
               title: i18next.t("organization:Required"),
               width: 90,
-              render: (row: any, _i, patch) => (
-                <Switch
-                  checked={!!row.required}
-                  disabled={!row.visible}
-                  onCheckedChange={(v) => patch({required: v})}
-                />
-              ),
+              render: (row: any, _i, patch) =>
+                SIGNUP_ITEMS_WITHOUT_INPUT.includes(row.name) ? null : (
+                  <Switch
+                    checked={!!row.required}
+                    disabled={!row.visible}
+                    onCheckedChange={(v) => patch({required: v})}
+                  />
+                ),
             },
             {
               key: "prompted",
               title: i18next.t("provider:Prompted"),
               width: 90,
-              render: (row: any, _i, patch) => (
-                <Switch
-                  checked={!!row.prompted}
-                  disabled={row.visible}
-                  onCheckedChange={(v) => patch({prompted: v})}
-                />
-              ),
+              render: (row: any, _i, patch) =>
+                SIGNUP_ITEMS_WITHOUT_INPUT.includes(row.name) ? null : (
+                  <Switch
+                    checked={!!row.prompted}
+                    disabled={row.visible}
+                    onCheckedChange={(v) => patch({prompted: v})}
+                  />
+                ),
             },
             {
               key: "type",

@@ -119,6 +119,7 @@ export const PROVIDER_CODE_RULES: EnumMap = {
   "all": {i18nKey: "All"},
   "signup": {i18nKey: "Signup"},
   "login": {i18nKey: "Login"},
+  "Magic link": {i18nKey: "Magic Link"},
   "forget": {i18nKey: "Forget Password"},
   "reset": {i18nKey: "Reset Password"},
   "mfaSetup": {i18nKey: "Set MFA"},
