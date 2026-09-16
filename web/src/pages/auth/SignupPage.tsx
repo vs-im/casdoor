@@ -105,7 +105,7 @@ export default function SignupPage({application: applicationProp}: {application?
     }
     const load = oAuthParams
       ? AuthBackend.getApplicationLogin(oAuthParams)
-      : ApplicationBackend.getApplication("admin", applicationName);
+      : ApplicationBackend.getDefaultLoginApplication(applicationName, params.applicationName !== undefined);
     load
       .then((res: any) => {
         if (res.status === "ok" && res.data) {

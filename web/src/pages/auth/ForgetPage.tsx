@@ -45,12 +45,12 @@ export default function ForgetPage() {
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
-    ApplicationBackend.getApplication("admin", applicationName)
+    ApplicationBackend.getDefaultLoginApplication(applicationName, params.applicationName !== undefined)
       .then((res: any) => {
         setApplication(res.status === "ok" ? res.data : null);
       })
       .catch(() => setApplication(null));
-  }, [applicationName]);
+  }, [applicationName, params.applicationName]);
 
   if (application === undefined) {
     return <Loading className="min-h-screen" />;

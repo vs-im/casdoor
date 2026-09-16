@@ -13,6 +13,29 @@
 // limitations under the License.
 
 import * as Setting from "@/lib/setting";
+import * as OrganizationBackend from "@/backend/OrganizationBackend";
+
+/**
+ * The bare auth pages (`/login`, `/signup`, `/forget`, `/prompt`, no explicit
+ * application name in the URL) used to fetch `Conf.DefaultApplication`
+ * ("app-built-in") directly, but that application doesn't exist on our
+ * instances — only the `built-in` organization's actual default application
+ * does. Resolve it the same way the owner-scoped routes do
+ * (`get-default-application` for org `built-in`), falling back to the old
+ * `app-built-in` lookup so an instance that does define that application
+ * keeps working.
+ */
+export function getDefaultLoginApplication(applicationName: string, isExplicit: boolean) {
+  if (isExplicit) {
+    return getApplication("admin", applicationName);
+  }
+  return OrganizationBackend.getDefaultApplication("admin", "built-in").then((res: any) => {
+    if (res.status === "ok" && res.data) {
+      return res;
+    }
+    return getApplication("admin", applicationName);
+  });
+}
 
 export function getApplications(owner, page: any = "", pageSize: any = "", field: any = "", value: any = "", sortField: any = "", sortOrder: any = "") {
   return fetch(`${Setting.ServerUrl}/api/get-applications?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${value}&sortField=${sortField}&sortOrder=${sortOrder}`, {

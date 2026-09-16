@@ -385,7 +385,7 @@ export default function LoginPage({type = "login", application: applicationProp,
           setMsg(`${i18next.t("general:Failed to connect to server")}: ${error}`);
         });
     } else {
-      ApplicationBackend.getApplication("admin", params.applicationName ?? applicationName)
+      ApplicationBackend.getDefaultLoginApplication(applicationName, params.applicationName !== undefined)
         .then((res: any) => {
           if (res.status === "ok") {
             onLoaded(res.data);

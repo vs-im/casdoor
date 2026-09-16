@@ -37,10 +37,10 @@ export default function PromptPage({application: applicationProp}: {application?
       setApplication(applicationProp);
       return;
     }
-    ApplicationBackend.getApplication("admin", applicationName)
+    ApplicationBackend.getDefaultLoginApplication(applicationName, params.applicationName !== undefined)
       .then((res: any) => setApplication(res.status === "ok" ? res.data : null))
       .catch(() => setApplication(null));
-  }, [applicationName, applicationProp]);
+  }, [applicationName, applicationProp, params.applicationName]);
 
   const loadUser = React.useCallback(() => {
     if (!account) {
