@@ -106,23 +106,31 @@ The branded shell itself (title, description, favicon) is covered by
 
 ## Merging upstream master into develop (instructions for an agent)
 
+This is the order that worked on the last sync (18 upstream commits, one
+conflict). `develop` is a published branch, so it is always a merge, never a
+rebase.
+
 ```
-git remote -v                       # upstream = casdoor/casdoor, origin = the fork
-git fetch upstream
-git switch develop && git pull --ff-only origin develop
-git switch -c chore/upstream-sync-<date> develop
-git merge upstream/master           # never rebase: develop is a published branch
+git remote add upstream https://github.com/casdoor/casdoor.git   # once
+git fetch upstream master
+git merge-base --is-ancestor master upstream/master && git branch -f master upstream/master
+git switch develop
+git merge upstream/master
 ```
+
+`master` only ever tracks upstream: it must fast-forward, and nothing of ours may
+land on it.
 
 Conflict zones, in the order they usually appear:
 
 | Area | What upstream does | What to keep |
 |---|---|---|
+| `object/application.go` | guards the seeded application by its upstream name and adds authorization checks around it | take upstream's new checks **and** keep the fork's application name in the guard — this was the only conflict of the last sync |
 | `conf/conf.go`, `conf/web_config.go` | adds config items | keep both: upstream's items **and** the `Brand*` fields plus their assignments in `GetWebConfig` |
 | `conf/brand.go` | does not exist upstream | ours, as it is |
 | `object/init.go` | edits the seeded organization/application | take upstream's structure, then re-apply `conf.GetBrandName/LogoUrl/WebsiteUrl/FaviconUrl` in place of the literals it reintroduces |
 | `object/mfa_totp.go` | may touch the issuer fallback | keep `conf.GetBrandTotpIssuer()` |
-| `object/magic_link.go` | fork-only file | ours |
+| `object/magic_link.go`, `controllers/magic_link.go`, `routers/lightweight_auth_filter.go` | fork-only files | ours |
 | `routers/static_filter.go` | changes how the shell is served | keep upstream's serving logic, keep the `applyBrandToIndexHtml` call right after the organization-theme block |
 | `web/index.html` | changes the shell | the `<title>`, the description and `/favicon.png` must stay **byte-identical to the strings `applyBrandToIndexHtml` looks for** |
 | `web/src/locales/*/data.json` | new and changed strings | take upstream's text, then replace the product name in the **values** with `{{brand}}` (keys stay upstream) |
@@ -132,14 +140,25 @@ After the merge, in this order:
 
 ```
 scripts/check-no-brand.sh
-go build ./... && go vet ./... && go test ./conf/... ./object/ -run 'Brand|Totp'
+go build ./... && go vet ./...
+go test ./conf/... ./object/ -run 'Brand|Totp'
 cd web && yarn install && yarn run typecheck && yarn run lint && yarn run build
-node web/scripts/check-brand-render.mjs "Acme Identity"
+node scripts/check-brand-render.mjs "<the deployment brand>"
 ```
+
+`go vet` reports one pre-existing finding in `storage/casdoor.go` (unkeyed
+fields) that comes from upstream; `go test ./object/...` as a whole needs a live
+database (`TestDumpToFile`), which is why only the targeted tests are listed.
 
 A new upstream string that names the product is a **finding, not a conflict**:
 `check-no-brand.sh` will not catch it (it is the upstream brand, not a downstream
 one), so grep the merge diff for the product name and decide whether it needs the
-`{{brand}}` placeholder. Then merge the sync branch into `develop` with
-`--no-ff` and verify `git merge-base --is-ancestor` and that the merge commit has
-two parents before pushing.
+`{{brand}}` placeholder.
+
+Finally, confirm the merge really happened before pushing:
+
+```
+git merge-base --is-ancestor upstream/master develop   # upstream is in
+git log -1 --format=%P                                 # two parents
+git diff upstream/master..develop --stat               # only our delta is left
+```
