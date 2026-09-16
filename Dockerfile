@@ -34,8 +34,8 @@ COPY . .
 RUN rm -rf web web-old && ./build.sh
 
 FROM alpine:latest AS standard
-LABEL MAINTAINER="https://maxs.pro/"
-ARG USER=vitalik
+LABEL MAINTAINER="https://casdoor.org/"
+ARG USER=casdoor
 ARG TARGETOS
 ARG TARGETARCH
 ENV BUILDX_ARCH="${TARGETOS:-linux}_${TARGETARCH:-amd64}"

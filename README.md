@@ -1,8 +1,3 @@
-docker build -t casdoor:latest .
-я заменил app-built-in на hasura
-
-wget https://go.dev/dl/go1.23.6.linux-arm64.tar.gz && sudo tar -C /usr/local -xzf go1.23.6.linux-arm64.tar.gz && export PATH=$PATH:/usr/local/go/bin && go version 
-
 <div align="center">
   <a href="https://casdoor.ai">
     <img src="https://cdn.casbin.org/img/casdoor-logo_1185x256.png" alt="Casdoor" width="500">

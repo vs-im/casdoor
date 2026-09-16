@@ -249,10 +249,10 @@ func initBuiltInApplication() {
 
 		CookieExpireInHours: 720,
 	}
-	// Harness supplies stable OAuth credentials and bootstrap defaults through
-	// the container environment.  Seed them directly so the first-run
-	// application is already usable; bootstrap must not update hasura through
-	// the API with non-admin client credentials.
+	// The deployment supplies stable OAuth credentials through the container
+	// environment. Seed them directly so the first-run application is already
+	// usable: a bootstrap script cannot update this application through the API
+	// with non-admin client credentials.
 	if clientID := os.Getenv("CASDOOR_CLIENT_ID"); clientID != "" {
 		application.ClientId = clientID
 	}

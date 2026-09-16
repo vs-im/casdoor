@@ -39,6 +39,8 @@ casdoor
 .env
 .agent/
 tasks/
+# the repository is yarn-only; a bun.lock is a local artifact
+bun.lock
 *.tgz
 
 # the console has its own .gitignore for these; web-old does not
