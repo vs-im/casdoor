@@ -6,8 +6,16 @@ WORKDIR /web
 COPY ./web/package.json ./web/yarn.lock ./
 RUN yarn install --frozen-lockfile --network-timeout 1000000
 
-# Copy source files and build
+# Copy source files
 COPY ./web .
+
+# Brand assets (logos, favicon) live outside the repository: the tree carries no
+# brand, the image gets one at build time. The directory is copied to
+# web/public/brand, so its files are served at /brand/<file> and can be pointed at
+# with CASDOOR_BRAND_LOGO_URL=/brand/logo.svg etc. See docs/branding.md.
+ARG BRAND_ASSETS_DIR=web/brand-default
+COPY ./${BRAND_ASSETS_DIR}/ ./public/brand/
+
 RUN NODE_OPTIONS="--max-old-space-size=4096" yarn run build
 
 

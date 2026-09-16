@@ -225,7 +225,7 @@ export function AppSidebar({onNavigate}: {onNavigate?: () => void}) {
           {/* collapsed the organization's favicon fits where its wordmark does not */}
           <img
             src={collapsed ? organization?.favicon || siderLogo : siderLogo}
-            alt={organization?.displayName || Conf.ProductName}
+            alt={organization?.displayName || Conf.BrandName}
             className={cn("object-contain", collapsed ? "h-6 w-6 rounded" : "h-8 max-w-[160px]")}
           />
         </Link>

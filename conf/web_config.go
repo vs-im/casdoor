@@ -22,6 +22,17 @@ type WebConfig struct {
 	StaticBaseUrl       string `json:"staticBaseUrl"`
 	DefaultApplication  string `json:"defaultApplication"`
 	MaxItemsForFlatMenu int64  `json:"maxItemsForFlatMenu"`
+
+	// Branding (CASDOOR_BRAND_*, see conf/brand.go and docs/branding.md): the
+	// frontend keeps the same upstream defaults compiled in and overrides them
+	// with these values, so a white-label deployment needs no frontend rebuild.
+	BrandName        string `json:"brandName"`
+	BrandTagline     string `json:"brandTagline"`
+	BrandLogoUrl     string `json:"brandLogoUrl"`
+	BrandLogoDarkUrl string `json:"brandLogoDarkUrl"`
+	BrandLogoMarkUrl string `json:"brandLogoMarkUrl"`
+	BrandFaviconUrl  string `json:"brandFaviconUrl"`
+	BrandWebsiteUrl  string `json:"brandWebsiteUrl"`
 }
 
 func GetWebConfig() *WebConfig {
@@ -42,6 +53,14 @@ func GetWebConfig() *WebConfig {
 		maxItemsForFlatMenu = 7
 	}
 	config.MaxItemsForFlatMenu = maxItemsForFlatMenu
+
+	config.BrandName = GetBrandName()
+	config.BrandTagline = GetBrandTagline()
+	config.BrandLogoUrl = GetBrandLogoUrl()
+	config.BrandLogoDarkUrl = GetBrandLogoDarkUrl()
+	config.BrandLogoMarkUrl = GetBrandLogoMarkUrl()
+	config.BrandFaviconUrl = GetBrandFaviconUrl()
+	config.BrandWebsiteUrl = GetBrandWebsiteUrl()
 
 	return config
 }

@@ -18,6 +18,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/casdoor/casdoor/conf"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 )
@@ -34,9 +35,10 @@ type TotpMfa struct {
 }
 
 func (mfa *TotpMfa) Initiate(userId string, issuer string) (*MfaProps, error) {
-	// Use the provided issuer (organization display name), or fall back to our product name if not provided
+	// Use the provided issuer (organization display name), or fall back to the
+	// deployment's brand name (CASDOOR_BRAND_TOTP_ISSUER) if not provided
 	if issuer == "" {
-		issuer = "Receipt Hunter"
+		issuer = conf.GetBrandTotpIssuer()
 	}
 
 	key, err := totp.Generate(totp.GenerateOpts{

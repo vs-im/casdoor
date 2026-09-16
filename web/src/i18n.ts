@@ -73,6 +73,11 @@ i18n
     nsSeparator: ":",
     interpolation: {
       escapeValue: true,
+      // The locale bundles carry "{{brand}}" wherever upstream wrote its own
+      // product name, so the tree stays brand-free; the deployment's brand
+      // (CASDOOR_BRAND_NAME, delivered in the backend's config cookie above) is
+      // substituted here, without touching any t() call site.
+      defaultVariables: {brand: Conf.BrandName},
     },
     react: {
       useSuspense: false,

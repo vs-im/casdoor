@@ -376,15 +376,20 @@ func SendMagicLinkToEmail(organization *Organization, provider *Provider, email 
 	return SendEmail(provider, title, content, []string{email}, sender)
 }
 
-// getDefaultEmailLogoURL is the logo the default email templates embed: our
-// wordmark from web/public, served by the frontend origin (an email client cannot
-// load a relative path).
+// getDefaultEmailLogoURL is the logo the default email templates embed
+// (CASDOOR_BRAND_LOGO_MARK_URL). A root-relative value is resolved against the
+// frontend origin, because an email client cannot load a relative path.
 func getDefaultEmailLogoURL() string {
+	logoURL := conf.GetBrandLogoMarkUrl()
+	if !strings.HasPrefix(logoURL, "/") {
+		return logoURL
+	}
+
 	origin := strings.TrimRight(conf.GetConfigString("originFrontend"), "/")
 	if origin == "" {
 		origin = strings.TrimRight(conf.GetConfigString("origin"), "/")
 	}
-	return origin + "/rh-logo-mark.png"
+	return origin + logoURL
 }
 
 func GetDefaultMagicLinkEmailContent(magicLinkURL string, expireTime string) string {
@@ -503,7 +508,7 @@ func GetDefaultMagicLinkEmailContent(magicLinkURL string, expireTime string) str
     <div class="message" style="margin-top: 24px;">
       This link can be used once and will expire at %expireTime.<br>
       Thanks,<br>
-      Receipt Hunter Team
+      %signature
     </div>
 
     <div class="footer">
@@ -513,6 +518,7 @@ func GetDefaultMagicLinkEmailContent(magicLinkURL string, expireTime string) str
 </body>
 </html>`
 	content = strings.ReplaceAll(content, "%logoUrl", logoURL)
+	content = strings.ReplaceAll(content, "%signature", conf.GetBrandEmailSignature())
 	content = strings.ReplaceAll(content, "%link", magicLinkURL)
 	return strings.ReplaceAll(content, "%expireTime", expireTime)
 }
@@ -633,7 +639,7 @@ func GetDefaultMagicLinkSignupEmailContent(magicLinkURL string, expireTime strin
     <div class="message" style="margin-top: 24px;">
       This link can be used once and will expire at %expireTime.<br>
       Thanks,<br>
-      Receipt Hunter Team
+      %signature
     </div>
 
     <div class="footer">
@@ -643,6 +649,7 @@ func GetDefaultMagicLinkSignupEmailContent(magicLinkURL string, expireTime strin
 </body>
 </html>`
 	content = strings.ReplaceAll(content, "%logoUrl", logoURL)
+	content = strings.ReplaceAll(content, "%signature", conf.GetBrandEmailSignature())
 	content = strings.ReplaceAll(content, "%link", magicLinkURL)
 	return strings.ReplaceAll(content, "%expireTime", expireTime)
 }

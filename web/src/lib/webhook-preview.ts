@@ -1,22 +1,26 @@
+import * as Conf from "@/Conf";
+
 
 /**
  * The sample payload the webhook preview renders, lifted from
  * `web/src/WebhookEditPage.js` so the two frontends show the same thing.
  */
-const applicationTemplate = {
+// A function, not a const: the branding it reads is filled in from the backend's
+// config cookie at startup, which may land after this module is evaluated.
+const applicationTemplate = () => ({
   owner: "admin", // this.props.account.applicationName,
   name: "application_123",
   organization: "built-in",
   createdTime: "2022-01-01T01:03:42+08:00",
   displayName: "New Application - 123",
-  logo: "/rh-logo.svg",
+  logo: Conf.BrandLogoUrl,
   enablePassword: true,
   enableSignUp: true,
   disableSignin: false,
   enableSigninSession: false,
   enableCodeSignin: false,
   enableSamlCompress: false,
-};
+});
 
 const previewTemplate = {
   "id": 9078,
@@ -30,7 +34,7 @@ const previewTemplate = {
   "requestUri": "/api/add-application",
   "action": "login",
   "isTriggered": false,
-  "object": JSON.stringify(applicationTemplate),
+  "object": "",
 };
 
 const userTemplate = {
@@ -81,7 +85,7 @@ const userTemplate = {
 
 /** The record a webhook would post, with the extended user the settings ask for. */
 export function buildWebhookPreview(webhook: any): string {
-  const preview: Record<string, any> = {...previewTemplate};
+  const preview: Record<string, any> = {...previewTemplate, object: JSON.stringify(applicationTemplate())};
   if (webhook?.isUserExtended) {
     if (webhook.tokenFields && webhook.tokenFields.length !== 0) {
       const extendedUser: Record<string, any> = {};

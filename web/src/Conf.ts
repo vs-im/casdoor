@@ -14,8 +14,25 @@
 
 import * as Cookie from "cookie";
 
+/**
+ * Branding. The compile-time values are the stock upstream ones, so the tree
+ * carries no downstream brand; a deployment sets the CASDOOR_BRAND_* variables on
+ * the server (see docs/branding.md) and the backend ships them here inside the
+ * `jsonWebConfig` cookie. `VITE_BRAND_*` only exists for `vite dev` without a
+ * backend. These are mutable module bindings: read them as `Conf.BrandName` at
+ * render time, never snapshot them into a module-level const.
+ */
+const viteEnv = (import.meta as any).env ?? {};
+
 /** The product name shown wherever upstream showed its own: titles, alt texts, emails, the TOTP issuer fallback. */
-export const ProductName = "Receipt Hunter";
+export let BrandName: string = viteEnv.VITE_BRAND_NAME || "Casdoor";
+/** The wordmark, and its twin for dark backgrounds. */
+export let BrandLogoUrl: string = viteEnv.VITE_BRAND_LOGO_URL || "https://cdn.casbin.org/img/casdoor-logo_1185x256.png";
+export let BrandLogoDarkUrl: string = viteEnv.VITE_BRAND_LOGO_DARK_URL || BrandLogoUrl;
+/** The square mark embedded in the built-in email templates. */
+export let BrandLogoMarkUrl: string = viteEnv.VITE_BRAND_LOGO_MARK_URL || BrandLogoUrl;
+export let BrandFaviconUrl: string = viteEnv.VITE_BRAND_FAVICON_URL || "https://cdn.casbin.org/img/favicon.png";
+export let BrandWebsiteUrl: string = viteEnv.VITE_BRAND_WEBSITE_URL || "https://casdoor.org";
 
 export let DefaultApplication = "app-built-in";
 
@@ -64,6 +81,25 @@ export function setConfig(config: Record<string, any>) {
   }
   if (config.maxItemsForFlatMenu !== undefined) {
     MaxItemsForFlatMenu = config.maxItemsForFlatMenu;
+  }
+  if (config.brandName) {
+    BrandName = config.brandName;
+  }
+  if (config.brandLogoUrl) {
+    BrandLogoUrl = config.brandLogoUrl;
+    BrandLogoDarkUrl = config.brandLogoUrl;
+  }
+  if (config.brandLogoDarkUrl) {
+    BrandLogoDarkUrl = config.brandLogoDarkUrl;
+  }
+  if (config.brandLogoMarkUrl) {
+    BrandLogoMarkUrl = config.brandLogoMarkUrl;
+  }
+  if (config.brandFaviconUrl) {
+    BrandFaviconUrl = config.brandFaviconUrl;
+  }
+  if (config.brandWebsiteUrl) {
+    BrandWebsiteUrl = config.brandWebsiteUrl;
   }
 }
 
