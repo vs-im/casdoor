@@ -230,10 +230,8 @@ func (c *ApiController) GetUser() {
 		return
 	}
 
-	requestUserId := c.GetSessionUsername()
-	isApplicationRequest := object.IsAppUser(requestUserId)
-	isAdmin := c.IsAdmin() || isApplicationRequest
-	isAdminOrSelf := c.IsAdminOrSelf(user) || isApplicationRequest
+	isAdmin := c.IsAdminOf(user)
+	isAdminOrSelf := c.IsAdminOrSelf(user)
 	user, err = object.GetMaskedUser(user, isAdminOrSelf)
 	if err != nil {
 		c.ResponseError(err.Error())
@@ -648,7 +646,11 @@ func (c *ApiController) SetPassword() {
 		return
 	}
 
-	msg = object.CheckPasswordReuse(targetUser, newPassword, organization, c.GetAcceptLanguage())
+	msg, err = object.CheckPasswordReuse(targetUser, newPassword, organization, c.GetAcceptLanguage())
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
 	if msg != "" {
 		c.ResponseError(msg)
 		return
@@ -676,14 +678,21 @@ func (c *ApiController) SetPassword() {
 		c.SetSession("verifiedUserId", "")
 	}
 
-	targetUser.AddPasswordHistory(organization)
+	if user.Ldap == "" {
+		err = targetUser.AddPasswordHistory(organization)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+	}
+
 	targetUser.Password = newPassword
 	targetUser.UpdateUserPassword(organization)
 	targetUser.NeedUpdatePassword = false
 	targetUser.LastChangePasswordTime = util.GetCurrentTime()
 
 	if user.Ldap == "" {
-		_, err = object.UpdateUser(userId, targetUser, []string{"password", "password_salt", "need_update_password", "password_type", "last_change_password_time", "password_history"}, false)
+		_, err = object.UpdateUser(userId, targetUser, []string{"password", "password_salt", "need_update_password", "password_type", "last_change_password_time"}, false)
 	} else {
 		if isAdmin {
 			err = object.ResetLdapPassword(targetUser, "", newPassword, c.GetAcceptLanguage())

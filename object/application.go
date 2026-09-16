@@ -438,6 +438,12 @@ func UpdateApplication(id string, application *Application, isGlobalAdmin bool, 
 		return false, errors.New(i18n.Translate(lang, "auth:Unauthorized operation"))
 	}
 
+	if !isGlobalAdmin {
+		KeepApplicationCustomHtml(application, oldApplication)
+	}
+
+	// The fork renames the seeded application (fc6f319a); upstream guards
+	// "app-built-in" here for the same reason.
 	if name == "hasura" {
 		application.Name = name
 	}

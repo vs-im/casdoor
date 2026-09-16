@@ -699,6 +699,19 @@ func GetTokenExchangeToken(application *Application, clientSecret string, subjec
 		return nil, tokenError, nil
 	}
 
+	// A valid signature is not enough: the subject token must still be active, the same
+	// way the refresh_token grant checks it, or a revoked token can be exchanged forever.
+	subjectTokenRecord, err := GetTokenByAccessToken(subjectToken)
+	if err != nil {
+		return nil, nil, err
+	}
+	if subjectTokenRecord == nil || subjectTokenRecord.ExpiresIn <= 0 {
+		return nil, &TokenError{
+			Error:            InvalidGrant,
+			ErrorDescription: "subject_token is revoked or unknown",
+		}, nil
+	}
+
 	user, err := getUser(subjectOwner, subjectName)
 	if err != nil {
 		return nil, nil, err
@@ -714,6 +727,14 @@ func GetTokenExchangeToken(application *Application, clientSecret string, subjec
 		return nil, &TokenError{
 			Error:            InvalidGrant,
 			ErrorDescription: "the user is forbidden to sign in, please contact the administrator",
+		}, nil
+	}
+
+	// the same as signing in: only a shared application serves the users of other organizations
+	if user.Owner != application.Organization && !application.IsShared {
+		return nil, &TokenError{
+			Error:            InvalidGrant,
+			ErrorDescription: fmt.Sprintf("user from subject_token: %s does not belong to the organization of the application: %s", user.GetId(), application.Organization),
 		}, nil
 	}
 

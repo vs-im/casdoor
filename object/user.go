@@ -228,8 +228,6 @@ type User struct {
 	FaceIds             []*FaceId             `json:"faceIds"`
 	Cart                []ProductInfo         `xorm:"mediumtext" json:"cart"`
 
-	PasswordHistory []*PasswordHistoryEntry `xorm:"mediumtext" json:"-"`
-
 	Ldap string `xorm:"ldap varchar(100)" json:"ldap"`
 	// UidNumber is the POSIX uid published by the built-in LDAP server, 0 when unassigned.
 	UidNumber  int               `xorm:"index" json:"uidNumber"`
@@ -1244,10 +1242,8 @@ func terminateUserAccess(user *User) error {
 		sessionIds = append(sessionIds, session.SessionId...)
 	}
 
-	// Send OIDC Back-Channel Logout notifications BEFORE expiring tokens,
-	// because SendBackchannelLogout calls GetActiveTokensByUser (expires_in > 0).
 	// The host is empty, so the issuer falls back to the configured origin
-	SendBackchannelLogout(user.Owner, user.Name, "", "")
+	sendBackchannelLogoutForTokens(user, tokens, "", "")
 
 	_, err = ExpireTokenByUser(user.Owner, user.Name)
 	if err != nil {
@@ -1283,6 +1279,11 @@ func DeleteUser(user *User) (bool, error) {
 	}
 
 	_, err = DeleteThirdPartyLinksByUser(user.Owner, user.Name)
+	if err != nil {
+		return false, err
+	}
+
+	err = DeletePasswordHistoryByUser(user.Owner, user.Name)
 	if err != nil {
 		return false, err
 	}
@@ -1433,8 +1434,16 @@ func (user *User) GetFriendlyName() string {
 	}
 }
 
-func isUserIdGlobalAdmin(userId string) bool {
-	return strings.HasPrefix(userId, "built-in/") || IsAppUser(userId)
+func isUserIdGlobalAdmin(userId string) (bool, error) {
+	if strings.HasPrefix(userId, "built-in/") {
+		return true, nil
+	}
+
+	appUser, err := GetAppUser(userId)
+	if err != nil {
+		return false, err
+	}
+	return appUser.IsGlobalAdmin(), nil
 }
 
 func ExtendUserWithRolesAndPermissions(user *User) (err error) {
@@ -1485,15 +1494,20 @@ func userChangeTrigger(owner string, oldName string, newName string) error {
 	}
 
 	for _, role := range roles {
+		changed := false
 		for j, u := range role.Users {
 			// u = organization/username
 			roleOwner, roleName, err := util.GetOwnerAndNameFromIdWithError(u)
 			if err != nil {
 				return err
 			}
-			if roleName == oldName {
+			if roleOwner == owner && roleName == oldName {
 				role.Users[j] = util.GetId(roleOwner, newName)
+				changed = true
 			}
+		}
+		if !changed {
+			continue
 		}
 		_, err = session.Where("name=?", role.Name).And("owner=?", role.Owner).Update(role)
 		if err != nil {
@@ -1507,6 +1521,7 @@ func userChangeTrigger(owner string, oldName string, newName string) error {
 		return err
 	}
 	for _, permission := range permissions {
+		changed := false
 		for j, u := range permission.Users {
 			if u == "*" {
 				continue
@@ -1517,9 +1532,13 @@ func userChangeTrigger(owner string, oldName string, newName string) error {
 			if err != nil {
 				return err
 			}
-			if permName == oldName {
+			if permOwner == owner && permName == oldName {
 				permission.Users[j] = util.GetId(permOwner, newName)
+				changed = true
 			}
+		}
+		if !changed {
+			continue
 		}
 		_, err = session.Where("name=?", permission.Name).And("owner=?", permission.Owner).Update(permission)
 		if err != nil {
@@ -1527,12 +1546,17 @@ func userChangeTrigger(owner string, oldName string, newName string) error {
 		}
 	}
 
-	_, err = session.Where(fmt.Sprintf("%s = ?", quoteColumn("user")), oldName).Cols("user").Update(&Resource{User: newName})
+	_, err = session.Where(fmt.Sprintf("owner = ? AND %s = ?", quoteColumn("user")), owner, oldName).Cols("user").Update(&Resource{User: newName})
 	if err != nil {
 		return err
 	}
 
 	_, err = session.Where("owner = ? AND user_name = ?", owner, oldName).Cols("user_name").Update(&ThirdPartyLink{UserName: newName})
+	if err != nil {
+		return err
+	}
+
+	_, err = session.Where("owner = ? AND name = ?", owner, oldName).Cols("name").Update(&PasswordHistory{Name: newName})
 	if err != nil {
 		return err
 	}

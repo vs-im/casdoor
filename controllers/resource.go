@@ -38,11 +38,7 @@ func (c *ApiController) checkResourcePermission(owner string, username string) b
 		return false
 	}
 
-	if object.IsAppUser(userId) {
-		return true
-	}
-
-	user, err := object.GetUser(userId)
+	user, err := object.GetUserOrAppUser(userId)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return false
@@ -63,6 +59,58 @@ func (c *ApiController) checkResourcePermission(owner string, username string) b
 
 	c.ResponseError(c.T("auth:Unauthorized operation"))
 	return false
+}
+
+// checkStorageProvider checks that a non-global admin only uses a storage provider their
+// organization can see: its own or a global one. Accessing a bucket directly ("Direct") is
+// limited to the organization's own providers, as a global one is shared by all organizations.
+func (c *ApiController) checkStorageProvider(provider *object.Provider, owner string, isDirect bool) bool {
+	if c.IsGlobalAdmin() {
+		return true
+	}
+
+	if provider.Category == "Storage" && (provider.Owner == owner || (!isDirect && provider.Owner == "admin")) {
+		return true
+	}
+
+	c.ResponseError(c.T("auth:Unauthorized operation"))
+	return false
+}
+
+// checkUploadPath keeps a non-global admin's upload inside the paths the frontend uses for
+// the target user, so that it cannot overwrite the files of other users or organizations.
+func (c *ApiController) checkUploadPath(tag string, owner string, username string, fullFilePath string) bool {
+	if c.IsGlobalAdmin() {
+		return true
+	}
+
+	filePath := strings.TrimPrefix(fullFilePath, "/")
+	isAllowed := false
+	switch {
+	case tag == "avatar" || strings.HasPrefix(tag, "idCard"):
+		// e.g., "avatar/built-in/admin.png"
+		dir, file := path.Split(filePath)
+		isAllowed = dir == fmt.Sprintf("%s/%s/", tag, owner) && strings.TrimSuffix(file, path.Ext(file)) == username
+	case tag == "termsOfUse":
+		// e.g., "termsOfUse/admin/app-built-in.html", only for an application of the organization
+		applicationId := strings.TrimSuffix(strings.TrimPrefix(filePath, "termsOfUse/"), ".html")
+		if c.IsAdmin() && strings.HasPrefix(filePath, "termsOfUse/") && strings.HasSuffix(filePath, ".html") {
+			application, err := object.GetApplication(applicationId)
+			if err != nil {
+				c.ResponseError(err.Error())
+				return false
+			}
+			isAllowed = application != nil && application.Organization == owner
+		}
+	default:
+		// e.g., "resource/built-in/admin/file.txt"
+		isAllowed = strings.HasPrefix(filePath, fmt.Sprintf("resource/%s/%s/", owner, username))
+	}
+
+	if !isAllowed {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+	}
+	return isAllowed
 }
 
 // GetResources
@@ -95,13 +143,27 @@ func (c *ApiController) GetResources() {
 	}
 
 	if isOrgAdmin {
+		if !c.requireOrganizationPermission(owner) {
+			return
+		}
 		user = ""
+	} else if !c.checkResourcePermission(owner, user) {
+		return
 	}
 
 	if sortField == "Direct" {
+		// lists the storage bucket itself, which isn't scoped by owner or user
+		if !isOrgAdmin {
+			c.ResponseError(c.T("auth:Unauthorized operation"))
+			return
+		}
+
 		provider, err := c.GetProviderFromContext("Storage")
 		if err != nil {
 			c.ResponseError(err.Error())
+			return
+		}
+		if !c.checkStorageProvider(provider, owner, true) {
 			return
 		}
 
@@ -195,6 +257,19 @@ func (c *ApiController) UpdateResource() {
 		return
 	}
 
+	// the name and provider locate the file that delete-resource removes, keep them as uploaded
+	if !c.IsGlobalAdmin() {
+		oldResource, err := object.GetResource(id)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		if oldResource != nil {
+			resource.Name = oldResource.Name
+			resource.Provider = oldResource.Provider
+		}
+	}
+
 	c.Data["json"] = wrapActionResponse(object.UpdateResource(id, &resource))
 	c.ServeJSON()
 }
@@ -214,6 +289,13 @@ func (c *ApiController) AddResource() {
 	}
 
 	if !c.checkResourcePermission(resource.Owner, resource.User) {
+		return
+	}
+
+	// a resource names the file that delete-resource removes, so the resources of a
+	// non-global admin only come from upload-resource, where the file path is checked
+	if !c.IsGlobalAdmin() {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
 		return
 	}
 
@@ -239,6 +321,32 @@ func (c *ApiController) DeleteResource() {
 		return
 	}
 
+	tag := c.Ctx.Input.Query("tag")
+	if !c.IsGlobalAdmin() {
+		if tag == "Direct" {
+			// the same as listing the bucket in GetResources()
+			if !c.IsAdmin() {
+				c.ResponseError(c.T("auth:Unauthorized operation"))
+				return
+			}
+		} else {
+			// delete the file of the stored resource, not the one the request names
+			storedResource, err := object.GetResource(resource.GetId())
+			if err != nil {
+				c.ResponseError(err.Error())
+				return
+			}
+			if storedResource == nil {
+				c.ResponseError(c.T("auth:Unauthorized operation"))
+				return
+			}
+			if !c.checkResourcePermission(storedResource.Owner, storedResource.User) {
+				return
+			}
+			resource = *storedResource
+		}
+	}
+
 	if resource.Provider != "" {
 		inputs, _ := c.Input()
 		inputs.Set("provider", resource.Provider)
@@ -250,9 +358,11 @@ func (c *ApiController) DeleteResource() {
 		c.ResponseError(err.Error())
 		return
 	}
+	if !c.checkStorageProvider(provider, resource.Owner, tag == "Direct") {
+		return
+	}
 	_, resource.Name = refineFullFilePath(resource.Name)
 
-	tag := c.Ctx.Input.Query("tag")
 	if tag == "Direct" {
 		resource.Name = path.Join(provider.PathPrefix, resource.Name)
 	}
@@ -320,6 +430,9 @@ func (c *ApiController) UploadResource() {
 		return
 	}
 	_, fullFilePath = refineFullFilePath(fullFilePath)
+	if !c.checkStorageProvider(provider, owner, false) || !c.checkUploadPath(tag, owner, username, fullFilePath) {
+		return
+	}
 
 	fileType := "unknown"
 	contentType := header.Header.Get("Content-Type")

@@ -55,6 +55,32 @@ var organizationParamObject = []string{
 	"/api/get-webhook-events",
 }
 
+// sessionObject lists the APIs whose controllers ignore the request parameters and
+// act on the signed-in user's organization (false) or on the user themselves (true),
+// which makes that the object to authorize against.
+var sessionObject = map[string]bool{
+	"/api/upload-groups":                false,
+	"/api/upload-roles":                 false,
+	"/api/upload-permissions":           false,
+	"/api/get-permissions-by-submitter": true,
+}
+
+func getSessionObject(ctx *context.Context, withName bool) (string, string, error) {
+	userId, ok := ctx.Input.GetData("currentUserId").(string)
+	if !ok || userId == "" {
+		return "", "", nil
+	}
+
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(userId)
+	if err != nil {
+		return "", "", err
+	}
+	if !withName {
+		name = ""
+	}
+	return owner, name, nil
+}
+
 type Object struct {
 	Owner string `json:"owner"`
 	Name  string `json:"name"`
@@ -140,13 +166,12 @@ func getObject(ctx *context.Context) (string, string, error) {
 	method := ctx.Request.Method
 	path := ctx.Request.URL.Path
 
-	// Special handling for MCP requests
-	if path == "/api/mcp" && method == http.MethodPost {
-		return getMcpObject(ctx)
-	}
-
 	if strings.HasPrefix(path, "/api/server/") {
 		return ctx.Input.Param(":owner"), ctx.Input.Param(":name"), nil
+	}
+
+	if withName, ok := sessionObject[path]; ok {
+		return getSessionObject(ctx, withName)
 	}
 
 	if method == http.MethodGet {
@@ -207,6 +232,15 @@ func getObject(ctx *context.Context) (string, string, error) {
 			id := ctx.Input.Query("id")
 			if id != "" {
 				return util.GetOwnerAndNameFromIdWithError(id)
+			}
+		}
+
+		if path == "/api/enforce" || path == "/api/batch-enforce" {
+			// the body is the casbin request, the object is the permission, model or enforcer
+			for _, param := range []string{"permissionId", "modelId", "enforcerId"} {
+				if id := ctx.Input.Query(param); id != "" {
+					return util.GetOwnerAndNameFromIdWithError(id)
+				}
 			}
 		}
 
@@ -274,12 +308,23 @@ func getObjectFromBody(ctx *context.Context, path string) (string, string) {
 // authorized. Otherwise an org admin can have a request authorized against an object
 // of their own organization and executed against another organization's object.
 func getObjects(ctx *context.Context) ([]Object, error) {
+	path := ctx.Request.URL.Path
+	if path == "/api/mcp" && ctx.Request.Method == http.MethodPost {
+		objects, err := getMcpObjects(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if len(objects) == 0 {
+			objects = []Object{{}}
+		}
+		return objects, nil
+	}
+
 	owner, name, err := getObject(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	path := ctx.Request.URL.Path
 	objects := []Object{{Owner: owner, Name: name}}
 
 	if ctx.Request.Method == http.MethodGet {
@@ -290,6 +335,10 @@ func getObjects(ctx *context.Context) ([]Object, error) {
 		if queryOwner != "" && queryOwner != owner && !util.InSlice(organizationParamObject, path) {
 			objects = append(objects, Object{Owner: queryOwner})
 		}
+		return objects, nil
+	}
+
+	if _, ok := sessionObject[path]; ok {
 		return objects, nil
 	}
 
