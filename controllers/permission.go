@@ -16,7 +16,6 @@ package controllers
 
 import (
 	"encoding/json"
-
 	"strings"
 
 	"github.com/beego/beego/v2/core/utils/pagination"

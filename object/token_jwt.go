@@ -333,6 +333,7 @@ func getClaimsWithoutThirdIdp(claims Claims) ClaimsWithoutThirdIdp {
 	}
 	return res
 }
+
 func getUserFieldValue(user *User, fieldName string) (interface{}, bool) {
 	if user == nil {
 		return nil, false
@@ -377,7 +378,6 @@ func getUserFieldValue(user *User, fieldName string) (interface{}, bool) {
 }
 
 func updateClaimsWithRoles(baseClaims jwt.MapClaims, roleNames []string, tokenAttributes []string) jwt.MapClaims {
-
 	for _, tokenAttribute := range tokenAttributes {
 		if tokenAttribute == "X-Hasura-Allowed-Roles" {
 			if len(roleNames) > 0 {

@@ -133,7 +133,7 @@ func (idp *AdfsIdProvider) GetUserInfo(token *oauth2.Token) (*UserInfo, error) {
 		return nil, err
 	}
 
-	respKey, err := json.Marshal(&(respKeys.Keys[0]))
+	respKey, err := json.Marshal(&respKeys.Keys[0])
 	if err != nil {
 		return nil, err
 	}
