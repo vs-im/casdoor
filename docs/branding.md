@@ -86,6 +86,7 @@ Nothing else changes: the same image with no `brand.env` is upstream Casdoor.
 
 ```
 scripts/check-no-brand.sh                     # no brand in the tree (CI gate)
+scripts/check-no-private.sh                   # no deployment-private data (CI gate)
 go build ./... && go vet ./...
 go test ./conf/... ./object/ -run 'Brand|Totp'
 cd web && yarn install && yarn run build
@@ -95,6 +96,13 @@ node web/scripts/check-brand-render.mjs "Acme Identity"   # locales render the b
 `scripts/check-no-brand.sh` greps the tracked and untracked tree for the brand
 patterns (`BRAND_PATTERNS` overrides the list) and fails if any brand asset got
 committed. Run it before every push of `develop` and before any upstream PR.
+
+`scripts/check-no-private.sh` is the second half of the same rule: branding is
+not the only thing that belongs to a deployment rather than to the fork. It scans
+the delta this fork adds on top of `upstream/master` for stand host names,
+personal identifiers, private-range addresses and credential shapes, and refuses
+committed local artifacts (`.env`, a lockfile of the wrong package manager, logs,
+keys). `PRIVATE_PATTERNS` extends the list for a new deployment.
 
 `web/scripts/check-brand-render.mjs` initialises i18next the way `src/i18n.ts`
 does and asserts that every `{{brand}}` placeholder in every language renders as
