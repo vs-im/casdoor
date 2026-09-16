@@ -21,6 +21,7 @@ import (
 	"github.com/beego/beego/v2/core/logs"
 	"github.com/beego/beego/v2/server/web"
 	_ "github.com/beego/beego/v2/server/web/session/redis"
+	_ "github.com/beego/beego/v2/server/web/session/redis_cluster"
 	"github.com/casdoor/casdoor/authz"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/controllers"
@@ -36,12 +37,11 @@ import (
 func main() {
 	web.BConfig.WebConfig.Session.SessionOn = true
 	web.BConfig.WebConfig.Session.SessionName = "casdoor_session_id"
-	if conf.GetConfigString("redisEndpoint") == "" {
+	if redisConfig := conf.GetRedisConfig(); redisConfig == nil {
 		web.BConfig.WebConfig.Session.SessionProvider = "file"
 		web.BConfig.WebConfig.Session.SessionProviderConfig = "./tmp"
 	} else {
-		web.BConfig.WebConfig.Session.SessionProvider = "redis"
-		web.BConfig.WebConfig.Session.SessionProviderConfig = conf.GetConfigString("redisEndpoint")
+		web.BConfig.WebConfig.Session.SessionProvider, web.BConfig.WebConfig.Session.SessionProviderConfig = redisConfig.GetSessionProvider()
 	}
 	sessionCookieLifeTime := 3600 * 24 * 30
 	if val, err := conf.GetConfigInt64("sessionCookieLifeTime"); err == nil && val > 0 {
@@ -77,7 +77,9 @@ func main() {
 	object.InitUserManager()
 	object.InitFromFile()
 	object.InitCleanupTokens()
+	object.InitCleanupRecords()
 	object.InitCleanupDeviceAuthMap()
+	object.InitExpirePermissions()
 
 	object.InitSiteMap()
 	if len(object.SiteMap) != 0 {
@@ -89,7 +91,7 @@ func main() {
 	util.SafeGoroutine(func() { controllers.InitCLIDownloader() })
 
 	// web.DelStaticPath("/static")
-	// web.SetStaticPath("/static", "web/build/static")
+	// web.SetStaticPath("/assets", "web/build/assets")
 
 	web.BConfig.WebConfig.DirectoryIndex = true
 	if web.BConfig.RunMode == "dev" {
@@ -99,6 +101,7 @@ func main() {
 	// https://studygolang.com/articles/2303
 	web.InsertFilter("*", web.BeforeStatic, routers.RequestBodyFilter)
 	web.InsertFilter("*", web.BeforeStatic, routers.ContentTypeFilter)
+	web.InsertFilter("*", web.BeforeStatic, routers.UploadedFileFilter)
 	web.InsertFilter("*", web.BeforeRouter, routers.StaticFilter)
 	web.InsertFilter("*", web.BeforeRouter, routers.AutoSigninFilter)
 	web.InsertFilter("*", web.BeforeRouter, routers.CorsFilter)

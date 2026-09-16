@@ -1,12 +1,13 @@
+# Фронт собирается из web-old (наш Ant Design UI с magic link); новый upstream web/ (shadcn) пока не используется — см. OQ-CAS-2-1
 FROM --platform=$BUILDPLATFORM node:20-alpine AS front
 WORKDIR /web
 
 # Copy only dependency files first for better caching
-COPY ./web/package.json ./web/yarn.lock ./
+COPY ./web-old/package.json ./web-old/yarn.lock ./
 RUN yarn install --frozen-lockfile --network-timeout 1000000
 
 # Copy source files and build
-COPY ./web .
+COPY ./web-old .
 RUN NODE_OPTIONS="--max-old-space-size=4096" yarn run build
 
 
@@ -22,7 +23,7 @@ RUN go mod download
 # Copy source files
 COPY . .
 
-RUN rm -rf web && ./build.sh
+RUN rm -rf web web-old && ./build.sh
 
 FROM alpine:latest AS standard
 LABEL MAINTAINER="https://maxs.pro/"

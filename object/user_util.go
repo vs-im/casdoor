@@ -62,16 +62,30 @@ func HasUserByField(organizationName string, field string, value string) bool {
 	return user != nil
 }
 
-func HasUserByPhoneAndCountryCode(organizationName string, phone string, countryCode string) bool {
+func GetUserByPhoneAndCountryCode(organizationName string, phone string, countryCode string) (*User, error) {
 	if phone == "" {
-		return false
+		return nil, nil
 	}
+
 	user := User{Owner: organizationName, Phone: phone, CountryCode: countryCode}
 	existed, err := ormer.Engine.Get(&user)
 	if err != nil {
+		return nil, err
+	}
+
+	if existed {
+		return &user, nil
+	} else {
+		return nil, nil
+	}
+}
+
+func HasUserByPhoneAndCountryCode(organizationName string, phone string, countryCode string) bool {
+	user, err := GetUserByPhoneAndCountryCode(organizationName, phone, countryCode)
+	if err != nil {
 		panic(err)
 	}
-	return existed
+	return user != nil
 }
 
 func GetUserByFields(organization string, field string) (*User, error) {
@@ -748,6 +762,15 @@ func CheckPermissionForUpdateUser(oldUser, newUser *User, isAdmin bool, allowDis
 		item := GetAccountItemByName("Cart", organization)
 		if !userVisible(isAdmin, item) {
 			newUser.Cart = oldUser.Cart
+		} else {
+			itemsChanged = append(itemsChanged, item)
+		}
+	}
+
+	if oldUser.UidNumber != newUser.UidNumber {
+		item := GetAccountItemByName("UID number", organization)
+		if !userVisible(isAdmin, item) {
+			newUser.UidNumber = oldUser.UidNumber
 		} else {
 			itemsChanged = append(itemsChanged, item)
 		}

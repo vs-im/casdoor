@@ -30,6 +30,11 @@ func AutoSigninFilter(ctx *context.Context) {
 	if strings.HasPrefix(urlPath, "/api/login/oauth/access_token") {
 		return
 	}
+	// The RFC 7591/7592 DCR endpoints authenticate themselves: the bearer value is the
+	// application's "registration_access_token", which is not a row in the "token" table.
+	if strings.HasPrefix(urlPath, "/api/oauth/register") {
+		return
+	}
 	if urlPath == "/api/mcp" {
 		var req mcpself.McpRequest
 		if err := json.Unmarshal(ctx.Input.RequestBody, &req); err == nil {
@@ -67,6 +72,17 @@ func AutoSigninFilter(ctx *context.Context) {
 		isExpired, expireTime := util.IsTokenExpired(token.CreatedTime, token.ExpiresIn)
 		if isExpired {
 			responseError(ctx, fmt.Sprintf("Access token has expired, expireTime = %s", expireTime))
+			return
+		}
+
+		// The token's user may have been forbidden or deleted after the token was issued
+		isUserActive, err := token.IsUserActive()
+		if err != nil {
+			responseError(ctx, err.Error())
+			return
+		}
+		if !isUserActive {
+			responseError(ctx, "The user is forbidden to sign in, please contact the administrator")
 			return
 		}
 

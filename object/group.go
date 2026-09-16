@@ -28,7 +28,7 @@ import (
 
 type Group struct {
 	Owner       string `xorm:"varchar(100) notnull pk" json:"owner"`
-	Name        string `xorm:"varchar(100) notnull pk unique index" json:"name"`
+	Name        string `xorm:"varchar(100) notnull pk index" json:"name"`
 	CreatedTime string `xorm:"varchar(100)" json:"createdTime"`
 	UpdatedTime string `xorm:"varchar(100)" json:"updatedTime"`
 
@@ -46,7 +46,9 @@ type Group struct {
 	HaveChildren bool     `xorm:"-" json:"haveChildren"`
 	Children     []*Group `json:"children,omitempty"`
 
-	IsEnabled  bool              `json:"isEnabled"`
+	IsEnabled bool `json:"isEnabled"`
+	// GidNumber is the POSIX gid published by the built-in LDAP server, 0 when unassigned.
+	GidNumber  int               `xorm:"index" json:"gidNumber"`
 	Properties map[string]string `xorm:"mediumtext" json:"properties"`
 }
 
@@ -93,27 +95,52 @@ func GetPaginationGroups(owner string, offset, limit int, field, value, sortFiel
 	return groups, nil
 }
 
-func GetGroupsHaveChildrenMap(groups []*Group) (map[string]*Group, error) {
-	groupsHaveChildren := []*Group{}
+// GetGroupsParentMap returns the parent group of each given group, keyed by the parent's ID.
+func GetGroupsParentMap(groups []*Group) (map[string]*Group, error) {
 	resultMap := make(map[string]*Group)
-	groupMap := map[string]*Group{}
 
-	groupIds := []string{}
+	groupNames := []string{}
 	for _, group := range groups {
-		groupMap[group.Name] = group
-		groupIds = append(groupIds, group.Name)
 		if !group.IsTopGroup {
-			groupIds = append(groupIds, group.ParentId)
+			groupNames = append(groupNames, group.ParentId)
 		}
 	}
+	if len(groupNames) == 0 {
+		return resultMap, nil
+	}
 
-	err := ormer.Engine.Cols("owner", "name", "parent_id", "display_name").Distinct("name").In("name", groupIds).Find(&groupsHaveChildren)
+	parentGroups := []*Group{}
+	err := ormer.Engine.Cols("owner", "name", "parent_id", "display_name").In("name", groupNames).Find(&parentGroups)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, group := range groupsHaveChildren {
+	for _, group := range parentGroups {
 		resultMap[group.GetId()] = group
+	}
+	return resultMap, nil
+}
+
+// GetGroupIdsHaveChildren returns the IDs of the given groups that have at least one subgroup.
+func GetGroupIdsHaveChildren(groups []*Group) (map[string]bool, error) {
+	resultMap := make(map[string]bool)
+
+	groupNames := []string{}
+	for _, group := range groups {
+		groupNames = append(groupNames, group.Name)
+	}
+	if len(groupNames) == 0 {
+		return resultMap, nil
+	}
+
+	childGroups := []*Group{}
+	err := ormer.Engine.Cols("owner", "parent_id").In("parent_id", groupNames).Find(&childGroups)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, group := range childGroups {
+		resultMap[fmt.Sprintf("%s/%s", group.Owner, group.ParentId)] = true
 	}
 	return resultMap, nil
 }
@@ -164,7 +191,7 @@ func UpdateGroup(id string, group *Group, isGlobalAdmin bool, lang string) (bool
 	}
 
 	if name != group.Name {
-		err := GroupChangeTrigger(name, group.Name)
+		err := GroupChangeTrigger(owner, name, group.Name)
 		if err != nil {
 			return false, err
 		}
@@ -253,7 +280,7 @@ func DeleteGroup(group *Group) (bool, error) {
 		return false, err
 	}
 
-	if count, err := ormer.Engine.Where("parent_id = ?", group.Name).Count(&Group{}); err != nil {
+	if count, err := ormer.Engine.Where("owner = ?", group.Owner).And("parent_id = ?", group.Name).Count(&Group{}); err != nil {
 		return false, err
 	} else if count > 0 {
 		return false, errors.New("group has children group")
@@ -295,10 +322,12 @@ func ConvertToTreeData(groups []*Group, parentId string) []*Group {
 	for _, group := range groups {
 		if group.ParentId == parentId {
 			node := &Group{
-				Title: group.DisplayName,
-				Key:   group.Name,
-				Type:  group.Type,
-				Owner: group.Owner,
+				Title:       group.DisplayName,
+				Key:         group.Name,
+				Type:        group.Type,
+				Owner:       group.Owner,
+				Name:        group.Name,
+				DisplayName: group.DisplayName,
 			}
 			children := ConvertToTreeData(groups, group.Name)
 			if len(children) > 0 {
@@ -416,8 +445,19 @@ func ExtendGroupWithUsers(group *Group) error {
 }
 
 func ExtendGroupsWithUsers(groups []*Group) error {
+	if len(groups) == 0 {
+		return nil
+	}
+
+	// Load the policy once for the whole page, GetAllUsersByGroup() would
+	// otherwise read the entire policy table again for every group.
+	err := userEnforcer.LoadPolicy()
+	if err != nil {
+		return err
+	}
+
 	for _, group := range groups {
-		users, err := userEnforcer.GetAllUsersByGroup(group.GetId())
+		users, err := userEnforcer.getAllUsersByGroup(group.GetId())
 		if err != nil {
 			return err
 		}
@@ -427,7 +467,7 @@ func ExtendGroupsWithUsers(groups []*Group) error {
 	return nil
 }
 
-func GroupChangeTrigger(oldName, newName string) error {
+func GroupChangeTrigger(owner string, oldName string, newName string) error {
 	session := ormer.Engine.NewSession()
 	defer session.Close()
 	err := session.Begin()
@@ -435,14 +475,17 @@ func GroupChangeTrigger(oldName, newName string) error {
 		return err
 	}
 
+	oldGroupId := util.GetId(owner, oldName)
+	newGroupId := util.GetId(owner, newName)
+
 	users := []*User{}
-	err = session.Where(builder.Like{"`groups`", oldName}).Find(&users)
+	err = session.Where("owner = ?", owner).And(builder.Like{"`groups`", oldGroupId}).Find(&users)
 	if err != nil {
 		return err
 	}
 
 	for _, user := range users {
-		user.Groups = util.ReplaceVal(user.Groups, oldName, newName)
+		user.Groups = util.ReplaceVal(user.Groups, oldGroupId, newGroupId)
 		_, err := updateUser(user.GetId(), user, []string{"groups"})
 		if err != nil {
 			return err
@@ -454,13 +497,26 @@ func GroupChangeTrigger(oldName, newName string) error {
 	}
 
 	groups := []*Group{}
-	err = session.Where("parent_id = ?", oldName).Find(&groups)
+	err = session.Where("owner = ?", owner).And("parent_id = ?", oldName).Find(&groups)
 	if err != nil {
 		return err
 	}
 	for _, group := range groups {
 		group.ParentId = newName
 		_, err := session.ID(core.PK{group.Owner, group.Name}).Cols("parent_id").Update(group)
+		if err != nil {
+			return err
+		}
+	}
+
+	subscriptions := []*Subscription{}
+	err = session.Where("owner = ?", owner).And(fmt.Sprintf("%s = ?", quoteColumn("group")), oldName).Find(&subscriptions)
+	if err != nil {
+		return err
+	}
+	for _, subscription := range subscriptions {
+		subscription.Group = newName
+		_, err := session.ID(core.PK{subscription.Owner, subscription.Name}).Cols("group").Update(subscription)
 		if err != nil {
 			return err
 		}

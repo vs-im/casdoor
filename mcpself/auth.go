@@ -154,7 +154,13 @@ func (c *McpController) GetClaimsFromToken() *object.Claims {
 		return nil
 	}
 
-	application, err := object.GetApplication(token.Application)
+	// The token's user may have been forbidden or deleted after the token was issued
+	isUserActive, err := token.IsUserActive()
+	if err != nil || !isUserActive {
+		return nil
+	}
+
+	application, err := object.GetApplication(util.GetId(token.Owner, token.Application))
 	if err != nil || application == nil {
 		return nil
 	}

@@ -20,8 +20,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/beego/beego/v2/core/logs"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/util"
@@ -96,8 +98,19 @@ type LdapGroup struct {
 	Cn          string   `json:"cn"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
+	GidNumber   string   `json:"gidNumber"`
 	Member      []string `json:"member"`
 	ParentDn    string   `json:"parentDn"`
+}
+
+// parsePosixNumber converts a POSIX uid/gid read from an LDAP server into the
+// form Casdoor stores. Anything absent or not a number leaves it unassigned.
+func parsePosixNumber(value string) int {
+	number, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || number < 0 {
+		return 0
+	}
+	return number
 }
 
 func (ldap *Ldap) GetLdapConn() (c *LdapConn, err error) {
@@ -132,9 +145,11 @@ func (l *LdapConn) Close() {
 		return
 	}
 
+	// The server may have dropped the connection already, e.g. after a long sync,
+	// and failing to unbind a connection we are discarding anyway is harmless.
 	err := l.Conn.Unbind()
 	if err != nil {
-		panic(err)
+		logs.Warning(fmt.Sprintf("failed to close the ldap connection, error %s", err.Error()))
 	}
 }
 
@@ -305,7 +320,7 @@ func (l *LdapConn) GetLdapGroups(ldapServer *Ldap) ([]LdapGroup, error) {
 	}
 	filterBuilder.WriteString(")")
 
-	SearchAttributes := []string{"cn", "name", "description", "member", "uniqueMember", "memberUid"}
+	SearchAttributes := []string{"cn", "name", "description", "gidNumber", "member", "uniqueMember", "memberUid"}
 	searchReq := goldap.NewSearchRequest(ldapServer.BaseDn,
 		goldap.ScopeWholeSubtree, goldap.NeverDerefAliases, 0, 0, false,
 		filterBuilder.String(), SearchAttributes, nil)
@@ -330,6 +345,10 @@ func (l *LdapConn) GetLdapGroups(ldapServer *Ldap) ([]LdapGroup, error) {
 			case "description":
 				if len(attribute.Values) > 0 {
 					group.Description = attribute.Values[0]
+				}
+			case "gidNumber":
+				if len(attribute.Values) > 0 {
+					group.GidNumber = attribute.Values[0]
 				}
 			case "member", "uniqueMember", "memberUid":
 				group.Member = append(group.Member, attribute.Values...)
@@ -498,7 +517,17 @@ func SyncLdapUsers(owner string, syncUsers []LdapUser, ldapId string) (existUser
 			}
 
 			user.Groups = buildLdapUserGroups(organization.Name, ldap, syncUser.MemberOf, existingGroupNameSet, user.Groups)
-			affected, err := UpdateUser(user.GetId(), user, []string{"groups"}, false)
+
+			columns := []string{"groups"}
+			// Adopt the LDAP uid without overwriting one already assigned in Casdoor.
+			if user.UidNumber == 0 {
+				if uidNumber := parsePosixNumber(syncUser.UidNumber); uidNumber != 0 {
+					user.UidNumber = uidNumber
+					columns = append(columns, "uid_number")
+				}
+			}
+
+			affected, err := UpdateUser(user.GetId(), user, columns, false)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -534,6 +563,7 @@ func SyncLdapUsers(owner string, syncUsers []LdapUser, ldapId string) (existUser
 				Tag:               tag,
 				Score:             score,
 				Ldap:              syncUser.Uuid,
+				UidNumber:         parsePosixNumber(syncUser.UidNumber),
 				Properties:        syncUser.Attributes,
 			}
 			formatUserPhone(newUser)
@@ -696,6 +726,10 @@ func SyncLdapGroups(owner string, ldapGroups []LdapGroup, ldapId string) (newGro
 			existingGroup.IsTopGroup = isTopGroup
 			existingGroup.Type = "ldap-synced"
 			existingGroup.UpdatedTime = util.GetCurrentTime()
+			// Adopt the LDAP gid without overwriting one already assigned in Casdoor.
+			if existingGroup.GidNumber == 0 {
+				existingGroup.GidNumber = parsePosixNumber(ldapGroup.GidNumber)
+			}
 
 			_, err := UpdateGroup(existingGroup.GetId(), existingGroup, true, "")
 			if err == nil {
@@ -713,6 +747,7 @@ func SyncLdapGroups(owner string, ldapGroups []LdapGroup, ldapId string) (newGro
 				IsTopGroup:  isTopGroup,
 				Type:        "ldap-synced",
 				IsEnabled:   true,
+				GidNumber:   parsePosixNumber(ldapGroup.GidNumber),
 			}
 
 			_, err := AddGroup(newGroup)
@@ -788,6 +823,35 @@ func GetExistUuids(owner string, uuids []string) ([]string, error) {
 	return existUuids, nil
 }
 
+// CheckLdapPasswordForget rejects the forgot-password flow for LDAP users. That flow ends
+// in ResetLdapPassword() with an empty old password, so the new password has to be written
+// with the bind account configured on the LDAP server, which usually is a read-only account
+// and makes the server answer with "Insufficient Access Rights". Checking it here keeps the
+// user from receiving a verification code and typing a new password before finding out.
+// Signing in, changing the password with the old one and an admin reset are not affected,
+// none of them depends on the bind account having write access. A bind account that does
+// have it, a Microsoft AD one over LDAPS for example, is opted in with EnablePasswordReset.
+func CheckLdapPasswordForget(user *User) error {
+	if user == nil || user.Ldap == "" {
+		return nil
+	}
+
+	ldaps, err := GetLdaps(user.Owner)
+	if err != nil {
+		return err
+	}
+
+	// ResetLdapPassword() looks the user up in every LDAP server of the organization, so the
+	// reset is only bound to fail when none of them allows it
+	for _, ldapServer := range ldaps {
+		if ldapServer.EnablePasswordReset {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("the password of the LDAP user: %s is managed by the LDAP server, please contact your administrator to reset it", user.Name)
+}
+
 func ResetLdapPassword(user *User, oldPassword string, newPassword string, lang string) error {
 	ldaps, err := GetLdaps(user.Owner)
 	if err != nil {
@@ -824,13 +888,13 @@ func ResetLdapPassword(user *User, oldPassword string, newPassword string, lang 
 		modifyPasswordRequest := goldap.NewModifyRequest(userDn, nil)
 		if conn.IsAD {
 			utf16 := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM)
-			pwdEncoded, err := utf16.NewEncoder().String("\"" + newPassword + "\"")
+			pwdEncoded, err = utf16.NewEncoder().String("\"" + newPassword + "\"")
 			if err != nil {
 				conn.Close()
 				return err
 			}
+			// don't touch "userAccountControl", it's a bitmask holding ACCOUNTDISABLE and other flags
 			modifyPasswordRequest.Replace("unicodePwd", []string{pwdEncoded})
-			modifyPasswordRequest.Replace("userAccountControl", []string{"512"})
 		} else if oldPassword != "" {
 			modifyPasswordRequestWithOldPassword := goldap.NewPasswordModifyRequest(userDn, oldPassword, newPassword)
 			_, err = conn.Conn.PasswordModify(modifyPasswordRequestWithOldPassword)

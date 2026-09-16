@@ -1,0 +1,599 @@
+// Copyright 2021 The Casdoor Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import React from "react";
+import Loading from "./common/Loading";
+import {Button, Card, Col, DatePicker, Input, Row, Select, Switch} from "antd";
+import dayjs from "dayjs";
+import PaginateSelect from "./common/PaginateSelect";
+import * as PermissionBackend from "./backend/PermissionBackend";
+import * as OrganizationBackend from "./backend/OrganizationBackend";
+import * as UserBackend from "./backend/UserBackend";
+import * as GroupBackend from "./backend/GroupBackend";
+import * as Setting from "./Setting";
+import i18next from "i18next";
+import * as RoleBackend from "./backend/RoleBackend";
+import * as ModelBackend from "./backend/ModelBackend";
+import * as ApplicationBackend from "./backend/ApplicationBackend";
+import moment from "moment/moment";
+
+class PermissionEditPage extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      classes: props,
+      organizationName: props.organizationName !== undefined ? props.organizationName : props.match.params.organizationName,
+      permissionName: decodeURIComponent(props.match.params.permissionName),
+      permission: null,
+      organizations: [],
+      model: null,
+      users: [],
+      groups: [],
+      roles: [],
+      models: [],
+      resources: [],
+      mode: props.location.mode !== undefined ? props.location.mode : "edit",
+    };
+  }
+
+  UNSAFE_componentWillMount() {
+    this.getPermission();
+    this.getOrganizations();
+  }
+
+  getPermission() {
+    if (this.state.mode === "add" && this.props.location.permission) {
+      const permission = this.props.location.permission;
+      this.setState({
+        permission: permission,
+      });
+
+      this.getModels(permission.owner);
+      this.getResources(permission.owner);
+      return;
+    }
+
+    PermissionBackend.getPermission(this.state.organizationName, this.state.permissionName)
+      .then((res) => {
+        const permission = res.data;
+
+        if (permission === null) {
+          this.props.history.push("/404");
+          return;
+        }
+
+        if (res.status === "error") {
+          Setting.showMessage("error", res.msg);
+          return;
+        }
+
+        this.setState({
+          permission: permission,
+        });
+
+        this.getModels(permission.owner);
+        this.getResources(permission.owner);
+        this.getModel(permission.model);
+      });
+  }
+
+  getOrganizations() {
+    OrganizationBackend.getOrganizations("admin")
+      .then((res) => {
+        this.setState({
+          organizations: res.data || [],
+        });
+      });
+  }
+
+  getModels(organizationName) {
+    ModelBackend.getModels(organizationName)
+      .then((res) => {
+        if (res.status === "error") {
+          Setting.showMessage("error", res.msg);
+          return;
+        }
+
+        this.setState({
+          models: res.data,
+        });
+      });
+  }
+
+  getModel(modelId) {
+    if (modelId === "") {
+      return;
+    }
+
+    const organizationName = modelId.split("/")[0];
+    const modelName = modelId.split("/")[1];
+    ModelBackend.getModel(organizationName, modelName)
+      .then((res) => {
+        this.setState({
+          model: res.data,
+        });
+      });
+  }
+
+  getResources(organizationName) {
+    ApplicationBackend.getApplicationsByOrganization("admin", organizationName)
+      .then((res) => {
+        this.setState({
+          resources: res.data || [],
+        });
+      });
+  }
+
+  parsePermissionField(key, value) {
+    if ([""].includes(key)) {
+      value = Setting.myParseInt(value);
+    }
+    return value;
+  }
+
+  updatePermissionField(key, value) {
+    if (key === "model") {
+      this.getModel(value);
+    }
+
+    value = this.parsePermissionField(key, value);
+
+    const permission = this.state.permission;
+    permission[key] = value;
+    this.setState({
+      permission: permission,
+    });
+  }
+
+  hasRoleDefinition(model) {
+    if (model !== null) {
+      return model.modelText.includes("role_definition");
+    }
+    return false;
+  }
+
+  hasDomainDefinition(model) {
+    if (model !== null) {
+      const match = model.modelText.match(/request_definition\s*\]\s*r\s*=\s*([^\r\n]+)/);
+      if (match) {
+        return match[1].split(",").map((token) => token.trim()).includes("dom");
+      }
+    }
+    return false;
+  }
+
+  renderPermission() {
+    return (
+      <Card size="small" title={
+        <div>
+          {this.state.mode === "add" ? i18next.t("permission:New Permission") : i18next.t("permission:Edit Permission")}&nbsp;&nbsp;&nbsp;&nbsp;
+          <Button onClick={() => this.submitPermissionEdit(false)}>{i18next.t("general:Save")}</Button>
+          <Button style={{marginLeft: "20px"}} type="primary" onClick={() => this.submitPermissionEdit(true)}>{i18next.t("general:Save & Exit")}</Button>
+          {this.state.mode === "add" ? <Button style={{marginLeft: "20px"}} onClick={() => this.deletePermission()}>{i18next.t("general:Cancel")}</Button> : null}
+        </div>
+      } style={(Setting.isMobile()) ? {margin: "5px"} : {}} type="inner">
+        <Row style={{marginTop: "10px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Organization"), i18next.t("general:Organization - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} style={{width: "100%"}} disabled={!Setting.isAdminUser(this.props.account)} value={this.state.permission.owner} onChange={(owner => {
+              this.updatePermissionField("owner", owner);
+              this.getModels(owner);
+              this.getResources(owner);
+            })}
+            options={this.state.organizations.map((organization) => Setting.getOption(organization.name, organization.name))
+            } />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Name"), i18next.t("general:Name - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input value={this.state.permission.name} onChange={e => {
+              this.updatePermissionField("name", e.target.value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Display name"), i18next.t("general:Display name - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input value={this.state.permission.displayName} onChange={e => {
+              this.updatePermissionField("displayName", e.target.value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Description"), i18next.t("general:Description - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input value={this.state.permission.description} onChange={e => {
+              this.updatePermissionField("description", e.target.value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Model"), i18next.t("general:Model - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} style={{width: "100%"}} value={this.state.permission.model} onChange={(model => {
+              this.updatePermissionField("model", model);
+            })}
+            options={this.state.models.map((model) => Setting.getDisplayNameOption(model))
+            } />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("role:Sub users"), i18next.t("role:Sub users - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <PaginateSelect
+              virtual
+              mode="multiple"
+              style={{width: "100%"}}
+              value={this.state.permission.users}
+              allowClear
+              fetchPage={async(...args) => {
+                const res = await UserBackend.getUsers(...args);
+                if (res.status !== "ok") {
+                  return res;
+                }
+                const data = res.data.map((user) => Setting.getDisplayNameOption(user));
+                if (args?.[1] === 1 && Array.isArray(res?.data)) {
+                  res.data = [
+                    Setting.getOption(i18next.t("general:All"), "*"),
+                    ...data,
+                  ];
+                } else {
+                  res.data = data;
+                }
+                return res;
+              }}
+              buildFetchArgs={({page, pageSize, searchText}) => {
+                const field = searchText ? "name" : "";
+                return [this.state.permission.owner, page, pageSize, field, searchText];
+              }}
+              reloadKey={this.state.permission?.owner}
+              filterOption={false}
+              onChange={(value => {this.updatePermissionField("users", value);})}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("role:Sub groups"), i18next.t("role:Sub groups - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <PaginateSelect
+              virtual
+              mode="multiple"
+              style={{width: "100%"}}
+              value={this.state.permission.groups}
+              allowClear
+              fetchPage={async(...args) => {
+                const res = await GroupBackend.getGroups(...args);
+                if (res.status !== "ok") {
+                  return res;
+                }
+                const data = res.data.map((group) => Setting.getDisplayNameOption(group));
+                if (args?.[2] === 1 && Array.isArray(res?.data)) {
+                  res.data = [
+                    Setting.getOption(i18next.t("general:All"), "*"),
+                    ...data,
+                  ];
+                } else {
+                  res.data = data;
+                }
+                return res;
+              }}
+              buildFetchArgs={({page, pageSize, searchText}) => {
+                const field = searchText ? "name" : "";
+                return [this.state.permission.owner, false, page, pageSize, field, searchText, "", ""];
+              }}
+              reloadKey={this.state.permission?.owner}
+              filterOption={false}
+              onChange={(value => {this.updatePermissionField("groups", value);})}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("role:Sub roles"), i18next.t("role:Sub roles - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <PaginateSelect
+              virtual
+              mode="multiple"
+              style={{width: "100%"}}
+              value={this.state.permission.roles}
+              disabled={!this.hasRoleDefinition(this.state.model)}
+              allowClear
+              fetchPage={async(...args) => {
+                const res = await RoleBackend.getRoles(...args);
+                if (res.status !== "ok") {
+                  return res;
+                }
+                const data = res.data.map((role) => Setting.getDisplayNameOption(role));
+                if (args?.[1] === 1 && Array.isArray(res?.data)) {
+                  // res.data = [{owner: i18next.t("general:All"), name: "*"}, ...res.data];
+                  res.data = [
+                    Setting.getOption(i18next.t("general:All"), "*"),
+                    ...data,
+                  ];
+                } else {
+                  res.data = data;
+                }
+                return res;
+              }}
+              buildFetchArgs={({page, pageSize, searchText}) => {
+                const field = searchText ? "name" : "";
+                return [this.state.permission.owner, page, pageSize, field, searchText, "", ""];
+              }}
+              reloadKey={this.state.permission?.owner}
+              filterOption={false}
+              onChange={(value => {this.updatePermissionField("roles", value);})}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("role:Sub domains"), i18next.t("role:Sub domains - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} mode="tags" style={{width: "100%"}} value={this.state.permission.domains}
+              disabled={!this.hasDomainDefinition(this.state.model)}
+              onChange={(value => {
+                this.updatePermissionField("domains", value);
+              })}
+              options={[
+                Setting.getOption(i18next.t("general:All"), "*"),
+                ...this.state.permission.domains.filter(domain => domain !== "*").map((domain) => Setting.getOption(domain, domain)),
+              ]}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("permission:Resource type"), i18next.t("permission:Resource type - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} style={{width: "100%"}} value={this.state.permission.resourceType} onChange={(value => {
+              this.updatePermissionField("resourceType", value);
+              this.updatePermissionField("resources", []);
+            })}
+            options={[
+              {value: "Application", name: i18next.t("general:Application")},
+              {value: "TreeNode", name: i18next.t("permission:TreeNode")},
+              {value: "Custom", name: i18next.t("general:Custom")},
+              {value: "API", name: "API"},
+            ].map((item) => Setting.getOption(item.name, item.value))}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Resources"), i18next.t("permission:Resources - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} mode={(this.state.permission.resourceType === "Custom") ? "tags" : "multiple"} style={{width: "100%"}} value={this.state.permission.resources}
+              onChange={(value => {this.updatePermissionField("resources", value);})}
+              options={this.state.permission.resourceType === "API" ? Setting.getApiPaths().map((option, index) => {
+                return Setting.getOption(option, option);
+              }) : [
+                Setting.getOption(i18next.t("general:All"), "*"),
+                ...this.state.resources.map((resource) => Setting.getOption(`${resource.name}`, `${resource.name}`)),
+              ]}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("permission:Actions"), i18next.t("permission:Actions - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} mode={(this.state.permission.resourceType === "Custom") ? "tags" : "multiple"} style={{width: "100%"}} value={this.state.permission.actions} onChange={(value => {
+              this.updatePermissionField("actions", value);
+            })}
+            options={this.state.permission.resourceType === "API" ? [
+              {value: "POST", name: "POST"},
+              {value: "GET", name: "GET"},
+            ] : [
+              {value: "Read", name: i18next.t("permission:Read")},
+              {value: "Write", name: i18next.t("permission:Write")},
+              {value: "Admin", name: i18next.t("general:Admin")},
+            ].map((item) => Setting.getOption(item.name, item.value))}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("permission:Effect"), i18next.t("permission:Effect - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} style={{width: "100%"}} value={this.state.permission.effect} onChange={(value => {
+              this.updatePermissionField("effect", value);
+            })}
+            options={[
+              {value: "Allow", name: i18next.t("permission:Allow")},
+              {value: "Deny", name: i18next.t("permission:Deny")},
+            ].map((item) => Setting.getOption(item.name, item.value))}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
+            {Setting.getLabel(i18next.t("general:Is enabled"), i18next.t("general:Is enabled - Tooltip"))} :
+          </Col>
+          <Col span={1} >
+            <Switch checked={this.state.permission.isEnabled} onChange={checked => {
+              this.updatePermissionField("isEnabled", checked);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:Expire time"), i18next.t("general:Expire time - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <DatePicker
+              showTime
+              allowClear
+              style={{width: "100%"}}
+              value={this.state.permission.expireTime ? dayjs(this.state.permission.expireTime) : null}
+              onChange={value => {
+                this.updatePermissionField("expireTime", value ? value.format() : "");
+              }}
+            />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("permission:Submitter"), i18next.t("permission:Submitter - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input disabled={true} value={this.state.permission.submitter} onChange={e => {
+              this.updatePermissionField("submitter", e.target.value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("permission:Approver"), i18next.t("permission:Approver - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input disabled={true} value={this.state.permission.approver} onChange={e => {
+              this.updatePermissionField("approver", e.target.value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("permission:Approve time"), i18next.t("permission:Approve time - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input disabled={true} value={Setting.getFormattedDate(this.state.permission.approveTime)} onChange={e => {
+              this.updatePermissionField("approveTime", e.target.value);
+            }} />
+          </Col>
+        </Row>
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("general:State"), i18next.t("general:State - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Select virtual={false} disabled={!Setting.isLocalAdminUser(this.props.account)} style={{width: "100%"}} value={this.state.permission.state} onChange={(value => {
+              if (this.state.permission.state !== value) {
+                if (value === "Approved") {
+                  this.updatePermissionField("approver", this.props.account.name);
+                  this.updatePermissionField("approveTime", moment().format());
+                } else {
+                  this.updatePermissionField("approver", "");
+                  this.updatePermissionField("approveTime", "");
+                }
+              }
+
+              this.updatePermissionField("state", value);
+            })}
+            options={[
+              {value: "Approved", name: i18next.t("permission:Approved")},
+              {value: "Pending", name: i18next.t("webhook:Pending")},
+            ].map((item) => Setting.getOption(item.name, item.value))}
+            />
+          </Col>
+        </Row>
+      </Card>
+    );
+  }
+
+  submitPermissionEdit(exitAfterSave) {
+    if (this.state.permission.users.length === 0 && this.state.permission.roles.length === 0) {
+      Setting.showMessage("error", i18next.t("general:The users and roles cannot be empty at the same time"));
+      return;
+    }
+    // if (this.state.permission.domains.length === 0) {
+    //   Setting.showMessage("error", "The domains cannot be empty");
+    //   return;
+    // }
+    if (this.state.permission.resources.length === 0) {
+      Setting.showMessage("error", i18next.t("general:The resources cannot be empty"));
+      return;
+    }
+    if (this.state.permission.actions.length === 0) {
+      Setting.showMessage("error", i18next.t("general:The actions cannot be empty"));
+      return;
+    }
+    if (!Setting.isLocalAdminUser(this.props.account) && this.state.permission.submitter !== this.props.account.name) {
+      Setting.showMessage("error", i18next.t("general:A normal user can only modify the permission submitted by itself"));
+      return;
+    }
+
+    const permission = Setting.deepCopy(this.state.permission);
+    const isAdd = this.state.mode === "add";
+    const apiCall = isAdd
+      ? PermissionBackend.addPermission(permission)
+      : PermissionBackend.updatePermission(this.state.organizationName, this.state.permissionName, permission);
+    apiCall
+      .then((res) => {
+        if (res.status === "ok") {
+          Setting.showMessage("success", i18next.t("general:Successfully saved"));
+          this.setState({
+            organizationName: this.state.permission.owner,
+            permissionName: this.state.permission.name,
+            mode: "edit",
+          });
+
+          if (exitAfterSave) {
+            this.props.history.push("/permissions");
+          } else {
+            this.props.history.push(`/permissions/${this.state.permission.owner}/${encodeURIComponent(this.state.permission.name)}`);
+          }
+        } else {
+          Setting.showMessage("error", `${i18next.t("general:Failed to save")}: ${res.msg}`);
+          if (!isAdd) {
+            this.updatePermissionField("name", this.state.permissionName);
+          }
+        }
+      })
+      .catch(error => {
+        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
+      });
+  }
+
+  deletePermission() {
+    this.props.history.push("/permissions");
+  }
+
+  render() {
+    return (
+      <div>
+        {
+          this.state.permission !== null ? this.renderPermission() : <Loading type="page" tip={i18next.t("login:Loading")} />
+        }
+        <div style={{margin: "20px 40px"}}>
+          <Button size="large" onClick={() => this.submitPermissionEdit(false)}>{i18next.t("general:Save")}</Button>
+          <Button style={{marginLeft: "20px"}} type="primary" size="large" onClick={() => this.submitPermissionEdit(true)}>{i18next.t("general:Save & Exit")}</Button>
+          {this.state.mode === "add" ? <Button style={{marginLeft: "20px"}} size="large" onClick={() => this.deletePermission()}>{i18next.t("general:Cancel")}</Button> : null}
+        </div>
+      </div>
+    );
+  }
+}
+
+export default PermissionEditPage;

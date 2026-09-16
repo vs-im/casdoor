@@ -14,6 +14,12 @@
 
 package object
 
+import (
+	"reflect"
+
+	"github.com/casdoor/casdoor/form"
+)
+
 func (application *Application) GetProviderByCategory(category string) (*Provider, error) {
 	providers, err := GetProviders(application.Organization)
 	if err != nil {
@@ -66,6 +72,8 @@ func (application *Application) GetProviderByCategoryAndRule(category string, me
 		m[provider.Name] = provider
 	}
 
+	// a row whose rule names the method wins over a generic ("All") row, whatever order they are listed in
+	var fallback *Provider
 	for _, providerItem := range application.Providers {
 		if providerItem.Provider != nil && providerItem.Provider.Category == "SMS" {
 			if !isProviderItemCountryCodeMatched(providerItem, countryCode) {
@@ -73,14 +81,21 @@ func (application *Application) GetProviderByCategoryAndRule(category string, me
 			}
 		}
 
-		if providerItem.Rule == method || providerItem.Rule == "" || providerItem.Rule == "All" || providerItem.Rule == "all" || providerItem.Rule == "None" {
-			if provider, ok := m[providerItem.Name]; ok {
-				return provider, nil
-			}
+		provider, ok := m[providerItem.Name]
+		if !ok {
+			continue
+		}
+
+		if providerItem.Rule == method {
+			return provider, nil
+		}
+
+		if fallback == nil && (providerItem.Rule == "" || providerItem.Rule == "All" || providerItem.Rule == "all" || providerItem.Rule == "None") {
+			fallback = provider
 		}
 	}
 
-	return nil, nil
+	return fallback, nil
 }
 
 func (application *Application) GetEmailProvider(method string) (*Provider, error) {
@@ -111,6 +126,44 @@ func (application *Application) IsSignupItemVisible(itemName string) bool {
 	}
 
 	return signupItem.Visible
+}
+
+// getSignupItemForField returns the signup item that renders the "Email" or "Phone"
+// field, which is the combined item when the application uses one.
+func (application *Application) getSignupItemForField(fieldName string) *SignupItem {
+	if signupItem := application.getSignupItem(fieldName); signupItem != nil {
+		return signupItem
+	}
+
+	if fieldName != "Email" && fieldName != "Phone" {
+		return nil
+	}
+
+	for _, itemName := range []string{"Email or Phone", "Phone or Email"} {
+		if signupItem := application.getSignupItem(itemName); signupItem != nil {
+			return signupItem
+		}
+	}
+
+	return nil
+}
+
+func (application *Application) IsSignupFieldVisible(fieldName string) bool {
+	signupItem := application.getSignupItemForField(fieldName)
+	if signupItem == nil {
+		return false
+	}
+
+	return signupItem.Visible
+}
+
+func (application *Application) GetSignupFieldRule(fieldName string) string {
+	signupItem := application.getSignupItemForField(fieldName)
+	if signupItem == nil {
+		return ""
+	}
+
+	return signupItem.Rule
 }
 
 func (application *Application) IsSignupItemRequired(itemName string) bool {
@@ -176,4 +229,56 @@ func (application *Application) HasPromptPage() bool {
 	}
 
 	return application.isAffiliationPrompted()
+}
+
+// the auth form fields each signup item owns
+var signupItemFields = map[string][]string{
+	"Username":       {"Username"},
+	"Display name":   {"Name", "FirstName", "LastName"},
+	"First name":     {"FirstName"},
+	"Last name":      {"LastName"},
+	"Password":       {"Password"},
+	"Email":          {"Email", "EmailCode"},
+	"Email or Phone": {"Email", "EmailCode", "Phone", "CountryCode", "PhoneCode"},
+	"Phone or Email": {"Email", "EmailCode", "Phone", "CountryCode", "PhoneCode"},
+	"Phone":          {"Phone", "CountryCode", "PhoneCode"},
+	"Country/Region": {"Region"},
+	"ID card":        {"IdCard"},
+	"Affiliation":    {"Affiliation"},
+	"Bio":            {"Bio"},
+	"Tag":            {"Tag"},
+	"Education":      {"Education"},
+	"Gender":         {"Gender"},
+	"Languages":      {"Language"},
+}
+
+func (application *Application) ClearHiddenSignupFields(authForm *form.AuthForm) {
+	if application == nil || authForm == nil {
+		return
+	}
+
+	visibleFields := map[string]bool{}
+	for _, signupItem := range application.SignupItems {
+		if signupItem == nil || !signupItem.Visible {
+			continue
+		}
+
+		for _, field := range signupItemFields[signupItem.Name] {
+			visibleFields[field] = true
+		}
+	}
+
+	authFormValue := reflect.ValueOf(authForm).Elem()
+	for _, fields := range signupItemFields {
+		for _, field := range fields {
+			if visibleFields[field] {
+				continue
+			}
+
+			fieldValue := authFormValue.FieldByName(field)
+			if fieldValue.IsValid() && fieldValue.Kind() == reflect.String && fieldValue.CanSet() {
+				fieldValue.SetString("")
+			}
+		}
+	}
 }

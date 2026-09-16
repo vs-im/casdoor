@@ -1,14 +1,12 @@
-describe('Test payments', () => {
-    beforeEach(()=>{
-        cy.login();
-    })
-    const selector = {
-        add: ".ant-table-title > div > .ant-btn"
-      };
-    it("test payments", () => {
-        cy.visit("http://localhost:7001/payments");
-        cy.url().should("eq", "http://localhost:7001/payments");
-        cy.get(selector.add,{timeout:10000}).click();
-        cy.url().should("include","http://localhost:7001/payments/")
-    });
-})
+describe("Test payments", () => {
+  beforeEach(() => {
+    cy.openConsole();
+  });
+
+  it("test payments", () => {
+    cy.visitListPage("/payments");
+    cy.get("#add-button", {timeout: 20000}).click();
+    cy.location("pathname").should("not.eq", "/payments");
+    cy.assertEditPageLoaded();
+  });
+});

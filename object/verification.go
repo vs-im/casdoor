@@ -226,7 +226,7 @@ func getVerificationRecord(dest string) (*VerificationRecord, error) {
 	record := &VerificationRecord{}
 	record.Receiver = dest
 
-	has, err := ormer.Engine.Desc("time").Where("is_used = false").Get(record)
+	has, err := ormer.Engine.Desc("time").Where("is_used = ?", false).Get(record)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +264,7 @@ func getUnusedVerificationRecord(dest string) (*VerificationRecord, error) {
 	record := &VerificationRecord{}
 	record.Receiver = dest
 
-	has, err := ormer.Engine.Desc("time").Where("is_used = false").Get(record)
+	has, err := ormer.Engine.Desc("time").Where("is_used = ?", false).Get(record)
 	if err != nil {
 		return nil, err
 	}
@@ -292,10 +292,7 @@ func CheckVerificationCode(dest string, code string, lang string) (*VerifyResult
 		return &VerifyResult{noRecordError, i18n.Translate(lang, "verification:The verification code has already been used!")}, nil
 	}
 
-	timeoutInMinutes, err := conf.GetConfigInt64("verificationCodeTimeout")
-	if err != nil {
-		return nil, err
-	}
+	timeoutInMinutes := conf.GetVerificationCodeTimeout()
 
 	now := time.Now().Unix()
 	if now-record.Time > timeoutInMinutes*60 {

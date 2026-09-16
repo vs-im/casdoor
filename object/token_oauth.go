@@ -99,7 +99,7 @@ func GetOAuthToken(grantType string, clientId string, clientSecret string, code 
 	case "urn:ietf:params:oauth:grant-type:token-exchange": // Token Exchange Grant (RFC 8693)
 		token, tokenError, err = GetTokenExchangeToken(application, clientSecret, subjectToken, subjectTokenType, audience, scope, host)
 	case "refresh_token":
-		refreshToken2, err := RefreshToken(application, grantType, refreshToken, scope, clientId, clientSecret, host, dpopProof)
+		refreshToken2, err := RefreshToken(application, grantType, refreshToken, scope, clientId, clientSecret, resource, host, dpopProof)
 		if err != nil {
 			return nil, err
 		}
@@ -316,6 +316,14 @@ func GetPasswordToken(application *Application, username string, password string
 			ErrorDescription: fmt.Sprintf("generate jwt token error: %s", err.Error()),
 		}, nil
 	}
+
+	// Record the signin after the token is generated, so that the "lastSigninTime"
+	// claim in the token means the previous signin instead of the current one.
+	err = RecordUserSignin(user, "")
+	if err != nil {
+		return nil, nil, err
+	}
+
 	token := &Token{
 		Owner:        application.Owner,
 		Name:         tokenName,
@@ -448,7 +456,7 @@ func GetJwtBearerToken(application *Application, assertion string, scope string,
 }
 
 // GetTokenByUser mints a token for the given user (Implicit flow helper).
-func GetTokenByUser(application *Application, user *User, scope string, nonce string, host string) (*Token, error) {
+func GetTokenByUser(application *Application, user *User, scope string, nonce string, sessionId string, host string) (*Token, error) {
 	err := ExtendUserWithRolesAndPermissions(user)
 	if err != nil {
 		return nil, err
@@ -473,6 +481,7 @@ func GetTokenByUser(application *Application, user *User, scope string, nonce st
 		Scope:        scope,
 		TokenType:    "Bearer",
 		CodeIsUsed:   true,
+		SessionId:    sessionId,
 	}
 	_, err = AddToken(token)
 	if err != nil {
@@ -741,7 +750,7 @@ func GetAccessTokenByUser(user *User, host string) (string, error) {
 		return "", fmt.Errorf("the application for user %s is not found", user.Id)
 	}
 
-	token, err := GetTokenByUser(application, user, "profile", "", host)
+	token, err := GetTokenByUser(application, user, "profile", "", "", host)
 	if err != nil {
 		return "", err
 	}

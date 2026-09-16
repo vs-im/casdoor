@@ -32,13 +32,17 @@ commentsRouter*.go
 
 # ignore build result
 casdoor
-server
+/server
 
-# include helm-chart
+# include helm-chart, but not its packaged output
 !manifests/casdoor
 .env
 .agent/
 tasks/
+*.tgz
 
+# the console has its own .gitignore for these; web-old does not
 web/cypress/videos/
 web/cypress/screenshots/
+web-old/cypress/videos/
+web-old/cypress/screenshots/

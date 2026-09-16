@@ -28,10 +28,13 @@ type UserInfo struct {
 	DisplayName string
 	UnionId     string
 	Email       string
-	Phone       string
-	CountryCode string
-	AvatarUrl   string
-	Extra       map[string]string
+	// EmailVerified reports whether the provider itself vouches for Email.
+	// Providers that make no such assertion leave it false.
+	EmailVerified bool
+	Phone         string
+	CountryCode   string
+	AvatarUrl     string
+	Extra         map[string]string
 }
 
 type ProviderInfo struct {
@@ -109,6 +112,8 @@ func GetIdProvider(idpInfo *ProviderInfo, redirectUrl string) (IdProvider, error
 		return NewAlipayIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl, idpInfo.AppCertificate, idpInfo.RootCertificate)
 	case "Custom", "Custom Flexible":
 		return NewCustomIdProvider(idpInfo, redirectUrl), nil
+	case "OIDC":
+		return NewOidcIdProvider(idpInfo, redirectUrl), nil
 	case "Infoflow":
 		if idpInfo.SubType == "Internal" {
 			return NewInfoflowInternalIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, idpInfo.AppId, redirectUrl), nil

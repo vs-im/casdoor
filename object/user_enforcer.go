@@ -85,16 +85,21 @@ func (e *UserGroupEnforcer) GetGroupsForUser(user string) ([]string, error) {
 	return groups, err
 }
 
-func (e *UserGroupEnforcer) GetAllUsersByGroup(group string) ([]string, error) {
+// LoadPolicy reads the whole policy from the storage. It's exposed so that a
+// caller which looks up many groups can load the policy once instead of once
+// per group.
+func (e *UserGroupEnforcer) LoadPolicy() error {
 	err := e.checkModel()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if err = e.enforcer.LoadPolicy(); err != nil {
-		return nil, err
-	}
+	return e.enforcer.LoadPolicy()
+}
 
+// getAllUsersByGroup reads the members of a group from the policy that is
+// already in memory, the caller is responsible for loading it.
+func (e *UserGroupEnforcer) getAllUsersByGroup(group string) ([]string, error) {
 	users, err := e.enforcer.GetUsersForRole(GetGroupWithPrefix(group))
 	if err != nil {
 		if errors2.Is(err, errors.ErrNameNotFound) {
@@ -103,6 +108,15 @@ func (e *UserGroupEnforcer) GetAllUsersByGroup(group string) ([]string, error) {
 		return nil, err
 	}
 	return users, nil
+}
+
+func (e *UserGroupEnforcer) GetAllUsersByGroup(group string) ([]string, error) {
+	err := e.LoadPolicy()
+	if err != nil {
+		return nil, err
+	}
+
+	return e.getAllUsersByGroup(group)
 }
 
 func GetGroupWithPrefix(group string) string {
@@ -150,4 +164,30 @@ func (e *UserGroupEnforcer) UpdateGroupsForUser(user string, groups []string) (b
 	}
 
 	return affected, nil
+}
+
+// RenameUser moves the group bindings of a user from the old user ID to the new one.
+// The group APIs read the members of a group from these bindings, so a rename that
+// doesn't move them would keep the old ID inside every group the user belonged to.
+func (e *UserGroupEnforcer) RenameUser(oldUser string, newUser string) error {
+	groups, err := e.GetGroupsForUser(oldUser)
+	if err != nil {
+		return err
+	}
+
+	if len(groups) == 0 {
+		return nil
+	}
+
+	_, err = e.DeleteGroupsForUser(oldUser)
+	if err != nil {
+		return err
+	}
+
+	_, err = e.UpdateGroupsForUser(newUser, groups)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

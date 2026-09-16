@@ -1,5 +1,7 @@
 web/node_modules/
 web/build/
+web-old/node_modules/
+web-old/build/
 .git/
 .gotmp/
 .gocache/

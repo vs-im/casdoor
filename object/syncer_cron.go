@@ -53,26 +53,29 @@ func addSyncerJob(syncer *Syncer) error {
 
 	err := syncer.initAdapter()
 	if err != nil {
+		recordSyncerError(syncer, err)
 		return err
+	}
+
+	// Sync groups first so that the groups referenced by the synced users already exist
+	err = syncer.syncGroups()
+	if err != nil {
+		// Log error but don't fail the entire sync
+		recordSyncerError(syncer, err)
+		fmt.Printf("Warning: syncGroups() error: %s\n", err.Error())
 	}
 
 	err = syncer.syncUsers()
 	if err != nil {
+		recordSyncerError(syncer, err)
 		return err
-	}
-
-	// Sync groups as well
-	err = syncer.syncGroups()
-	if err != nil {
-		// Log error but don't fail the entire sync
-		fmt.Printf("Warning: syncGroups() error: %s\n", err.Error())
 	}
 
 	schedule := fmt.Sprintf("@every %ds", syncer.SyncInterval)
 	cron := getCronMap(syncer.Name)
 	_, err = cron.AddFunc(schedule, func() {
-		syncer.syncUsersNoError()
 		syncer.syncGroupsNoError()
+		syncer.syncUsersNoError()
 	})
 	if err != nil {
 		return err

@@ -46,6 +46,7 @@ type Token struct {
 	CodeExpireIn     int64  `json:"codeExpireIn"`
 	Resource         string `xorm:"varchar(255)" json:"resource"`           // RFC 8707 Resource Indicator
 	DPoPJkt          string `xorm:"varchar(255) 'dpop_jkt'" json:"dPoPJkt"` // RFC 9449 DPoP JWK thumbprint binding
+	SessionId        string `xorm:"varchar(100) index" json:"sessionId"`    // the Beego session id that minted the token
 }
 
 func GetTokenCount(owner, organization, field, value string) (int64, error) {
@@ -109,6 +110,26 @@ func GetTokenByAccessToken(accessToken string) (*Token, error) {
 		return nil, nil
 	}
 	return &token, nil
+}
+
+// IsUserActive checks whether the token's end user is still allowed to use it, a token issued to
+// a forbidden, soft-deleted or removed user is treated as inactive. The tokens of the
+// "client_credentials" grant are not bound to an end user, so they are always active.
+// Refs: https://datatracker.ietf.org/doc/html/rfc7662
+func (token *Token) IsUserActive() (bool, error) {
+	if token.GrantType == "client_credentials" || token.User == "" {
+		return true, nil
+	}
+
+	user, err := getUser(token.Organization, token.User)
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, nil
+	}
+
+	return !user.IsForbidden && !user.IsDeleted, nil
 }
 
 func GetTokenByRefreshToken(refreshToken string) (*Token, error) {
@@ -231,12 +252,43 @@ func DeleteToken(token *Token) (bool, error) {
 
 func GetActiveTokensByUser(organization, username string) ([]*Token, error) {
 	tokens := []*Token{}
-	err := ormer.Engine.Where("organization = ? and user = ? and expires_in > 0", organization, username).Find(&tokens)
+	err := ormer.Engine.Where(fmt.Sprintf("organization = ? and %s = ? and expires_in > 0", quoteColumn("user")), organization, username).Find(&tokens)
 	return tokens, err
 }
 
 func ExpireTokenByUser(owner, username string) (bool, error) {
-	affected, err := ormer.Engine.Where("organization = ? and user = ?", owner, username).Cols("expires_in").Update(&Token{ExpiresIn: 0})
+	affected, err := ormer.Engine.Where(fmt.Sprintf("organization = ? and %s = ?", quoteColumn("user")), owner, username).Cols("expires_in").Update(&Token{ExpiresIn: 0})
+	if err != nil {
+		return false, err
+	}
+
+	return affected != 0, nil
+}
+
+// ExpireTokensBySessionIds expires the user's tokens minted under the given Beego session ids, so that
+// ending a login session (admin delete, single-session logout) also revokes its OAuth tokens
+func ExpireTokensBySessionIds(owner string, username string, sessionIds []string) (bool, error) {
+	ids := []string{}
+	for _, sessionId := range sessionIds {
+		if sessionId != "" {
+			ids = append(ids, sessionId)
+		}
+	}
+	if len(ids) == 0 {
+		return false, nil
+	}
+
+	affected, err := ormer.Engine.In("session_id", ids).Where(fmt.Sprintf("organization = ? and %s = ? and expires_in > 0", quoteColumn("user")), owner, username).Cols("expires_in").Update(&Token{ExpiresIn: 0})
+	if err != nil {
+		return false, err
+	}
+
+	return affected != 0, nil
+}
+
+// ExpireTokenByUserAndApplication expires the user's tokens in one application, "owner" is the organization of the user
+func ExpireTokenByUserAndApplication(owner string, username string, application string) (bool, error) {
+	affected, err := ormer.Engine.Where(fmt.Sprintf("organization = ? and %s = ? and application = ? and expires_in > 0", quoteColumn("user")), owner, username, application).Cols("expires_in").Update(&Token{ExpiresIn: 0})
 	if err != nil {
 		return false, err
 	}

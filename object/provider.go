@@ -52,7 +52,7 @@ type Provider struct {
 	CustomUserInfoUrl string            `xorm:"varchar(200)" json:"customUserInfoUrl"`
 	CustomLogoutUrl   string            `xorm:"varchar(200)" json:"customLogoutUrl"`
 	CustomLogo        string            `xorm:"varchar(200)" json:"customLogo"`
-	Scopes            string            `xorm:"varchar(100)" json:"scopes"`
+	Scopes            string            `xorm:"varchar(200)" json:"scopes"`
 	UserMapping       map[string]string `xorm:"varchar(500)" json:"userMapping"`
 	HttpHeaders       map[string]string `xorm:"varchar(500)" json:"httpHeaders"`
 
@@ -61,7 +61,7 @@ type Provider struct {
 	DisableSsl             bool   `json:"disableSsl"`                  // Deprecated: Use SslMode instead. If the provider type is WeChat, DisableSsl means EnableQRCode, if type is Google, it means sync phone number
 	SslMode                string `xorm:"varchar(100)" json:"sslMode"` // "Auto" (empty means Auto), "Enable", "Disable"
 	Title                  string `xorm:"varchar(100)" json:"title"`
-	Content                string `xorm:"varchar(2000)" json:"content"` // If provider type is WeChat, Content means QRCode string by Base64 encoding
+	Content                string `xorm:"mediumtext" json:"content"` // If provider type is WeChat, Content means QRCode string by Base64 encoding
 	MagicLinkContent       string `xorm:"mediumtext" json:"magicLinkContent"`
 	MagicLinkSignupContent string `xorm:"mediumtext" json:"magicLinkSignupContent"`
 	Receiver               string `xorm:"varchar(100)" json:"receiver"`
@@ -636,7 +636,7 @@ func FromProviderToIdpInfo(ctx *context.Context, provider *Provider) (*idp.Provi
 			providerInfo.ClientId = provider.ClientId2
 			providerInfo.ClientSecret = provider.ClientSecret2
 		}
-	} else if provider.Type == "ADFS" || provider.Type == "AzureAD" || provider.Type == "AzureADB2C" || provider.Type == "Casdoor" || provider.Type == "Okta" {
+	} else if provider.Type == "ADFS" || provider.Type == "AzureAD" || provider.Type == "AzureADB2C" || provider.Type == "Casdoor" || provider.Type == "Okta" || provider.Type == "OIDC" {
 		providerInfo.HostUrl = provider.Domain
 	} else if provider.Type == "Alipay" && provider.Cert != "" {
 		cert, err := GetCert(util.GetId(provider.Owner, provider.Cert))
@@ -732,7 +732,7 @@ func InvokeCustomProviderLogout(application *Application, accessToken string) {
 
 	for _, providerItem := range application.Providers {
 		provider := providerItem.Provider
-		if provider == nil || provider.Category != "OAuth" || !strings.HasPrefix(provider.Type, "Custom") {
+		if provider == nil || provider.Category != "OAuth" || !IsCustomOAuthProvider(provider.Type) {
 			continue
 		}
 		if provider.CustomLogoutUrl == "" {

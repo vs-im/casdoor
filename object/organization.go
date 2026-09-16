@@ -65,10 +65,15 @@ type Organization struct {
 	PasswordObfuscatorType string     `xorm:"varchar(100)" json:"passwordObfuscatorType"`
 	PasswordObfuscatorKey  string     `xorm:"varchar(100)" json:"passwordObfuscatorKey"`
 	PasswordExpireDays     int        `json:"passwordExpireDays"`
+	PasswordHistoryCount   int        `json:"passwordHistoryCount"`
+	TokenRetentionDays     int        `json:"tokenRetentionDays"`
+	RecordRetentionDays    int        `json:"recordRetentionDays"`
 	CountryCodes           []string   `xorm:"mediumtext"  json:"countryCodes"`
 	DefaultAvatar          string     `xorm:"varchar(200)" json:"defaultAvatar"`
 	UsePermanentAvatar     bool       `xorm:"bool" json:"usePermanentAvatar"`
 	DefaultApplication     string     `xorm:"varchar(100)" json:"defaultApplication"`
+	DefaultTokenFormat     string     `xorm:"varchar(100)" json:"defaultTokenFormat"`
+	DefaultTokenFields     []string   `xorm:"varchar(1000)" json:"defaultTokenFields"`
 	UserTypes              []string   `xorm:"mediumtext" json:"userTypes"`
 	Tags                   []string   `xorm:"mediumtext" json:"tags"`
 	Languages              []string   `xorm:"varchar(255)" json:"languages"`
@@ -83,6 +88,7 @@ type Organization struct {
 	UseEmailAsUsername     bool       `json:"useEmailAsUsername"`
 	EnableTour             bool       `json:"enableTour"`
 	DisableSignin          bool       `json:"disableSignin"`
+	DisableConsole         bool       `json:"disableConsole"`
 	IpRestriction          string     `json:"ipRestriction"`
 	NavItems               []string   `xorm:"mediumtext" json:"navItems"`
 	UserNavItems           []string   `xorm:"mediumtext" json:"userNavItems"`
@@ -227,6 +233,19 @@ func GetMaskedOrganizations(isAdmin bool, organizations []*Organization, errs ..
 	return organizations, nil
 }
 
+// hashMasterPassword hashes the master password in place so that it is never stored in plaintext.
+// The masked value "***" means the password is unchanged, so it is left as-is.
+func (organization *Organization) hashMasterPassword() {
+	if organization.MasterPassword == "" || organization.MasterPassword == "***" {
+		return
+	}
+
+	credManager := cred.GetCredManager(organization.PasswordType)
+	if credManager != nil {
+		organization.MasterPassword = credManager.GetHashedPassword(organization.MasterPassword, organization.PasswordSalt)
+	}
+}
+
 func UpdateOrganization(id string, organization *Organization, isGlobalAdmin bool) (bool, error) {
 	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
 	if err != nil {
@@ -250,13 +269,7 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 		}
 	}
 
-	if organization.MasterPassword != "" && organization.MasterPassword != "***" {
-		credManager := cred.GetCredManager(organization.PasswordType)
-		if credManager != nil {
-			hashedPassword := credManager.GetHashedPassword(organization.MasterPassword, organization.PasswordSalt)
-			organization.MasterPassword = hashedPassword
-		}
-	}
+	organization.hashMasterPassword()
 
 	if !isGlobalAdmin {
 		organization.NavItems = org.NavItems
@@ -285,6 +298,19 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 }
 
 func AddOrganization(organization *Organization) (bool, error) {
+	// there is no previous record for a new organization, so the masked values mean "empty"
+	if organization.MasterPassword == "***" {
+		organization.MasterPassword = ""
+	}
+	if organization.DefaultPassword == "***" {
+		organization.DefaultPassword = ""
+	}
+	if organization.MasterVerificationCode == "***" {
+		organization.MasterVerificationCode = ""
+	}
+
+	organization.hashMasterPassword()
+
 	affected, err := ormer.Engine.Insert(organization)
 	if err != nil {
 		return false, err
@@ -320,6 +346,38 @@ func GetOrganizationByUser(user *User) (*Organization, error) {
 		return nil, err
 	}
 	return org, nil
+}
+
+// GetDefaultTokenFormat returns the token format that newly created applications of the
+// organization should use. It falls back to "JWT" when the organization does not exist or
+// has no default token format configured yet.
+func GetDefaultTokenFormat(organizationName string) (string, error) {
+	organization, err := getOrganization("admin", organizationName)
+	if err != nil {
+		return "", err
+	}
+
+	if organization == nil || organization.DefaultTokenFormat == "" {
+		return "JWT", nil
+	}
+
+	return organization.DefaultTokenFormat, nil
+}
+
+// GetDefaultTokenFields returns the token fields ("JWT-Custom" claim set) that newly created
+// applications of the organization should use. It returns an empty list when the organization
+// does not exist or has no default token fields configured yet.
+func GetDefaultTokenFields(organizationName string) ([]string, error) {
+	organization, err := getOrganization("admin", organizationName)
+	if err != nil {
+		return nil, err
+	}
+
+	if organization == nil || organization.DefaultTokenFields == nil {
+		return []string{}, nil
+	}
+
+	return organization.DefaultTokenFields, nil
 }
 
 func GetAccountItemByName(name string, organization *Organization) *AccountItem {

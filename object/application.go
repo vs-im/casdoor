@@ -29,6 +29,22 @@ type SigninMethod struct {
 	Rule        string `json:"rule"`
 }
 
+const (
+	// SigninMethodRuleHidePassword disables a signin method instead of only hiding it
+	// in the login page. The rule was named "Hide-Password" when it was added, so the
+	// applications configured before the rename still store the legacy value.
+	SigninMethodRuleHidePassword       = "Hide password"
+	SigninMethodRuleHidePasswordLegacy = "Hide-Password"
+)
+
+func (signinMethod *SigninMethod) IsHidden() bool {
+	if signinMethod == nil {
+		return false
+	}
+
+	return signinMethod.Rule == SigninMethodRuleHidePassword || signinMethod.Rule == SigninMethodRuleHidePasswordLegacy
+}
+
 type SignupItem struct {
 	Name        string   `json:"name"`
 	Visible     bool     `json:"visible"`
@@ -83,6 +99,7 @@ type Application struct {
 	Type                         string          `xorm:"varchar(20)" json:"type"`
 	Scopes                       []*ScopeItem    `xorm:"mediumtext" json:"scopes"`
 	Logo                         string          `xorm:"varchar(200)" json:"logo"`
+	LogoDark                     string          `xorm:"varchar(200)" json:"logoDark"`
 	Title                        string          `xorm:"varchar(100)" json:"title"`
 	Favicon                      string          `xorm:"varchar(200)" json:"favicon"`
 	Order                        int             `json:"order"`
@@ -189,7 +206,7 @@ func (application *Application) HasSigninMethod(name string) bool {
 	}
 
 	for _, signinMethod := range application.SigninMethods {
-		if signinMethod != nil && signinMethod.Name == name && signinMethod.Rule != "Hide password" {
+		if signinMethod != nil && signinMethod.Name == name && !signinMethod.IsHidden() {
 			return true
 		}
 	}
@@ -329,9 +346,15 @@ func GetApplicationByOrganizationName(organization string) (*Application, error)
 func GetApplicationByUser(user *User) (*Application, error) {
 	if user.SignupApplication != "" {
 		return getApplication("admin", user.SignupApplication)
-	} else {
+	}
+
+	// users without a signup application should get the organization's default one
+	application, err := GetDefaultApplication(util.GetId("admin", user.Owner))
+	if err != nil {
 		return GetApplicationByOrganizationName(user.Owner)
 	}
+
+	return application, nil
 }
 
 func GetApplicationByUserId(userId string) (application *Application, err error) {
@@ -487,6 +510,22 @@ func AddApplication(application *Application) (bool, error) {
 	if application.ClientSecret == "" {
 		application.ClientSecret = util.GenerateClientSecret()
 	}
+	if application.TokenFormat == "" {
+		tokenFormat, err := GetDefaultTokenFormat(application.Organization)
+		if err != nil {
+			return false, err
+		}
+
+		application.TokenFormat = tokenFormat
+	}
+	if len(application.TokenFields) == 0 {
+		tokenFields, err := GetDefaultTokenFields(application.Organization)
+		if err != nil {
+			return false, err
+		}
+
+		application.TokenFields = tokenFields
+	}
 
 	app, err := GetApplicationByClientId(application.ClientId)
 	if err != nil {
@@ -495,6 +534,15 @@ func AddApplication(application *Application) (bool, error) {
 
 	if app != nil {
 		return false, nil
+	}
+
+	if application.IsShared == true && application.Organization != "built-in" {
+		return false, fmt.Errorf("only applications belonging to built-in organization can be shared")
+	}
+
+	err = checkMultipleCaptchaProviders(application, "en")
+	if err != nil {
+		return false, err
 	}
 
 	// Initialize default values for required fields to prevent UI errors

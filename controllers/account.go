@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/beego/beego/v2/core/logs"
@@ -117,6 +118,9 @@ func (c *ApiController) Signup() {
 		return
 	}
 
+	// a value posted for a hidden signup item did not come from the signup page
+	application.ClearHiddenSignupFields(&authForm)
+
 	clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
 	err = object.CheckEntryIp(clientIp, nil, application, organization, c.GetAcceptLanguage())
 	if err != nil {
@@ -170,7 +174,7 @@ func (c *ApiController) Signup() {
 
 	userEmailVerified := false
 
-	if application.IsSignupItemVisible("Email") && application.GetSignupItemRule("Email") != "No verification" && authForm.Email != "" {
+	if application.IsSignupFieldVisible("Email") && application.GetSignupFieldRule("Email") != "No verification" && authForm.Email != "" {
 		var checkResult *object.VerifyResult
 		checkResult, err = object.CheckVerificationCode(authForm.Email, authForm.EmailCode, c.GetAcceptLanguage())
 		if err != nil {
@@ -186,7 +190,7 @@ func (c *ApiController) Signup() {
 	}
 
 	var checkPhone string
-	if application.IsSignupItemVisible("Phone") && application.GetSignupItemRule("Phone") != "No verification" && authForm.Phone != "" {
+	if application.IsSignupFieldVisible("Phone") && application.GetSignupFieldRule("Phone") != "No verification" && authForm.Phone != "" {
 		checkPhone, _ = util.GetE164Number(authForm.Phone, authForm.CountryCode)
 
 		var checkResult *object.VerifyResult
@@ -241,6 +245,7 @@ func (c *ApiController) Signup() {
 		Email:             strings.ToLower(authForm.Email),
 		Phone:             authForm.Phone,
 		CountryCode:       authForm.CountryCode,
+		Language:          authForm.Language,
 		Address:           []string{},
 		Affiliation:       authForm.Affiliation,
 		IdCard:            authForm.IdCard,
@@ -351,7 +356,7 @@ func (c *ApiController) Signup() {
 			return
 		}
 
-		code, err := object.GetOAuthCode(userId, clientId, "", "password", responseType, redirectUri, scope, state, nonce, codeChallenge, "", c.Ctx.Request.Host, c.GetAcceptLanguage())
+		code, err := object.GetOAuthCode(userId, clientId, "", "password", responseType, redirectUri, scope, state, nonce, codeChallenge, "", c.Ctx.Input.CruSession.SessionID(context.Background()), c.Ctx.Request.Host, c.GetAcceptLanguage())
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
 			return
@@ -375,7 +380,7 @@ func (c *ApiController) Signup() {
 // @Param   client_id     query    string  false     "client_id"
 // @Param   state     query    string  false     "state"
 // @Success 200 {object} controllers.Response The Response object
-// @router /logout [post]
+// @router /logout [get,post]
 func (c *ApiController) Logout() {
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0-final.html
 	accessToken := c.GetString("id_token_hint")
@@ -409,20 +414,24 @@ func (c *ApiController) Logout() {
 		}
 		sessionToken := c.GetSessionToken()
 
+		// Capture the Beego session id before ClearUserSession(): SessionRegenerateID()
+		// replaces CruSession's id, so reading it afterwards would miss the id stored in the DB.
+		beegoSessionId := c.Ctx.Input.CruSession.SessionID(context.Background())
+
+		// Sent before deleteUserSession(), which expires the tokens that SendBackchannelLogout() looks up
+		bcOwner, bcUsername := util.GetOwnerAndNameFromIdNoCheck(user)
+		object.SendBackchannelLogout(bcOwner, bcUsername, "", c.Ctx.Request.Host)
+
 		c.ClearUserSession()
 		c.ClearTokenSession()
 
-		if err := c.deleteUserSession(user); err != nil {
+		if err := c.deleteUserSession(user, beegoSessionId); err != nil {
 			c.ResponseError(err.Error())
 			return
 		}
 
 		// Propagate logout to external Custom OAuth2 providers
 		object.InvokeCustomProviderLogout(application, sessionToken)
-
-		// Send OIDC Back-Channel Logout notifications (https://openid.net/specs/openid-connect-backchannel-1_0.html)
-		bcOwner, bcUsername := util.GetOwnerAndNameFromIdNoCheck(user)
-		object.SendBackchannelLogout(bcOwner, bcUsername, "", c.Ctx.Request.Host)
 
 		// "post_logout_redirect_uri" has been made optional, see: https://github.com/casdoor/casdoor/issues/2151
 		if redirectUri != "" {
@@ -437,13 +446,19 @@ func (c *ApiController) Logout() {
 		c.ResponseOk(user, application.HomepageUrl)
 		return
 	} else {
-		_, application, token, err := object.ExpireTokenByAccessToken(accessToken)
+		token, err := object.GetTokenByAccessToken(accessToken)
 		if err != nil {
 			c.ResponseError(err.Error())
 			return
 		}
 		if token == nil {
 			c.ResponseError(c.T("token:Token not found, invalid accessToken"))
+			return
+		}
+
+		application, err := object.GetApplication(util.GetId(token.Owner, token.Application))
+		if err != nil {
+			c.ResponseError(err.Error())
 			return
 		}
 		if application == nil {
@@ -453,22 +468,38 @@ func (c *ApiController) Logout() {
 
 		if user == "" {
 			user = util.GetId(token.Organization, token.User)
+
+			// RecordMessage() captured "recordUserId" from the session before this handler ran,
+			// but RP-Initiated Logout may carry no session cookie. Overwrite it with the subject
+			// resolved from "id_token_hint" so the audit record and webhook are not left with an
+			// empty user and organization.
+			c.Ctx.Input.SetParam("recordUserId", user)
 		}
+
+		// Sent before the tokens are expired, SendBackchannelLogout() only sees active ones
+		object.SendBackchannelLogout(token.Organization, token.User, "", c.Ctx.Request.Host)
+
+		_, err = object.ExpireToken(token)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		// Capture the Beego session id before ClearUserSession(): SessionRegenerateID()
+		// replaces CruSession's id, so reading it afterwards would miss the id stored in the DB.
+		beegoSessionId := c.Ctx.Input.CruSession.SessionID(context.Background())
 
 		c.ClearUserSession()
 		c.ClearTokenSession()
 
 		// TODO https://github.com/casdoor/casdoor/pull/1494#discussion_r1095675265
-		if err := c.deleteUserSession(user); err != nil {
+		if err := c.deleteUserSession(user, beegoSessionId); err != nil {
 			c.ResponseError(err.Error())
 			return
 		}
 
 		// Propagate logout to external Custom OAuth2 providers
 		object.InvokeCustomProviderLogout(application, accessToken)
-
-		// Send OIDC Back-Channel Logout notifications (https://openid.net/specs/openid-connect-backchannel-1_0.html)
-		object.SendBackchannelLogout(token.Organization, token.User, "", c.Ctx.Request.Host)
 
 		// "post_logout_redirect_uri" has been made optional, see: https://github.com/casdoor/casdoor/issues/2151
 		if redirectUri == "" {
@@ -491,9 +522,9 @@ func (c *ApiController) redirectToPostLogout(application *object.Application, re
 	redirectUrl := redirectUri
 	if state != "" {
 		if strings.Contains(redirectUri, "?") {
-			redirectUrl = fmt.Sprintf("%s&state=%s", strings.TrimSuffix(redirectUri, "/"), state)
+			redirectUrl = fmt.Sprintf("%s&state=%s", strings.TrimSuffix(redirectUri, "/"), url.QueryEscape(state))
 		} else {
-			redirectUrl = fmt.Sprintf("%s?state=%s", strings.TrimSuffix(redirectUri, "/"), state)
+			redirectUrl = fmt.Sprintf("%s?state=%s", strings.TrimSuffix(redirectUri, "/"), url.QueryEscape(state))
 		}
 	}
 	c.Ctx.Redirect(http.StatusFound, redirectUrl)
@@ -523,16 +554,13 @@ func (c *ApiController) SsoLogout() {
 	ssoApplication := c.GetSessionApplication()
 	ssoSessionToken := c.GetSessionToken()
 
+	// Capture the Beego session id before ClearUserSession(): SessionRegenerateID()
+	// replaces CruSession's id, so reading it afterwards would miss the id stored in the DB.
+	currentSessionId := c.Ctx.Input.CruSession.SessionID(context.Background())
+
 	c.ClearUserSession()
 	c.ClearTokenSession()
 	owner, username, err := util.GetOwnerAndNameFromIdWithError(user)
-	if err != nil {
-		c.ResponseError(err.Error())
-		return
-	}
-
-	currentSessionId := c.Ctx.Input.CruSession.SessionID(context.Background())
-	_, err = object.DeleteSessionId(util.GetSessionId(owner, username, object.CasdoorApplication), currentSessionId)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
@@ -568,10 +596,11 @@ func (c *ApiController) SsoLogout() {
 			return
 		}
 
+		// The ids are collected for the SSO logout notification below, the Beego sessions
+		// themselves are destroyed by DeleteAllUserSessions()
 		for _, session := range sessions {
 			sessionIds = append(sessionIds, session.SessionId...)
 		}
-		object.DeleteBeegoSession(sessionIds)
 
 		_, err = object.DeleteAllUserSessions(owner, username)
 		if err != nil {
@@ -586,6 +615,16 @@ func (c *ApiController) SsoLogout() {
 
 		// Only delete the current session's Beego session
 		object.DeleteBeegoSession(sessionIds)
+
+		// The current Beego session id is stored under the application used at login, which is
+		// often not "app-built-in", so it has to be removed from every Session row holding it.
+		// This runs after "sessionIds" has been filled, so the SSO logout notification below
+		// still carries the current session id.
+		err = object.DeleteUserSessionId(owner, username, currentSessionId)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
 
 		util.LogInfo(c.Ctx, "API: [%s] logged out from current session", user)
 	}
@@ -835,19 +874,13 @@ func (c *ApiController) GetCaptcha() {
 	c.ResponseOk(Captcha{Type: "none"})
 }
 
-func (c *ApiController) deleteUserSession(user string) error {
+func (c *ApiController) deleteUserSession(user string, beegoSessionId string) error {
 	owner, username, err := util.GetOwnerAndNameFromIdWithError(user)
 	if err != nil {
 		return err
 	}
 
-	// Casdoor session ID derived from owner, username, and application
-	sessionId := util.GetSessionId(owner, username, object.CasdoorApplication)
-
-	// Explicitly get the Beego session ID from the context
-	beegoSessionId := c.Ctx.Input.CruSession.SessionID(context.Background())
-
-	_, err = object.DeleteSessionId(sessionId, beegoSessionId)
+	err = object.DeleteUserSessionId(owner, username, beegoSessionId)
 	if err != nil {
 		return err
 	}

@@ -36,6 +36,16 @@ const (
 	MfaAuthVerification  = "mfaAuth"
 )
 
+// an unknown method would skip every method-specific check below, so reject it up front
+func isValidVerificationMethod(method string) bool {
+	switch method {
+	case SignupVerification, ResetVerification, LoginVerification, ForgetVerification, MfaSetupVerification, MfaAuthVerification:
+		return true
+	default:
+		return false
+	}
+}
+
 // GetVerifications
 // @Title GetVerifications
 // @Tag Verification API
@@ -131,6 +141,23 @@ func (c *ApiController) GetVerification() {
 	c.ResponseOk(payment)
 }
 
+// getUserByEmail resolves the address the way object.GetUserByFields() does for the
+// sign-in and forget-password flows: signup stores the email in lowercase, so on a
+// case-sensitive database only a lowered lookup matches what the user typed.
+func getUserByEmail(owner string, email string) (*object.User, error) {
+	user, err := object.GetUserByEmail(owner, email)
+	if err != nil || user != nil {
+		return user, err
+	}
+
+	lowered := strings.ToLower(email)
+	if lowered == email {
+		return nil, nil
+	}
+
+	return object.GetUserByEmail(owner, lowered)
+}
+
 // SendVerificationCode ...
 // @Title SendVerificationCode
 // @Tag Verification API
@@ -154,10 +181,17 @@ func (c *ApiController) SendVerificationCode() {
 		return
 	}
 
+	vform.Dest = strings.TrimSpace(vform.Dest)
+
 	clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
 
 	if msg := vform.CheckParameter(form.SendVerifyCode, c.GetAcceptLanguage()); msg != "" {
 		c.ResponseError(msg)
+		return
+	}
+
+	if !isValidVerificationMethod(vform.Method) {
+		c.ResponseError(c.T("verification:Wrong parameter") + ": method.")
 		return
 	}
 
@@ -191,6 +225,7 @@ func (c *ApiController) SendVerificationCode() {
 	organization, err := object.GetOrganization(util.GetId(application.Owner, application.Organization))
 	if err != nil {
 		c.ResponseError(c.T(err.Error()))
+		return
 	}
 
 	if organization == nil {
@@ -231,7 +266,7 @@ func (c *ApiController) SendVerificationCode() {
 		// For login verification, try to find user by email/phone for CAPTCHA check
 		// This is a preliminary lookup; the actual validation happens later in the switch statement
 		if vform.Type == object.VerifyTypeEmail && util.IsEmailValid(vform.Dest) {
-			user, err = object.GetUserByEmail(organization.Name, vform.Dest)
+			user, err = getUserByEmail(organization.Name, vform.Dest)
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -309,12 +344,17 @@ func (c *ApiController) SendVerificationCode() {
 			return
 		}
 
+		if vform.Method == SignupVerification && object.HasUserByField(organization.Name, "email", strings.ToLower(vform.Dest)) {
+			c.ResponseError(c.T("check:Email already exists"))
+			return
+		}
+
 		if vform.Method == LoginVerification || vform.Method == ForgetVerification {
 			if user != nil && util.GetMaskedEmail(user.Email) == vform.Dest {
 				vform.Dest = user.Email
 			}
 
-			user, err = object.GetUserByEmail(organization.Name, vform.Dest)
+			user, err = getUserByEmail(organization.Name, vform.Dest)
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -323,6 +363,13 @@ func (c *ApiController) SendVerificationCode() {
 			if user == nil {
 				c.ResponseError(c.T("verification:the user does not exist, please sign up first"))
 				return
+			}
+
+			if vform.Method == ForgetVerification {
+				if err = object.CheckLdapPasswordForget(user); err != nil {
+					c.ResponseError(err.Error())
+					return
+				}
 			}
 		} else if vform.Method == ResetVerification {
 			user = c.getCurrentUser()
@@ -347,8 +394,24 @@ func (c *ApiController) SendVerificationCode() {
 			return
 		}
 
+		// let a "Custom HTTP Email" webhook localize the email, a signup code is sent before the user exists
+		if provider.HttpHeaders == nil {
+			provider.HttpHeaders = map[string]string{}
+		}
+		if _, ok := provider.HttpHeaders["Accept-Language"]; !ok {
+			provider.HttpHeaders["Accept-Language"] = c.GetAcceptLanguage()
+		}
+
 		sendResp = object.SendVerificationCodeToEmail(organization, user, provider, clientIp, vform.Dest, vform.Method, c.Ctx.Request.Host, application.Name, application)
 	case object.VerifyTypePhone:
+		if vform.Method == SignupVerification {
+			phone, countryCode, _ := util.GetNormalizedPhone(vform.Dest, vform.CountryCode)
+			if object.HasUserByPhoneAndCountryCode(organization.Name, phone, countryCode) {
+				c.ResponseError(c.T("check:Phone already exists"))
+				return
+			}
+		}
+
 		if vform.Method == LoginVerification || vform.Method == ForgetVerification {
 			if user != nil && util.GetMaskedPhone(user.Phone) == vform.Dest {
 				vform.Dest = user.Phone
@@ -360,6 +423,13 @@ func (c *ApiController) SendVerificationCode() {
 			} else if user == nil {
 				c.ResponseError(c.T("verification:the user does not exist, please sign up first"))
 				return
+			}
+
+			if vform.Method == ForgetVerification {
+				if err = object.CheckLdapPasswordForget(user); err != nil {
+					c.ResponseError(err.Error())
+					return
+				}
 			}
 
 			vform.CountryCode = user.GetCountryCode(vform.CountryCode)
@@ -489,8 +559,17 @@ func (c *ApiController) ResetEmailOrPhone() {
 		return
 	}
 
+	countryCode := user.GetCountryCode("")
 	if destType == object.VerifyTypePhone {
-		if object.HasUserByPhoneAndCountryCode(user.Owner, dest, user.GetCountryCode("")) {
+		normalizedPhone, normalizedCountryCode, isValid := util.GetNormalizedPhone(dest, countryCode)
+		if !isValid {
+			c.ResponseError(fmt.Sprintf(c.T("verification:Phone number is invalid in your region %s"), countryCode))
+			return
+		}
+
+		dest, countryCode = normalizedPhone, normalizedCountryCode
+
+		if object.HasUserByPhoneAndCountryCode(user.Owner, dest, countryCode) {
 			c.ResponseError(c.T("check:Phone already exists"))
 			return
 		}
@@ -505,8 +584,8 @@ func (c *ApiController) ResetEmailOrPhone() {
 			c.ResponseError(errMsg)
 			return
 		}
-		if checkDest, ok = util.GetE164Number(dest, user.GetCountryCode("")); !ok {
-			c.ResponseError(fmt.Sprintf(c.T("verification:Phone number is invalid in your region %s"), user.CountryCode))
+		if checkDest, ok = util.GetE164Number(dest, countryCode); !ok {
+			c.ResponseError(fmt.Sprintf(c.T("verification:Phone number is invalid in your region %s"), countryCode))
 			return
 		}
 	} else if destType == object.VerifyTypeEmail {
@@ -546,7 +625,8 @@ func (c *ApiController) ResetEmailOrPhone() {
 		_, err = object.UpdateUser(id, user, columns, false)
 	case object.VerifyTypePhone:
 		user.Phone = dest
-		_, err = object.SetUserField(user, "phone", user.Phone)
+		user.CountryCode = countryCode
+		_, err = object.UpdateUser(user.GetId(), user, []string{"phone", "country_code"}, false)
 	default:
 		c.ResponseError(c.T("verification:Unknown type"))
 		return

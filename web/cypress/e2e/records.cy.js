@@ -1,10 +1,9 @@
-describe('Test records', () => {
-    beforeEach(()=>{
-        cy.login();
-    })
-    it("test records", () => {
-        cy.visit("http://localhost:7001");
-        cy.visit("http://localhost:7001/records");
-        cy.url().should("eq", "http://localhost:7001/records");
-    });
-})
+describe("Test records", () => {
+  beforeEach(() => {
+    cy.openConsole();
+  });
+
+  it("test records", () => {
+    cy.visitListPage("/records");
+  });
+});

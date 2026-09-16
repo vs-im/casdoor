@@ -7,6 +7,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - "v*"
   pull_request:
 
 jobs:
@@ -44,7 +46,11 @@ jobs:
           node-version: 20
           cache: "yarn"
           cache-dependency-path: ./web/yarn.lock
-      - run: yarn install && CI=false yarn run build
+      - run: yarn install
+        working-directory: ./web
+      - run: yarn typecheck && yarn lint
+        working-directory: ./web
+      - run: CI=false yarn run build
         working-directory: ./web
       - name: Upload build artifacts
         if: github.repository == 'casdoor/casdoor' && github.event_name == 'push'
@@ -80,8 +86,19 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: false
 
+      # HTTP/1.1 and retries: proxy.golang.org resets HTTP/2 streams mid-download.
       - name: Sync vendor tree
-        run: go mod vendor
+        env:
+          GODEBUG: http2client=0
+        run: |
+          for i in 1 2 3; do
+            if go mod vendor; then
+              exit 0
+            fi
+            echo "go mod vendor failed (attempt $i), retrying in $((i * 10))s..."
+            sleep $((i * 10))
+          done
+          exit 1
 
       # CI and local `make lint` both use the repo's gofumpt-only golangci-lint config.
       - name: golangci-lint
@@ -94,6 +111,9 @@ jobs:
     name: e2e-test
     runs-on: ubuntu-latest
     needs: [go-tests]
+    # The suite is a few minutes' work. Anything near this is hung, not slow,
+    # and is worth failing rather than leaving to sit for the six-hour default.
+    timeout-minutes: 20
     services:
       mysql:
         image: mysql:5.7
@@ -109,9 +129,25 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: ./go.mod
+      # Started before the front-end steps so the backend compiles while yarn
+      # installs; it is waited on further down, once it is needed.
       - name: start backend
         run: nohup go run ./main.go > /tmp/backend.log 2>&1 &
         working-directory: ./
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: "yarn"
+          cache-dependency-path: ./web/yarn.lock
+      # Restored before `yarn install`, whose Cypress postinstall is what fills
+      # this directory.
+      - name: Cache the Cypress binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('web/yarn.lock') }}
+      - run: yarn install
+        working-directory: ./web
       - name: Wait for backend to be ready
         run: |
           echo "Waiting for backend server to start on port 8000..."
@@ -129,16 +165,11 @@ jobs:
             echo "Waiting... ($i/60)"
             sleep 1
           done
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 20
-          cache: "yarn"
-          cache-dependency-path: ./web/yarn.lock
-      - run: yarn install
-        working-directory: ./web
       - uses: cypress-io/github-action@v5
         with:
           browser: chrome
+          # `yarn install` above already installed everything, Cypress included.
+          install: false
           start: yarn start
           wait-on: "http://localhost:7001"
           wait-on-timeout: 210
@@ -149,41 +180,15 @@ jobs:
         with:
           name: cypress-screenshots
           path: ./web/cypress/screenshots
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cypress-videos
-          path: ./web/cypress/videos
-
-  tag-release:
-    name: Create Tag
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-    if: github.repository == 'casdoor/casdoor' && github.event_name == 'push'
-    needs: [frontend, backend, linter, e2e]
-    outputs:
-      new-release-published: ${{ steps.semantic.outputs.new_release_published }}
-      new-release-version: ${{ steps.semantic.outputs.new_release_version }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Create Tag with Semantic Release
-        id: semantic
-        uses: cycjimmy/semantic-release-action@v4
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   github-release:
     name: GitHub Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      issues: write
-    if: github.repository == 'casdoor/casdoor' && github.event_name == 'push' && needs.tag-release.outputs.new-release-published == 'true'
-    needs: [tag-release]
+    # Releases are cut by hand: push a `vX.Y.Z` tag and this job publishes it.
+    if: github.repository == 'casdoor/casdoor' && startsWith(github.ref, 'refs/tags/v')
+    needs: [frontend, backend, linter, e2e]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -230,37 +235,29 @@ jobs:
     name: Docker Release
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      issues: write
-    if: github.repository == 'casdoor/casdoor' && github.event_name == 'push' && needs.tag-release.outputs.new-release-published == 'true'
-    needs: [tag-release]
+      contents: read
+    if: github.repository == 'casdoor/casdoor' && startsWith(github.ref, 'refs/tags/v')
+    needs: [frontend, backend, linter, e2e]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          fetch-depth: -1
+          # The image build stamps the version by walking the git history, so it
+          # needs the full history and the tags, not the default shallow clone.
+          fetch-depth: 0
 
-      - name: Fetch Previous version
-        id: get-previous-tag
-        uses: actions-ecosystem/action-get-latest-tag@v1.6.0
-
-      - name: Decide Should_Push Or Not
-        id: should_push
+      # Registry versions keep the historical, un-prefixed form: tag `v1.2.3`
+      # publishes `1.2.3`. `latest` is skipped for pre-release tags such as
+      # `v1.2.3-beta.1`.
+      - name: Resolve the released version
+        id: version
         run: |
-          old_version=${{steps.get-previous-tag.outputs.tag}}
-          new_version=${{ needs.tag-release.outputs.new-release-version }}
-
-          old_array=(${old_version//\./ })
-          new_array=(${new_version//\./ })
-
-          if [ ${old_array[0]} != ${new_array[0]} ]
-          then 
-              echo ::set-output name=push::'true'
-          elif [ ${old_array[1]} != ${new_array[1]} ]
-          then 
-              echo ::set-output name=push::'true'
+          version=${GITHUB_REF_NAME#v}
+          echo "version=$version" >> $GITHUB_OUTPUT
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
           else
-              echo ::set-output name=push::'false'
+            echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Set up QEMU
@@ -274,59 +271,37 @@ jobs:
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v1
-        if: github.repository == 'casdoor/casdoor' && github.event_name == 'push' && steps.should_push.outputs.push=='true'
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Push to Docker Hub
         uses: docker/build-push-action@v3
-        if: github.repository == 'casdoor/casdoor' && github.event_name == 'push' && steps.should_push.outputs.push=='true'
         with:
           context: .
           target: STANDARD
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: casbin/casdoor:${{ needs.tag-release.outputs.new-release-version }},casbin/casdoor:latest
+          tags: |
+            casbin/casdoor:${{ steps.version.outputs.version }}
+            ${{ steps.version.outputs.prerelease == 'false' && 'casbin/casdoor:latest' || '' }}
 
       - name: Push All In One Version to Docker Hub
         uses: docker/build-push-action@v3
-        if: github.repository == 'casdoor/casdoor' && github.event_name == 'push' && steps.should_push.outputs.push=='true'
         with:
           context: .
           target: ALLINONE
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: casbin/casdoor-all-in-one:${{ needs.tag-release.outputs.new-release-version }},casbin/casdoor-all-in-one:latest
+          tags: |
+            casbin/casdoor-all-in-one:${{ steps.version.outputs.version }}
+            ${{ steps.version.outputs.prerelease == 'false' && 'casbin/casdoor-all-in-one:latest' || '' }}
 
-      - uses: actions/checkout@v3
-        if: steps.should_push.outputs.push=='true'
-        with:
-          repository: casdoor/casdoor-helm
-          ref: "master"
-          token: ${{ secrets.GH_BOT_TOKEN }}
-          path: ./casdoor-helm
-
-      - name: Update Helm Chart
-        if: steps.should_push.outputs.push=='true'
-        working-directory: ./casdoor-helm
+      - name: Package and push Helm chart
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          # Set the appVersion and version of the chart to the current tag
-          sed -i "s/appVersion: .*/appVersion: ${{ needs.tag-release.outputs.new-release-version }}/g" ./charts/casdoor/Chart.yaml
-          sed -i "s/version: .*/version: ${{ needs.tag-release.outputs.new-release-version }}/g" ./charts/casdoor/Chart.yaml
-
           REGISTRY=oci://registry-1.docker.io/casbin
-          cd charts/casdoor
-          helm package .
-          PKG_NAME=$(ls *.tgz)
-          helm repo index . --url $REGISTRY --merge index.yaml
-          helm push $PKG_NAME $REGISTRY
-          rm $PKG_NAME
 
-          # Commit and push the changes back to the repository
-          git config --global user.name "casbin-bot"
-          git config --global user.email "bot@casbin.org"
-          git add Chart.yaml index.yaml
-          git commit -m "chore(helm): bump helm charts appVersion to ${{ needs.tag-release.outputs.new-release-version }}"
-          git tag ${{ needs.tag-release.outputs.new-release-version }}
-          git push origin HEAD:master --follow-tags
+          helm package manifests/casdoor --version "$VERSION" --app-version "$VERSION"
+          helm push casdoor-helm-charts-$VERSION.tgz $REGISTRY
