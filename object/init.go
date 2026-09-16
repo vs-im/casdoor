@@ -129,7 +129,7 @@ func initBuiltInOrganization() bool {
 		CreatedTime:        util.GetCurrentTime(),
 		DisplayName:        "Built-in Organization",
 		WebsiteUrl:         "https://example.com",
-		Favicon:            fmt.Sprintf("%s/img/casbin/favicon.ico", conf.GetConfigString("staticBaseUrl")),
+		Favicon:            "/favicon.png",
 		PasswordType:       "bcrypt",
 		PasswordOptions:    []string{"AtLeast6"},
 		CountryCodes:       []string{"US", "ES", "FR", "DE", "GB", "CN", "JP", "KR", "VN", "ID", "SG", "IN"},
