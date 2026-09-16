@@ -11,5 +11,5 @@ export function PoweredBy() {
     return <>{Conf.CustomFooter}</>;
   }
 
-  return <span>© {new Date().getFullYear()} {Conf.ProductName}</span>;
+  return <span>© {new Date().getFullYear()} {Conf.BrandName}</span>;
 }

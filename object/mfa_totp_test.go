@@ -15,8 +15,11 @@
 package object
 
 import (
+	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/casdoor/casdoor/conf"
 )
 
 func TestTotpMfaUtil(t *testing.T) {
@@ -75,7 +78,7 @@ func TestTotpMfaInitiate_WithCustomIssuer(t *testing.T) {
 
 func TestTotpMfaInitiate_WithEmptyIssuer(t *testing.T) {
 	totpMfa := NewTotpMfaUtil(nil)
-	// Test with empty issuer (should default to "Casdoor")
+	// Test with empty issuer (should default to the brand name, "Casdoor" upstream)
 	mfaProps, err := totpMfa.Initiate("test/user", "")
 	if err != nil {
 		t.Errorf("Initiate failed: %v", err)
@@ -86,9 +89,10 @@ func TestTotpMfaInitiate_WithEmptyIssuer(t *testing.T) {
 		return
 	}
 
-	// Verify the URL contains the default issuer "Receipt Hunter"
-	if !strings.Contains(mfaProps.URL, "Receipt%20Hunter") {
-		t.Errorf("URL should contain default issuer 'Receipt Hunter', got: %s", mfaProps.URL)
+	// Verify the URL contains the default issuer (the brand name, "Casdoor" unless
+	// the deployment sets CASDOOR_BRAND_NAME / CASDOOR_BRAND_TOTP_ISSUER)
+	if !strings.Contains(mfaProps.URL, url.PathEscape(conf.GetBrandTotpIssuer())) {
+		t.Errorf("URL should contain default issuer '%s', got: %s", conf.GetBrandTotpIssuer(), mfaProps.URL)
 	}
 }
 
@@ -111,5 +115,26 @@ func TestGetMfaUtil_Totp(t *testing.T) {
 
 	if totpMfa.MfaType != TotpType {
 		t.Errorf("Expected MFA type %s, got %s", TotpType, totpMfa.MfaType)
+	}
+}
+
+func TestTotpMfaInitiate_WithBrandedIssuer(t *testing.T) {
+	// A white-label deployment sets the issuer through the environment; the tree
+	// itself carries only the upstream default.
+	t.Setenv(conf.BrandTotpIssuerEnv, "Acme Identity")
+
+	totpMfa := NewTotpMfaUtil(nil)
+	mfaProps, err := totpMfa.Initiate("test/user", "")
+	if err != nil {
+		t.Errorf("Initiate failed: %v", err)
+	}
+
+	if mfaProps == nil {
+		t.Error("Initiate returned nil mfaProps")
+		return
+	}
+
+	if !strings.Contains(mfaProps.URL, url.PathEscape("Acme Identity")) {
+		t.Errorf("URL should contain the branded issuer 'Acme Identity', got: %s", mfaProps.URL)
 	}
 }

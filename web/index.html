@@ -3,13 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <!-- routers/static_filter.go rewrites this exact path to the organization's own
-         favicon, so the first paint is already branded; keep it byte-identical -->
+         favicon (or to CASDOOR_BRAND_FAVICON_URL), so the first paint is already
+         branded; keep it byte-identical. The same file rewrites the <title> and the
+         description above from CASDOOR_BRAND_NAME / CASDOOR_BRAND_TAGLINE -->
     <link rel="icon" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
-    <meta name="description" content="Receipt Hunter - sign in" />
-    <title>Receipt Hunter</title>
+    <meta name="description" content="Casdoor - sign in" />
+    <title>Casdoor</title>
     <script>
       // Show a readable message instead of a blank white page when the app bundle
       // cannot be loaded or executed, for example in an outdated browser or in the
@@ -19,15 +21,15 @@
         var shown = false;
 
         function show(title, detail) {
-          var box = document.getElementById("rh-boot-fallback");
+          var box = document.getElementById("boot-fallback");
           if (!box || shown) {
             return;
           }
           shown = true;
 
-          var titleEl = document.getElementById("rh-boot-title");
-          var hintEl = document.getElementById("rh-boot-hint");
-          var detailEl = document.getElementById("rh-boot-detail");
+          var titleEl = document.getElementById("boot-title");
+          var hintEl = document.getElementById("boot-hint");
+          var detailEl = document.getElementById("boot-detail");
 
           titleEl.innerHTML = title;
           hintEl.style.display = "block";
@@ -59,13 +61,13 @@
          bundle does not get that far. Inline styles on purpose: the stylesheet is
          part of the bundle that just failed. -->
     <div id="root">
-      <div id="rh-boot-fallback" style="max-width: 560px; margin: 15vh auto 0 auto; padding: 0 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #262626; text-align: center; line-height: 1.6;">
-        <div id="rh-boot-title" style="font-size: 20px; font-weight: 600;">Loading...</div>
-        <div id="rh-boot-hint" style="display: none; margin-top: 12px; font-size: 14px; color: #595959;">
+      <div id="boot-fallback" style="max-width: 560px; margin: 15vh auto 0 auto; padding: 0 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #262626; text-align: center; line-height: 1.6;">
+        <div id="boot-title" style="font-size: 20px; font-weight: 600;">Loading...</div>
+        <div id="boot-hint" style="display: none; margin-top: 12px; font-size: 14px; color: #595959;">
           Your browser may be too old to run this page. Please open this page in a recent version of Chrome, Edge, Firefox or Safari.
           If this page was opened inside an app's built-in login window, sign in with your system browser instead.
         </div>
-        <div id="rh-boot-detail" style="display: none; margin-top: 12px; padding: 8px 12px; font-size: 12px; font-family: Consolas, Menlo, monospace; color: #8c8c8c; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 5px; word-break: break-all; text-align: left;"></div>
+        <div id="boot-detail" style="display: none; margin-top: 12px; padding: 8px 12px; font-size: 12px; font-family: Consolas, Menlo, monospace; color: #8c8c8c; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 5px; word-break: break-all; text-align: left;"></div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

@@ -46,3 +46,7 @@ web/cypress/videos/
 web/cypress/screenshots/
 web-old/cypress/videos/
 web-old/cypress/screenshots/
+
+# Brand assets copied in at image build time (docs/branding.md); never committed
+web/public/brand/
+web/brand/

@@ -95,7 +95,7 @@ export function ProviderButtons({application, method, rule, onBeforeClick}: Prov
    * unavailable or hands the request back, and it is what the antd login page did
    * inline while rendering the buttons.
    */
-  // "?action=<name>" is the spelling the Receipt Hunter frontends use for the same hop
+  // "?action=<name>" is the spelling some downstream frontends use for the same hop
   const hintParams = new URLSearchParams(location.search);
   const hint = method === "link" ? null : (hintParams.get("provider_hint") ?? hintParams.get("action"));
   const hintedName = items.find((item: any) => item.provider?.name === hint)?.provider?.name;

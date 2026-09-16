@@ -228,6 +228,32 @@ func StaticFilter(ctx *context.Context) {
 	}
 }
 
+// indexHtmlFaviconPlaceholder is the favicon path web/index.html ships; both the
+// organization theme and the deployment branding are substituted into it.
+const indexHtmlFaviconPlaceholder = "/favicon.png"
+
+// applyBrandToIndexHtml replaces the upstream product strings of the static shell
+// with the deployment's branding, so that the first paint is already branded and
+// the frontend bundle needs no rebuild per brand. The defaults of every
+// CASDOOR_BRAND_* variable are the upstream values, so an unbranded deployment
+// gets its own text back unchanged.
+func applyBrandToIndexHtml(content string) string {
+	if brandName := conf.GetBrandName(); brandName != conf.DefaultBrandName {
+		content = strings.ReplaceAll(content, fmt.Sprintf("<title>%s</title>", conf.DefaultBrandName), fmt.Sprintf("<title>%s</title>", brandName))
+	}
+
+	defaultTagline := fmt.Sprintf("%s - sign in", conf.DefaultBrandName)
+	if tagline := conf.GetBrandTagline(); tagline != defaultTagline {
+		content = strings.ReplaceAll(content, fmt.Sprintf(`content="%s"`, defaultTagline), fmt.Sprintf(`content="%s"`, tagline))
+	}
+
+	if favicon := conf.GetBrandFaviconUrl(); favicon != "" && favicon != indexHtmlFaviconPlaceholder {
+		content = strings.ReplaceAll(content, indexHtmlFaviconPlaceholder, favicon)
+	}
+
+	return content
+}
+
 func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, organizationThemeCookie *OrganizationThemeCookie) {
 	f, err := os.Open(filepath.Clean(name))
 	if err != nil {
@@ -243,9 +269,13 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, o
 	oldContent := util.ReadStringFromPath(name)
 	newContent := oldContent
 	if organizationThemeCookie != nil {
-		newContent = strings.ReplaceAll(newContent, "/favicon.png", organizationThemeCookie.Favicon)
-		newContent = strings.ReplaceAll(newContent, "<title>Receipt Hunter</title>", fmt.Sprintf("<title>%s</title>", organizationThemeCookie.DisplayName))
+		newContent = strings.ReplaceAll(newContent, indexHtmlFaviconPlaceholder, organizationThemeCookie.Favicon)
+		newContent = strings.ReplaceAll(newContent, fmt.Sprintf("<title>%s</title>", conf.DefaultBrandName), fmt.Sprintf("<title>%s</title>", organizationThemeCookie.DisplayName))
 	}
+
+	// Whatever the organization did not override is branded for the deployment
+	// (CASDOOR_BRAND_*); with no variables set this rewrites Casdoor to Casdoor.
+	newContent = applyBrandToIndexHtml(newContent)
 
 	// Set the correct <html lang="..."> on the initial HTML response so browsers
 	// do not mis-detect the page language (e.g. Chrome offering to translate a

@@ -1,3 +1,4 @@
+import * as Conf from "@/Conf";
 import * as Setting from "@/lib/setting";
 
 /**
@@ -12,7 +13,7 @@ export function newOrganization(createdTime: string) {
     name: `organization_${randomName}`,
     createdTime,
     displayName: `New Organization - ${randomName}`,
-    websiteUrl: "https://receipt-hunter.com",
+    websiteUrl: Conf.BrandWebsiteUrl,
     favicon: `${Setting.StaticBaseUrl}/img/favicon.png`,
     passwordType: "bcrypt",
     passwordSalt: "",

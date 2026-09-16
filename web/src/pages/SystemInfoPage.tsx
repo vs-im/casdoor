@@ -263,7 +263,7 @@ export default function SystemInfoPage() {
 
       <Card id="about-card">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">{Conf.ProductName}</CardTitle>
+          <CardTitle className="text-base">{Conf.BrandName}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-1 text-sm">
           <p className="text-muted-foreground">

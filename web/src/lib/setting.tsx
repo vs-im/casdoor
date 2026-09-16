@@ -42,7 +42,6 @@ import "@/i18n";
 export const ServerUrl = "";
 
 export const StaticBaseUrl = Conf.StaticBaseUrl;
-export const ProductName = Conf.ProductName;
 
 export const MAX_PAGE_SIZE = 25;
 export const SEARCH_DEBOUNCE_MS = 300;
@@ -230,9 +229,9 @@ export function getAlgorithmNames(themeData) {
 
 export function getLogo(themes) {
   if (themes.includes("dark")) {
-    return "/rh-logo-dark.svg";
+    return Conf.BrandLogoDarkUrl;
   } else {
-    return "/rh-logo.svg";
+    return Conf.BrandLogoUrl;
   }
 }
 
@@ -242,7 +241,7 @@ export function getLogo(themes) {
  * it disappears on a dark sidebar — but it has a dark twin, which `getLogo` returns.
  */
 function isDefaultLogo(logo: string | undefined | null) {
-  return typeof logo === "string" && (logo.endsWith("/rh-logo.svg") || logo.endsWith("logo_1185x256.png"));
+  return typeof logo === "string" && (logo === Conf.BrandLogoUrl || logo.endsWith("logo_1185x256.png"));
 }
 
 /**
@@ -2064,10 +2063,18 @@ export function getPublicAssetUrl(path: string) {
   return `${window.location.origin}${path}`;
 }
 
+/**
+ * The brand mark for HTML that leaves the page (emails): a root-relative brand
+ * asset is resolved against this origin, an absolute URL is used as it is.
+ */
+export function getBrandLogoMarkUrl() {
+  return Conf.BrandLogoMarkUrl.startsWith("/") ? getPublicAssetUrl(Conf.BrandLogoMarkUrl) : Conf.BrandLogoMarkUrl;
+}
+
 export function getDefaultFooterContent() {
   // the height is inline rather than an attribute: this HTML is injected into the
   // page, where Tailwind's preflight would otherwise reset it to `height: auto`
-  return `© ${new Date().getFullYear()} ${ProductName}`;
+  return `© ${new Date().getFullYear()} ${Conf.BrandName}`;
 }
 
 export function getEmptyFooterContent() {
@@ -2098,7 +2105,7 @@ export function getDefaultHtmlEmailContent() {
 <body>
 <div class="email-container">
   <div class="header">
-        <img src="${getPublicAssetUrl("/rh-logo-mark.png")}" alt="${ProductName}" width="96">
+        <img src="${getBrandLogoMarkUrl()}" alt="${Conf.BrandName}" width="96">
     </div>
     <p><strong>%{user.friendlyName}</strong>, here is your verification code</p>
     <p>Use this code for your transaction. It's valid for 5 minutes</p>
@@ -2111,7 +2118,7 @@ export function getDefaultHtmlEmailContent() {
       </div>
     </reset-link>
     <p>Thanks</p>
-    <p>${ProductName} Team</p>
+    <p>${Conf.BrandName} Team</p>
     <hr>
     <div class="footer">
         <p>Need help? Please contact your administrator.</p>
@@ -2140,9 +2147,9 @@ export function getDefaultInvitationHtmlEmailContent() {
 <body>
 <div class="email-container">
   <div class="header">
-        <img src="${getPublicAssetUrl("/rh-logo-mark.png")}" alt="${ProductName}" width="96">
+        <img src="${getBrandLogoMarkUrl()}" alt="${Conf.BrandName}" width="96">
     </div>
-    <p>You have been invited into ${ProductName}</p>
+    <p>You have been invited into ${Conf.BrandName}</p>
     <div class="code">
         %code
     </div>
@@ -2152,7 +2159,7 @@ export function getDefaultInvitationHtmlEmailContent() {
       </div>
     </reset-link>
     <p>Thanks</p>
-    <p>${ProductName} Team</p>
+    <p>${Conf.BrandName} Team</p>
     <hr>
     <div class="footer">
         <p>Need help? Please contact your administrator.</p>
@@ -2255,7 +2262,7 @@ export function getDefaultMagicLinkHtmlEmailContent() {
 <body>
   <div class="container">
     <div class="logo">
-      <img src="${getPublicAssetUrl("/rh-logo-mark.png")}" alt="${ProductName}" width="96">
+      <img src="${getBrandLogoMarkUrl()}" alt="${Conf.BrandName}" width="96">
     </div>
 
     <div class="greeting">
@@ -2277,7 +2284,7 @@ export function getDefaultMagicLinkHtmlEmailContent() {
     <div class="message" style="margin-top: 24px;">
       This link can be used once and will expire soon.<br>
       Thanks,<br>
-      ${ProductName} Team
+      ${Conf.BrandName} Team
     </div>
 
     <div class="footer">
@@ -2381,7 +2388,7 @@ export function getDefaultMagicLinkSignupHtmlEmailContent() {
 <body>
   <div class="container">
     <div class="logo">
-      <img src="${getPublicAssetUrl("/rh-logo-mark.png")}" alt="${ProductName}" width="96">
+      <img src="${getBrandLogoMarkUrl()}" alt="${Conf.BrandName}" width="96">
     </div>
 
     <div class="greeting">
@@ -2403,7 +2410,7 @@ export function getDefaultMagicLinkSignupHtmlEmailContent() {
     <div class="message" style="margin-top: 24px;">
       This link can be used once and will expire soon.<br>
       Thanks,<br>
-      ${ProductName} Team
+      ${Conf.BrandName} Team
     </div>
 
     <div class="footer">

@@ -1,6 +1,7 @@
 import i18next from "i18next";
 import {getAuthUrl} from "@/auth/Provider";
 import * as Setting from "@/lib/setting";
+import * as Conf from "@/Conf";
 
 /**
  * MetaMask sign-in, ported from web/src/auth/Web3Auth.js. The EIP-712 payload,
@@ -63,7 +64,7 @@ export function signEthereumTypedData(from: string, nonce: string): Promise<Web3
   const typedData = JSON.stringify({
     domain: {
       chainId: getEthereum().chainId,
-      name: "Receipt Hunter",
+      name: Conf.BrandName,
       version: "1",
     },
     message: {
