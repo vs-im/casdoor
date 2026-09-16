@@ -376,12 +376,19 @@ func SendMagicLinkToEmail(organization *Organization, provider *Provider, email 
 	return SendEmail(provider, title, content, []string{email}, sender)
 }
 
-func GetDefaultMagicLinkEmailContent(magicLinkURL string, expireTime string) string {
-	staticBaseURL := strings.TrimRight(conf.GetConfigString("staticBaseUrl"), "/")
-	if staticBaseURL == "" {
-		staticBaseURL = "https://cdn.casbin.org"
+// getDefaultEmailLogoURL is the logo the default email templates embed: our
+// wordmark from web/public, served by the frontend origin (an email client cannot
+// load a relative path).
+func getDefaultEmailLogoURL() string {
+	origin := strings.TrimRight(conf.GetConfigString("originFrontend"), "/")
+	if origin == "" {
+		origin = strings.TrimRight(conf.GetConfigString("origin"), "/")
 	}
-	logoURL := fmt.Sprintf("%s/img/casdoor-logo_1185x256.png", staticBaseURL)
+	return origin + "/rh-logo-mark.png"
+}
+
+func GetDefaultMagicLinkEmailContent(magicLinkURL string, expireTime string) string {
+	logoURL := getDefaultEmailLogoURL()
 	content := `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -496,7 +503,7 @@ func GetDefaultMagicLinkEmailContent(magicLinkURL string, expireTime string) str
     <div class="message" style="margin-top: 24px;">
       This link can be used once and will expire at %expireTime.<br>
       Thanks,<br>
-      Casdoor Team
+      Receipt Hunter Team
     </div>
 
     <div class="footer">
@@ -511,11 +518,7 @@ func GetDefaultMagicLinkEmailContent(magicLinkURL string, expireTime string) str
 }
 
 func GetDefaultMagicLinkSignupEmailContent(magicLinkURL string, expireTime string) string {
-	staticBaseURL := strings.TrimRight(conf.GetConfigString("staticBaseUrl"), "/")
-	if staticBaseURL == "" {
-		staticBaseURL = "https://cdn.casbin.org"
-	}
-	logoURL := fmt.Sprintf("%s/img/casdoor-logo_1185x256.png", staticBaseURL)
+	logoURL := getDefaultEmailLogoURL()
 	content := `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -630,7 +633,7 @@ func GetDefaultMagicLinkSignupEmailContent(magicLinkURL string, expireTime strin
     <div class="message" style="margin-top: 24px;">
       This link can be used once and will expire at %expireTime.<br>
       Thanks,<br>
-      Casdoor Team
+      Receipt Hunter Team
     </div>
 
     <div class="footer">

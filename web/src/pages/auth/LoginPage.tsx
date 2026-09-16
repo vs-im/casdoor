@@ -1,6 +1,7 @@
 import * as React from "react";
 import i18next from "i18next";
 import {Link, useLocation, useNavigate, useParams} from "react-router-dom";
+import * as Conf from "@/Conf";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Input} from "@/components/ui/input";
@@ -224,7 +225,7 @@ function OrganizationChoiceBox({mode}: {mode: string}) {
       Setting.showMessage("error", i18next.t("login:Please input your organization name!"));
       return;
     }
-    Setting.goToLink(`/login/${organization}?orgChoiceMode=None`);
+    Setting.goToLink(`${Setting.getOrganizationLoginPath(organization)}?orgChoiceMode=None`);
   };
 
   if (mode === "Select") {
@@ -527,7 +528,7 @@ export default function LoginPage({type = "login", application: applicationProp,
   const handleCasLoginResult = (res: any, casParams: any) => {
     let message = "Logged in successfully. ";
     if (casParams.service === "") {
-      message += "Now you can visit apps protected by Casdoor.";
+      message += `Now you can visit apps protected by ${Conf.ProductName}.`;
     }
     Setting.showMessage("success", message);
     if (casParams.service !== "") {
@@ -694,7 +695,7 @@ export default function LoginPage({type = "login", application: applicationProp,
       return;
     }
     searchParams.set("orgChoiceMode", "None");
-    Setting.goToLink(`/login/${name}?${searchParams.toString()}`);
+    Setting.goToLink(`${Setting.getOrganizationLoginPath(name)}?${searchParams.toString()}`);
   };
 
   const refreshInlineCaptcha = () => captchaRef.current?.loadCaptcha();

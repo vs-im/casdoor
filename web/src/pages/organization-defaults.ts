@@ -12,7 +12,7 @@ export function newOrganization(createdTime: string) {
     name: `organization_${randomName}`,
     createdTime,
     displayName: `New Organization - ${randomName}`,
-    websiteUrl: "https://door.casdoor.com",
+    websiteUrl: "https://receipt-hunter.com",
     favicon: `${Setting.StaticBaseUrl}/img/favicon.png`,
     passwordType: "bcrypt",
     passwordSalt: "",

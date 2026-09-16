@@ -1,5 +1,6 @@
 import * as React from "react";
 import i18next from "i18next";
+import * as Conf from "@/Conf";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
 import {Loading} from "@/components/common/Loading";
@@ -262,49 +263,14 @@ export default function SystemInfoPage() {
 
       <Card id="about-card">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">{i18next.t("system:About Casdoor")}</CardTitle>
+          <CardTitle className="text-base">{Conf.ProductName}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-1 text-sm">
           <p className="text-muted-foreground">
             {i18next.t("system:An Identity and Access Management (IAM) / Single-Sign-On (SSO) platform with web UI supporting OAuth 2.0, OIDC, SAML and CAS")}
           </p>
           <div>
-            GitHub:{" "}
-            <a href="https://github.com/casdoor/casdoor" target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
-              Casdoor
-            </a>
-          </div>
-          <div>
-            {i18next.t("system:Version")}:{" "}
-            {versionInfo?.version ? (
-              <a
-                href={`https://github.com/casdoor/casdoor/releases/tag/${versionInfo.version}`}
-                target="_blank"
-                rel="noreferrer"
-                className="underline-offset-4 hover:underline"
-              >
-                {versionText}
-              </a>
-            ) : (
-              versionText
-            )}
-          </div>
-          <div>
-            {i18next.t("system:Official website")}:{" "}
-            <a href="https://casdoor.org" target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
-              https://casdoor.org
-            </a>
-          </div>
-          <div>
-            {i18next.t("system:Community")}:{" "}
-            <a
-              href="https://casdoor.org/#:~:text=Casdoor%20API-,Community,-GitHub"
-              target="_blank"
-              rel="noreferrer"
-              className="underline-offset-4 hover:underline"
-            >
-              Get in Touch!
-            </a>
+            {i18next.t("system:Version")}: {versionText}
           </div>
         </CardContent>
       </Card>

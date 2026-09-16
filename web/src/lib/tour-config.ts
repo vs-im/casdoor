@@ -1,4 +1,3 @@
-import * as Setting from "@/lib/setting";
 
 export interface TourStep {
   title: string;
@@ -17,9 +16,9 @@ export interface TourStep {
 export const TourObj: Record<string, TourStep[]> = {
   home: [
     {
-      title: "Welcome to casdoor",
-      description: "You can learn more about the use of CasDoor at https://casdoor.org/.",
-      coverUrl: `${Setting.StaticBaseUrl}/img/casdoor-logo_1185x256.png`,
+      title: "Welcome to Receipt Hunter",
+      description: "This tour walks you through the identity console.",
+      coverUrl: "/rh-logo.svg",
     },
     {
       title: "Statistic cards",
@@ -28,20 +27,20 @@ export const TourObj: Record<string, TourStep[]> = {
     },
     {
       title: "Import users",
-      description: "You can add new users or update existing Casdoor users by uploading a XLSX file of user information.",
+      description: "You can add new users or update existing Receipt Hunter users by uploading a XLSX file of user information.",
       id: "echarts-chart",
     },
   ],
   webhooks: [
     {
       title: "Webhook List",
-      description: "Event systems allow you to build integrations, which subscribe to certain events on Casdoor. When one of those event is triggered, we'll send a POST json payload to the configured URL. The application parsed the json payload and carry out the hooked function. Events consist of signup, login, logout, update users, which are stored in the action field of the record. Event systems can be used to update an external issue from users.",
+      description: "Event systems allow you to build integrations, which subscribe to certain events on Receipt Hunter. When one of those event is triggered, we'll send a POST json payload to the configured URL. The application parsed the json payload and carry out the hooked function. Events consist of signup, login, logout, update users, which are stored in the action field of the record. Event systems can be used to update an external issue from users.",
     },
   ],
   syncers: [
     {
       title: "Syncer List",
-      description: "Casdoor stores users in user table. Don't worry about migrating your application user data into Casdoor, when you plan to use Casdoor as an authentication platform. Casdoor provides syncer to quickly help you sync user data to Casdoor.",
+      description: "Receipt Hunter stores users in user table. Don't worry about migrating your application user data into Receipt Hunter, when you plan to use Receipt Hunter as an authentication platform. Receipt Hunter provides syncer to quickly help you sync user data to Receipt Hunter.",
     },
   ],
   sysinfo: [
@@ -66,8 +65,8 @@ export const TourObj: Record<string, TourStep[]> = {
       id: "throughput-card",
     },
     {
-      title: "About Casdoor",
-      description: "You can get more Casdoor information in this card.",
+      title: "About",
+      description: "You can see the server version in this card.",
       id: "about-card",
     },
   ],
@@ -80,13 +79,13 @@ export const TourObj: Record<string, TourStep[]> = {
   pricings: [
     {
       title: "Price List",
-      description: "Casdoor can be used as subscription management system via plan, pricing and subscription.",
+      description: "Receipt Hunter can be used as subscription management system via plan, pricing and subscription.",
     },
   ],
   plans: [
     {
       title: "Plan List",
-      description: "Plan  describe list of application's features with own name and price. Plan features depends on Casdoor role with set of permissions.That allow to describe plan's features independ on naming and price. For example: plan may has diffrent prices depends on county or date.",
+      description: "Plan  describe list of application's features with own name and price. Plan features depends on Receipt Hunter role with set of permissions.That allow to describe plan's features independ on naming and price. For example: plan may has diffrent prices depends on county or date.",
     },
   ],
   payments: [
@@ -110,19 +109,19 @@ export const TourObj: Record<string, TourStep[]> = {
   tokens: [
     {
       title: "Token List",
-      description: "Casdoor is based on OAuth. Tokens are users' OAuth token.You can get access token in this list.",
+      description: "Receipt Hunter is based on OAuth. Tokens are users' OAuth token.You can get access token in this list.",
     },
   ],
   enforcers: [
     {
       title: "Enforcer List",
-      description: "In addition to the API interface for requesting enforcement of permission control, Casdoor also provides other interfaces that help external applications obtain permission policy information, which is also listed here.",
+      description: "In addition to the API interface for requesting enforcement of permission control, Receipt Hunter also provides other interfaces that help external applications obtain permission policy information, which is also listed here.",
     },
   ],
   adapters: [
     {
       title: "Adapter List",
-      description: "Casdoor supports using the UI to connect the adapter and manage the policy rules. In Casbin, the policy storage is implemented as an adapter (aka middleware for Casbin). A Casbin user can use an adapter to load policy rules from a storage, or save policy rules to it.",
+      description: "Receipt Hunter supports using the UI to connect the adapter and manage the policy rules. In Casbin, the policy storage is implemented as an adapter (aka middleware for Casbin). A Casbin user can use an adapter to load policy rules from a storage, or save policy rules to it.",
     },
   ],
   models: [
@@ -134,16 +133,16 @@ export const TourObj: Record<string, TourStep[]> = {
   permissions: [
     {
       title: "Permission List",
-      description: "All users associated with a single Casdoor organization are shared between the organization's applications and therefore have access to the applications. Sometimes you may want to restrict users' access to certain applications, or certain resources in a certain application. In this case, you can use Permission implemented by Casbin.",
+      description: "All users associated with a single Receipt Hunter organization are shared between the organization's applications and therefore have access to the applications. Sometimes you may want to restrict users' access to certain applications, or certain resources in a certain application. In this case, you can use Permission implemented by Casbin.",
     },
     {
       title: "Permission Add",
-      description: "In the Casdoor Web UI, you can add a Model for your organization in the Model configuration item, and a Policy for your organization in the Permission configuration item. ",
+      description: "In the Receipt Hunter Web UI, you can add a Model for your organization in the Model configuration item, and a Policy for your organization in the Permission configuration item. ",
       id: "add-button",
     },
     {
       title: "Permission Upload",
-      description: "With Casbin Online Editor, you can get Model and Policy files suitable for your usage scenarios. You can easily import the Model file into Casdoor through the Casdoor Web UI for use by the built-in Casbin. ",
+      description: "With Casbin Online Editor, you can get Model and Policy files suitable for your usage scenarios. You can easily import the Model file into Receipt Hunter through the Receipt Hunter Web UI for use by the built-in Casbin. ",
       id: "upload-button",
     },
   ],
@@ -156,7 +155,7 @@ export const TourObj: Record<string, TourStep[]> = {
   resources: [
     {
       title: "Resource List",
-      description: "You can upload resources in casdoor. Before upload resources, you need to configure a storage provider. Please see Storage Provider.",
+      description: "You can upload resources in Receipt Hunter. Before upload resources, you need to configure a storage provider. Please see Storage Provider.",
     },
     {
       title: "Upload Resource",
@@ -178,7 +177,7 @@ export const TourObj: Record<string, TourStep[]> = {
   organizations: [
     {
       title: "Organization List",
-      description: "Organization is the basic unit of Casdoor, which manages users and applications. If a user signed in to an organization, then he can access all applications belonging to the organization without signing in again.",
+      description: "Organization is the basic unit of Receipt Hunter, which manages users and applications. If a user signed in to an organization, then he can access all applications belonging to the organization without signing in again.",
     },
   ],
   groups: [
@@ -190,18 +189,18 @@ export const TourObj: Record<string, TourStep[]> = {
   users: [
     {
       title: "User List",
-      description: "As an authentication platform, Casdoor is able to manage users.",
+      description: "As an authentication platform, Receipt Hunter is able to manage users.",
     },
     {
       title: "Import users",
-      description: "You can add new users or update existing Casdoor users by uploading a XLSX file of user information.",
+      description: "You can add new users or update existing Receipt Hunter users by uploading a XLSX file of user information.",
       id: "upload-button",
     },
   ],
   applications: [
     {
       title: "Application List",
-      description: "If you want to use Casdoor to provide login service for your web Web APPs, you can add them as Casdoor applications. Users can access all applications in their organizations without login twice.",
+      description: "If you want to use Receipt Hunter to provide login service for your web Web APPs, you can add them as Receipt Hunter applications. Users can access all applications in their organizations without login twice.",
     },
   ],
 };

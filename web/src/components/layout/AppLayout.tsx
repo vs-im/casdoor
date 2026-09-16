@@ -5,7 +5,6 @@ import {SidebarInset, SidebarProvider} from "@/components/ui/sidebar";
 import {EnableMfaNotification} from "@/components/auth/EnableMfaNotification";
 import {CommandPalette, useCommandPalette} from "@/components/common/CommandPalette";
 import {ConsoleTour} from "@/components/common/ConsoleTour";
-import {GithubCorner} from "@/components/common/GithubCorner";
 import {Loading} from "@/components/common/Loading";
 import {Header} from "@/components/layout/Header";
 import {PoweredBy} from "@/components/layout/PoweredBy";
@@ -37,7 +36,6 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <GithubCorner />
       <ConsoleTour />
       <EnableMfaNotification />
       <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />

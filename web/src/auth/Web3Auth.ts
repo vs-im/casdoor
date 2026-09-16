@@ -63,7 +63,7 @@ export function signEthereumTypedData(from: string, nonce: string): Promise<Web3
   const typedData = JSON.stringify({
     domain: {
       chainId: getEthereum().chainId,
-      name: "Casdoor",
+      name: "Receipt Hunter",
       version: "1",
     },
     message: {

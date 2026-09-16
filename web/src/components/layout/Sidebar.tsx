@@ -1,6 +1,7 @@
 import * as React from "react";
 import {Link, useLocation} from "react-router-dom";
 import {ChevronDown} from "lucide-react";
+import * as Conf from "@/Conf";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -224,7 +225,7 @@ export function AppSidebar({onNavigate}: {onNavigate?: () => void}) {
           {/* collapsed the organization's favicon fits where its wordmark does not */}
           <img
             src={collapsed ? organization?.favicon || siderLogo : siderLogo}
-            alt={organization?.displayName || "Casdoor"}
+            alt={organization?.displayName || Conf.ProductName}
             className={cn("object-contain", collapsed ? "h-6 w-6 rounded" : "h-8 max-w-[160px]")}
           />
         </Link>

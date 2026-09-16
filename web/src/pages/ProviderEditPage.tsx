@@ -688,7 +688,7 @@ export default function ProviderEditPage() {
       patch.host = "smtp.example.com";
       patch.port = 465;
       patch.sslMode = "Auto";
-      patch.title = "Casdoor Verification Code";
+      patch.title = "Receipt Hunter Verification Code";
       patch.content = Setting.getDefaultHtmlEmailContent();
       patch.metadata = Setting.getDefaultInvitationHtmlEmailContent();
       patch.magicLinkContent = Setting.getDefaultMagicLinkHtmlEmailContent();
@@ -1032,7 +1032,7 @@ export default function ProviderEditPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => updateProviderField("content", "You have requested a verification code at Casdoor. Here is your code: %s, please enter in 5 minutes. <reset-link>Or click %link to reset</reset-link>")}
+              onClick={() => updateProviderField("content", "You have requested a verification code at Receipt Hunter. Here is your code: %s, please enter in 5 minutes. <reset-link>Or click %link to reset</reset-link>")}
             >
               {i18next.t("general:Reset to Default")} (Text)
             </Button>
@@ -1066,7 +1066,7 @@ export default function ProviderEditPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => updateProviderField("metadata", "You have invited to join Casdoor. Here is your invitation code: %s, please enter in 5 minutes. Or click %link to signup")}
+              onClick={() => updateProviderField("metadata", "You have been invited to join Receipt Hunter. Here is your invitation code: %s, please enter in 5 minutes. Or click %link to signup")}
             >
               {i18next.t("general:Reset to Default")} (Text)
             </Button>
@@ -1099,7 +1099,7 @@ export default function ProviderEditPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => updateProviderField("magicLinkContent", "You have requested a magic link at Casdoor. Click %link to sign in. The link can be used once and expires soon.")}
+              onClick={() => updateProviderField("magicLinkContent", "You have requested a magic link at Receipt Hunter. Click %link to sign in. The link can be used once and expires soon.")}
             >
               {i18next.t("general:Reset to Default")} (Text)
             </Button>
@@ -1131,7 +1131,7 @@ export default function ProviderEditPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => updateProviderField("magicLinkSignupContent", "Welcome to Casdoor. Click %link to create your account. The link can be used once and expires soon.")}
+              onClick={() => updateProviderField("magicLinkSignupContent", "Welcome to Receipt Hunter. Click %link to create your account. The link can be used once and expires soon.")}
             >
               {i18next.t("general:Reset to Default")} (Text)
             </Button>

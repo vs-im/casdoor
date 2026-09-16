@@ -86,9 +86,9 @@ func TestTotpMfaInitiate_WithEmptyIssuer(t *testing.T) {
 		return
 	}
 
-	// Verify the URL contains the default issuer "Casdoor"
-	if !strings.Contains(mfaProps.URL, "Casdoor") {
-		t.Errorf("URL should contain default issuer 'Casdoor', got: %s", mfaProps.URL)
+	// Verify the URL contains the default issuer "Receipt Hunter"
+	if !strings.Contains(mfaProps.URL, "Receipt%20Hunter") {
+		t.Errorf("URL should contain default issuer 'Receipt Hunter', got: %s", mfaProps.URL)
 	}
 }
 

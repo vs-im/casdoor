@@ -42,6 +42,7 @@ import "@/i18n";
 export const ServerUrl = "";
 
 export const StaticBaseUrl = Conf.StaticBaseUrl;
+export const ProductName = Conf.ProductName;
 
 export const MAX_PAGE_SIZE = 25;
 export const SEARCH_DEBOUNCE_MS = 300;
@@ -229,24 +230,24 @@ export function getAlgorithmNames(themeData) {
 
 export function getLogo(themes) {
   if (themes.includes("dark")) {
-    return `${StaticBaseUrl}/img/casdoor-logo_1185x256_dark.png`;
+    return "/rh-logo-dark.svg";
   } else {
-    return `${StaticBaseUrl}/img/casdoor-logo_1185x256.png`;
+    return "/rh-logo.svg";
   }
 }
 
 /**
- * Casdoor's own wordmark, which `object/init.go` stores as the built-in
- * organization's and application's logo. It is nearly black, so it disappears on
- * a dark sidebar — but it has a `_dark` twin, which `getLogo` returns.
+ * The stock wordmark (ours, or the upstream one an older `object/init.go` stored
+ * as the built-in organization's and application's logo). It is nearly black, so
+ * it disappears on a dark sidebar — but it has a dark twin, which `getLogo` returns.
  */
-function isDefaultCasdoorLogo(logo: string | undefined | null) {
-  return typeof logo === "string" && logo.endsWith("/img/casdoor-logo_1185x256.png");
+function isDefaultLogo(logo: string | undefined | null) {
+  return typeof logo === "string" && (logo.endsWith("/rh-logo.svg") || logo.endsWith("logo_1185x256.png"));
 }
 
 /**
  * The logo to paint for the current theme: an explicit `logoDark` wins in dark
- * mode, an organization that never replaced Casdoor's default gets the dark
+ * mode, an organization that never replaced the stock wordmark gets the dark
  * twin of it, and a real custom logo is left alone — the deployment chose it.
  */
 export function getThemedLogo(
@@ -258,7 +259,7 @@ export function getThemedLogo(
     if (logoDark) {
       return logoDark;
     }
-    if (!logo || isDefaultCasdoorLogo(logo)) {
+    if (!logo || isDefaultLogo(logo)) {
       return getLogo(themes);
     }
   }
@@ -340,7 +341,7 @@ export const OtherProviderInfo = {
     },
     "Custom HTTP SMS": {
       logo: `${StaticBaseUrl}/img/social_default.png`,
-      url: "https://casdoor.org/docs/provider/sms/overview",
+      url: "",
     },
     "Mock SMS": {
       logo: `${StaticBaseUrl}/img/social_default.png`,
@@ -370,7 +371,7 @@ export const OtherProviderInfo = {
     },
     "Custom HTTP Email": {
       logo: `${StaticBaseUrl}/img/social_default.png`,
-      url: "https://casdoor.org/docs/provider/email/overview",
+      url: "",
     },
     "Resend": {
       logo: `${StaticBaseUrl}/img/email_resend.png`,
@@ -416,7 +417,7 @@ export const OtherProviderInfo = {
     },
     "Casdoor": {
       logo: `${StaticBaseUrl}/img/casdoor.png`,
-      url: "https://casdoor.org/docs/provider/storage/overview",
+      url: "",
     },
     "CUCloud OSS": {
       logo: `${StaticBaseUrl}/img/social_cucloud.png`,
@@ -552,7 +553,7 @@ export const OtherProviderInfo = {
     },
     "Custom HTTP": {
       logo: `${StaticBaseUrl}/img/email_default.png`,
-      url: "https://casdoor.org/docs/provider/notification/overview",
+      url: "",
     },
     "DingTalk": {
       logo: `${StaticBaseUrl}/img/social_dingtalk.png`,
@@ -656,7 +657,7 @@ export const OtherProviderInfo = {
   Log: {
     "Casdoor Permission Log": {
       logo: `${StaticBaseUrl}/img/social_default.png`,
-      url: "https://casdoor.org",
+      url: "",
     },
     "System Log": {
       logo: `${StaticBaseUrl}/img/social_default.png`,
@@ -2058,10 +2059,15 @@ export function getUserCommonFields() {
     "WebauthnCredentials", "FaceIds", "Invitation", "InvitationCode", "Ldap", "Properties", "Groups"];
 }
 
+/** An absolute URL for a file in web/public, for HTML that leaves the page (emails). */
+export function getPublicAssetUrl(path: string) {
+  return `${window.location.origin}${path}`;
+}
+
 export function getDefaultFooterContent() {
   // the height is inline rather than an attribute: this HTML is injected into the
   // page, where Tailwind's preflight would otherwise reset it to `height: auto`
-  return `Powered by <a target="_blank" href="https://casdoor.org" rel="noreferrer"><img style="display: inline-block; height: 20px; width: auto; padding-bottom: 3px" alt="Casdoor" src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png"/></a>`;
+  return `© ${new Date().getFullYear()} ${ProductName}`;
 }
 
 export function getEmptyFooterContent() {
@@ -2092,8 +2098,7 @@ export function getDefaultHtmlEmailContent() {
 <body>
 <div class="email-container">
   <div class="header">
-        <h3>Casbin Organization</h3>
-        <img src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png" alt="Casdoor Logo" width="300">
+        <img src="${getPublicAssetUrl("/rh-logo-mark.png")}" alt="${ProductName}" width="96">
     </div>
     <p><strong>%{user.friendlyName}</strong>, here is your verification code</p>
     <p>Use this code for your transaction. It's valid for 5 minutes</p>
@@ -2106,10 +2111,10 @@ export function getDefaultHtmlEmailContent() {
       </div>
     </reset-link>
     <p>Thanks</p>
-    <p>Casbin Team</p>
+    <p>${ProductName} Team</p>
     <hr>
     <div class="footer">
-        <p>Casdoor is a brand operated by Casbin organization. For more info please refer to <a href="https://casdoor.org">https://casdoor.org</a></p>
+        <p>Need help? Please contact your administrator.</p>
     </div>
 </div>
 </body>
@@ -2135,10 +2140,9 @@ export function getDefaultInvitationHtmlEmailContent() {
 <body>
 <div class="email-container">
   <div class="header">
-        <h3>Casbin Organization</h3>
-        <img src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png" alt="Casdoor Logo" width="300">
+        <img src="${getPublicAssetUrl("/rh-logo-mark.png")}" alt="${ProductName}" width="96">
     </div>
-    <p>You have been invited into Casdoor</p>
+    <p>You have been invited into ${ProductName}</p>
     <div class="code">
         %code
     </div>
@@ -2148,10 +2152,10 @@ export function getDefaultInvitationHtmlEmailContent() {
       </div>
     </reset-link>
     <p>Thanks</p>
-    <p>Casbin Team</p>
+    <p>${ProductName} Team</p>
     <hr>
     <div class="footer">
-        <p>Casdoor is a brand operated by Casbin organization. For more info please refer to <a href="https://casdoor.org">https://casdoor.org</a></p>
+        <p>Need help? Please contact your administrator.</p>
     </div>
 </div>
 </body>
@@ -2251,7 +2255,7 @@ export function getDefaultMagicLinkHtmlEmailContent() {
 <body>
   <div class="container">
     <div class="logo">
-      <img src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png" alt="Logo">
+      <img src="${getPublicAssetUrl("/rh-logo-mark.png")}" alt="${ProductName}" width="96">
     </div>
 
     <div class="greeting">
@@ -2273,7 +2277,7 @@ export function getDefaultMagicLinkHtmlEmailContent() {
     <div class="message" style="margin-top: 24px;">
       This link can be used once and will expire soon.<br>
       Thanks,<br>
-      Casdoor Team
+      ${ProductName} Team
     </div>
 
     <div class="footer">
@@ -2377,7 +2381,7 @@ export function getDefaultMagicLinkSignupHtmlEmailContent() {
 <body>
   <div class="container">
     <div class="logo">
-      <img src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png" alt="Logo">
+      <img src="${getPublicAssetUrl("/rh-logo-mark.png")}" alt="${ProductName}" width="96">
     </div>
 
     <div class="greeting">
@@ -2399,7 +2403,7 @@ export function getDefaultMagicLinkSignupHtmlEmailContent() {
     <div class="message" style="margin-top: 24px;">
       This link can be used once and will expire soon.<br>
       Thanks,<br>
-      Casdoor Team
+      ${ProductName} Team
     </div>
 
     <div class="footer">
@@ -2760,6 +2764,15 @@ export function storeSigninUrl() {
 export function getStoredSigninUrl() {
   const signinUrl = sessionStorage.getItem("signinUrl");
   return signinUrl?.startsWith("/") ? signinUrl : "";
+}
+
+/**
+ * The sign-in page of an organization: `/login/<org>`, except for the operators'
+ * organization (built-in), whose page is the bare `/login` — the only address
+ * the console is entered by, so it never grows a suffix.
+ */
+export function getOrganizationLoginPath(organization: string) {
+  return organization === "built-in" ? "/login" : `/login/${organization}`;
 }
 
 export function getLoginLink(application) {

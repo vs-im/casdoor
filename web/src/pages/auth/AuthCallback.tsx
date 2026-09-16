@@ -1,6 +1,7 @@
 import * as React from "react";
 import i18next from "i18next";
 import {useLocation, useNavigate} from "react-router-dom";
+import * as Conf from "@/Conf";
 import {Alert, AlertDescription} from "@/components/ui/alert";
 import {Loading} from "@/components/common/Loading";
 import {AuthLayout} from "@/components/auth/AuthLayout";
@@ -284,7 +285,7 @@ export default function AuthCallback() {
     const handleCas = (ok: any, service: string) => {
       let message = "Logged in successfully.";
       if (service === "") {
-        message += " Now you can visit apps protected by Casdoor.";
+        message += ` Now you can visit apps protected by ${Conf.ProductName}.`;
       }
       Setting.showMessage("success", message);
       if (service !== "") {

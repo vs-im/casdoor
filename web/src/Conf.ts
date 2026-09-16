@@ -14,6 +14,9 @@
 
 import * as Cookie from "cookie";
 
+/** The product name shown wherever upstream showed its own: titles, alt texts, emails, the TOTP issuer fallback. */
+export const ProductName = "Receipt Hunter";
+
 export let DefaultApplication = "app-built-in";
 
 export let ShowGithubCorner = false;

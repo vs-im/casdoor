@@ -165,6 +165,12 @@ function useRequiredMfaRedirect() {
   }, [account, navigate, location.pathname]);
 }
 
+/** `/login/built-in` → `/login`: the operators sign in on the bare address, the query string (OAuth params, orgChoiceMode) travels along. */
+function CanonicalLoginRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/login${location.search}`} replace state={location.state} />;
+}
+
 /** Sends anonymous visitors to the sign-in page of their organization. */
 function RequireAuth({children}: {children: React.ReactNode}) {
   const {account, loading} = useAccount();
@@ -176,6 +182,7 @@ function RequireAuth({children}: {children: React.ReactNode}) {
   if (account === null) {
     const lastOrg = localStorage.getItem("lastLoginOrg");
     const to = lastOrg && lastOrg !== "built-in" ? `/login/${lastOrg}` : "/login";
+    // the operators' organization (built-in) signs in on the bare /login; see LoginPage
     return <Navigate to={to} replace state={{from: location.pathname + location.search}} />;
   }
   return <>{children}</>;
@@ -209,6 +216,8 @@ export default function App() {
       <Routes>
         {/* Authentication */}
         <Route path="/login" element={<LoginPage type="login" />} />
+        {/* /login/built-in is the same page as /login; keep one canonical address */}
+        <Route path="/login/built-in" element={<CanonicalLoginRedirect />} />
         <Route path="/login/:owner" element={<LoginPage type="login" />} />
         <Route path="/login/oauth/authorize" element={<LoginPage type="code" />} />
         <Route path="/login/oauth/device/:userCode" element={<LoginPage type="device" />} />

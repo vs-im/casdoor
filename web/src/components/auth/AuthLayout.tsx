@@ -1,6 +1,7 @@
 import * as React from "react";
 import i18next from "i18next";
 import {AlertCircle, ArrowLeft} from "lucide-react";
+import * as Conf from "@/Conf";
 import {PoweredBy} from "@/components/layout/PoweredBy";
 import {Button} from "@/components/ui/button";
 import {LanguageSelect} from "@/components/common/LanguageSelect";
@@ -292,10 +293,10 @@ export function AuthLayout({
                 <div className="login-logo-box mb-6 flex justify-center">
                   {application?.homepageUrl ? (
                     <a href={application.homepageUrl} target="_blank" rel="noreferrer">
-                      <img src={logo} alt={application?.displayName ?? "Casdoor"} className="h-10 max-w-full object-contain" />
+                      <img src={logo} alt={application?.displayName ?? Conf.ProductName} className="h-10 max-w-full object-contain" />
                     </a>
                   ) : (
-                    <img src={logo} alt={application?.displayName ?? "Casdoor"} className="h-10 max-w-full object-contain" />
+                    <img src={logo} alt={application?.displayName ?? Conf.ProductName} className="h-10 max-w-full object-contain" />
                   )}
                 </div>
               )}
