@@ -43,8 +43,15 @@ if [ -n "$(printf '%s' "$findings" | tr -d '[:space:]')" ]; then
   exit 1
 fi
 
-# Local artifacts that must never be committed, whatever they contain.
-artifacts=$(git ls-files | grep -E '(^|/)(\.env(\..*)?|bun\.lock|bun\.lockb|.*\.log|.*\.orig|.*\.bak|.*\.pem|.*\.key)$' || true)
+# Local artifacts that must never be committed, whatever they contain. Only files
+# this fork adds count: upstream's own fixtures (test certificates and keys) are
+# upstream's business.
+if git rev-parse --verify --quiet upstream/master >/dev/null; then
+  tracked=$(git diff upstream/master...HEAD --diff-filter=A --name-only)
+else
+  tracked=$(git ls-files)
+fi
+artifacts=$(printf '%s\n' "$tracked" | grep -E '(^|/)(\.env(\..*)?|bun\.lock|bun\.lockb|.*\.log|.*\.orig|.*\.bak|.*\.pem|.*\.key)$' || true)
 if [ -n "$artifacts" ]; then
   echo "check-no-private: local artifacts are committed:" >&2
   printf '%s\n' "$artifacts" >&2
