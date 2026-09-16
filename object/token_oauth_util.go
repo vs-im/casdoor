@@ -339,7 +339,7 @@ func GetOAuthCode(userId string, clientId string, provider string, signinMethod 
 	if err != nil {
 		return nil, err
 	}
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, provider, signinMethod, nonce, scope, resource, host)
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, provider, signinMethod, nonce, scope, resource, host, sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -503,7 +503,7 @@ func RefreshToken(application *Application, grantType string, refreshToken strin
 		return nil, err
 	}
 
-	newAccessToken, newRefreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", scope, resource, host)
+	newAccessToken, newRefreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", scope, resource, host, token.SessionId)
 	if err != nil {
 		return &TokenError{
 			Error:            EndpointError,
@@ -553,6 +553,14 @@ func RefreshToken(application *Application, grantType string, refreshToken strin
 	_, err = DeleteToken(token)
 	if err != nil {
 		return nil, err
+	}
+
+	// a refresh is activity of the device that signed in (password grant has no Beego cookie to report it otherwise)
+	if newToken.SessionId != "" {
+		err = UpdateSessionLastActiveTime(user.Owner, user.Name, newToken.SessionId)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	tokenWrapper := &TokenWrapper{
@@ -804,7 +812,7 @@ func createGuestUserToken(application *Application, clientSecret string, verifie
 		}, nil
 	}
 
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, guestUser, "", "", "", "", "", "")
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, guestUser, "", "", "", "", "", "", "")
 	if err != nil {
 		return nil, &TokenError{
 			Error:            EndpointError,

@@ -23,7 +23,7 @@ import (
 	"github.com/casdoor/casdoor/util"
 )
 
-func GetOAuthToken(grantType string, clientId string, clientSecret string, code string, verifier string, scope string, nonce string, username string, password string, host string, refreshToken string, tag string, avatar string, lang string, subjectToken string, subjectTokenType string, assertion string, clientAssertion string, clientAssertionType string, audience string, resource string, dpopProof string) (interface{}, error) {
+func GetOAuthToken(grantType string, clientId string, clientSecret string, code string, verifier string, scope string, nonce string, username string, password string, host string, refreshToken string, tag string, avatar string, lang string, subjectToken string, subjectTokenType string, assertion string, clientAssertion string, clientAssertionType string, audience string, resource string, dpopProof string, passwordSession *SessionInfo) (interface{}, error) {
 	var (
 		application *Application
 		err         error
@@ -85,7 +85,7 @@ func GetOAuthToken(grantType string, clientId string, clientSecret string, code 
 	case "authorization_code": // Authorization Code Grant
 		token, tokenError, err = GetAuthorizationCodeToken(application, clientSecret, code, verifier, resource)
 	case "password": // Resource Owner Password Credentials Grant
-		token, tokenError, err = GetPasswordToken(application, username, password, scope, host)
+		token, tokenError, err = GetPasswordToken(application, username, password, scope, host, passwordSession)
 	case "client_credentials": // Client Credentials Grant
 		token, tokenError, err = GetClientCredentialsToken(application, clientSecret, scope, host)
 	case "token", "id_token": // Implicit Grant
@@ -257,7 +257,10 @@ func GetAuthorizationCodeToken(application *Application, clientSecret string, co
 }
 
 // GetPasswordToken handles the Resource Owner Password Credentials Grant flow.
-func GetPasswordToken(application *Application, username string, password string, scope string, host string) (*Token, *TokenError, error) {
+// session (optional) is the Beego session id / client IP / user agent of the request: the grant then
+// gets a Session row like an /api/login sign-in, so it shows up in get-sessions and delete-session
+// expires its tokens (Token.SessionId).
+func GetPasswordToken(application *Application, username string, password string, scope string, host string, session *SessionInfo) (*Token, *TokenError, error) {
 	expandedScope, ok := IsScopeValidAndExpand(scope, application)
 	if !ok {
 		return nil, &TokenError{
@@ -309,7 +312,12 @@ func GetPasswordToken(application *Application, username string, password string
 		return nil, nil, err
 	}
 
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", scope, "", host)
+	sessionId := ""
+	if session != nil {
+		sessionId = session.SessionId
+	}
+
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", scope, "", host, sessionId)
 	if err != nil {
 		return nil, &TokenError{
 			Error:            EndpointError,
@@ -338,13 +346,47 @@ func GetPasswordToken(application *Application, username string, password string
 		Scope:        scope,
 		TokenType:    "Bearer",
 		CodeIsUsed:   true,
+		SessionId:    sessionId,
 	}
 	_, err = AddToken(token)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	if sessionId != "" {
+		_, err = AddSession(newPasswordGrantSession(application, user, session))
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	return token, nil, nil
+}
+
+// newPasswordGrantSession builds the Session row of a password grant. The row lives as long as the
+// refresh token can be used (the access token alone is renewed on every refresh); a console
+// session (SetSessionUsername) is deliberately not created.
+func newPasswordGrantSession(application *Application, user *User, session *SessionInfo) *Session {
+	now := time.Now()
+	lifetimeHours := application.RefreshExpireInHours
+	if lifetimeHours <= 0 {
+		lifetimeHours = application.ExpireInHours
+	}
+
+	return &Session{
+		Owner:       user.Owner,
+		Name:        user.Name,
+		Application: application.Name,
+		SessionId:   []string{session.SessionId},
+		SessionInfos: []*SessionInfo{{
+			SessionId:      session.SessionId,
+			CreatedTime:    util.GetCurrentTime(),
+			LastActiveTime: util.GetCurrentTime(),
+			ExpireTime:     now.Add(time.Duration(lifetimeHours * float64(time.Hour))).Format(time.RFC3339),
+			Ip:             session.Ip,
+			UserAgent:      session.UserAgent,
+		}},
+	}
 }
 
 // GetClientCredentialsToken handles the Client Credentials Grant flow.
@@ -370,7 +412,7 @@ func GetClientCredentialsToken(application *Application, clientSecret string, sc
 		Type:  "application",
 	}
 
-	accessToken, _, tokenName, err := generateJwtToken(application, nullUser, "", "", "", scope, "", host)
+	accessToken, _, tokenName, err := generateJwtToken(application, nullUser, "", "", "", scope, "", host, "")
 	if err != nil {
 		return nil, &TokenError{
 			Error:            EndpointError,
@@ -462,7 +504,7 @@ func GetTokenByUser(application *Application, user *User, scope string, nonce st
 		return nil, err
 	}
 
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", nonce, scope, "", host)
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", nonce, scope, "", host, sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -576,7 +618,7 @@ func GetWechatMiniProgramToken(application *Application, code string, host strin
 		return nil, nil, err
 	}
 
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", "", "", host)
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", "", "", host, "")
 	if err != nil {
 		return nil, &TokenError{
 			Error:            EndpointError,
@@ -709,7 +751,7 @@ func GetTokenExchangeToken(application *Application, clientSecret string, subjec
 		return nil, nil, err
 	}
 
-	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", scope, "", host)
+	accessToken, refreshToken, tokenName, err := generateJwtToken(application, user, "", "", "", scope, "", host, "")
 	if err != nil {
 		return nil, &TokenError{
 			Error:            EndpointError,
