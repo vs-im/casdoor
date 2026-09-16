@@ -34,6 +34,7 @@ type ClaimsStandard struct {
 	Address             OIDCAddress `json:"address,omitempty"`
 	Azp                 string      `json:"azp,omitempty"`
 	Provider            string      `json:"provider,omitempty"`
+	Sid                 string      `json:"sid,omitempty"`
 
 	jwt.RegisteredClaims
 }
@@ -56,6 +57,7 @@ func getStandardClaims(claims Claims) ClaimsStandard {
 		RegisteredClaims: claims.RegisteredClaims,
 		Azp:              claims.Azp,
 		Provider:         claims.Provider,
+		Sid:              claims.Sid,
 	}
 
 	res.Phone = ""

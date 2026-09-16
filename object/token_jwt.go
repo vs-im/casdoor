@@ -36,6 +36,8 @@ type Claims struct {
 	Provider string `json:"provider,omitempty"`
 
 	SigninMethod string `json:"signinMethod,omitempty"`
+	// Sid is the Beego session id the token was minted under (OIDC "sid"), empty when the grant had no session
+	Sid string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -160,6 +162,7 @@ type ClaimsShort struct {
 	Provider  string `json:"provider,omitempty"`
 
 	SigninMethod string `json:"signinMethod,omitempty"`
+	Sid          string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -182,6 +185,7 @@ type ClaimsWithoutThirdIdp struct {
 	Provider  string `json:"provider,omitempty"`
 
 	SigninMethod string `json:"signinMethod,omitempty"`
+	Sid          string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -315,6 +319,7 @@ func getShortClaims(claims Claims) ClaimsShort {
 		Azp:              claims.Azp,
 		SigninMethod:     claims.SigninMethod,
 		Provider:         claims.Provider,
+		Sid:              claims.Sid,
 	}
 	return res
 }
@@ -330,6 +335,7 @@ func getClaimsWithoutThirdIdp(claims Claims) ClaimsWithoutThirdIdp {
 		Azp:                 claims.Azp,
 		SigninMethod:        claims.SigninMethod,
 		Provider:            claims.Provider,
+		Sid:                 claims.Sid,
 	}
 	return res
 }
@@ -421,6 +427,10 @@ func getClaimsCustom(claims Claims, tokenField []string, tokenAttributes []*JwtI
 	// Always include azp if present (authorized party)
 	if claims.Azp != "" {
 		res["azp"] = claims.Azp
+	}
+
+	if claims.Sid != "" {
+		res["sid"] = claims.Sid
 	}
 
 	// Always include nonce and scope as they are built-in OAuth/OIDC fields (even if empty)
@@ -547,7 +557,7 @@ func getTokenAudience(application *Application, user *User, resource string) jwt
 	return jwt.ClaimStrings{application.ClientId}
 }
 
-func generateJwtToken(application *Application, user *User, provider string, signinMethod string, nonce string, scope string, resource string, host string) (string, string, string, error) {
+func generateJwtToken(application *Application, user *User, provider string, signinMethod string, nonce string, scope string, resource string, host string, sessionId string) (string, string, string, error) {
 	nowTime := time.Now()
 	expireTime := nowTime.Add(time.Duration(application.ExpireInHours * float64(time.Hour)))
 	refreshExpireTime := nowTime.Add(time.Duration(application.RefreshExpireInHours * float64(time.Hour)))
@@ -585,6 +595,7 @@ func generateJwtToken(application *Application, user *User, provider string, sig
 		Azp:          application.ClientId,
 		Provider:     provider,
 		SigninMethod: signinMethod,
+		Sid:          sessionId,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    originBackend,
 			Subject:   user.Id,

@@ -15,6 +15,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -347,7 +348,17 @@ func (c *ApiController) GetOAuthToken() {
 		return
 	}
 
-	token, err := object.GetOAuthToken(grantType, clientId, clientSecret, code, verifier, scope, nonce, username, password, host, refreshToken, tag, avatar, c.GetAcceptLanguage(), subjectToken, subjectTokenType, assertion, clientAssertion, clientAssertionType, audience, resource, dpopProof)
+	// password grant: bind the tokens to the Beego session of this request (see object.GetPasswordToken)
+	var passwordSession *object.SessionInfo
+	if grantType == "password" && c.Ctx.Input.CruSession != nil {
+		passwordSession = &object.SessionInfo{
+			SessionId: c.Ctx.Input.CruSession.SessionID(context.Background()),
+			Ip:        util.GetClientIpFromRequest(c.Ctx.Request),
+			UserAgent: c.Ctx.Request.UserAgent(),
+		}
+	}
+
+	token, err := object.GetOAuthToken(grantType, clientId, clientSecret, code, verifier, scope, nonce, username, password, host, refreshToken, tag, avatar, c.GetAcceptLanguage(), subjectToken, subjectTokenType, assertion, clientAssertion, clientAssertionType, audience, resource, dpopProof, passwordSession)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
