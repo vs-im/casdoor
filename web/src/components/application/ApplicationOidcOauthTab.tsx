@@ -24,7 +24,8 @@ const GRANT_TYPES = [
 ];
 const TOKEN_FORMATS = ["JWT", "JWT-Empty", "JWT-Custom", "JWT-Standard"];
 const TOKEN_SIGNING_METHODS = ["RS256", "RS512", "ES256", "ES512", "ES384"];
-const TOKEN_ATTRIBUTE_TYPES = ["String", "Number", "Boolean"];
+// the only two the backend distinguishes: "String" carries one value, anything else a list
+const TOKEN_ATTRIBUTE_TYPES = ["Array", "String"];
 const TOKEN_ATTRIBUTE_CATEGORIES: EnumMap = {
   "Static Value": {i18nKey: "application:Static Value"},
   "Existing Field": {i18nKey: "application:Existing Field"},
