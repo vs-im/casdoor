@@ -1191,7 +1191,41 @@ func replaceAttributeValue(user *User, value string) []string {
 	valueList = replaceAttributeValues("$user.id", user.Id, valueList)
 	valueList = replaceAttributeValues("$user.phone", user.Phone, valueList)
 
+	// last, so that a property value is never itself scanned for placeholders
+	if strings.Contains(value, propertyPlaceholderPrefix) {
+		valueList = replacePropertyAttributeValues(user, value, valueList)
+	}
+
 	return valueList
+}
+
+const propertyPlaceholderPrefix = "$user.properties."
+
+// propertyPlaceholder matches "$user.properties.<key>", where <key> is a key of the
+// user's Properties map.
+var propertyPlaceholder = regexp.MustCompile(`\$user\.properties\.[A-Za-z0-9_.\-]+`)
+
+// replacePropertyAttributeValues expands "$user.properties.<key>" the way "$user.roles"
+// is expanded: a property holds a single string, so a comma-separated one stands for a
+// list and yields one value per element (an attribute of type "Array" then carries the
+// whole list, one of type "String" its first element). A property that is missing or
+// empty expands to nothing, which drops the attribute instead of emitting an empty one.
+func replacePropertyAttributeValues(user *User, value string, values []string) []string {
+	for _, placeholder := range propertyPlaceholder.FindAllString(value, -1) {
+		key := strings.TrimPrefix(placeholder, propertyPlaceholderPrefix)
+
+		var parts []string
+		for _, part := range strings.Split(user.Properties[key], ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				parts = append(parts, part)
+			}
+		}
+
+		values = replaceAttributeValuesWithList(placeholder, parts, values)
+	}
+
+	return values
 }
 
 func replaceAttributeValues(val string, replaceVal string, values []string) []string {
