@@ -31,6 +31,10 @@ const SIGNIN_METHOD_RULES: Record<string, EnumMap> = {
     "Non-LDAP": {i18nKey: "general:Non-LDAP"},
     "Hide password": {i18nKey: "general:Hide password"},
   },
+  "Magic link": {
+    "Sign in only": {i18nKey: "application:Sign in only"},
+    "Sign in or sign up": {i18nKey: "application:Sign in or sign up"},
+  },
   "WeChat": {
     "Tab": {i18nKey: "general:Tab"},
     "Login page": {i18nKey: "general:Login page"},
@@ -40,6 +44,12 @@ const SIGNIN_METHOD_RULES: Record<string, EnumMap> = {
     "Login page": {i18nKey: "general:Login page"},
   },
 };
+
+// a rule left over from another method (e.g. "All" on WebAuthn) hides the method on the login page
+function getDefaultSigninMethodRule(name: string): string {
+  const rules = Object.keys(SIGNIN_METHOD_RULES[name] ?? {});
+  return rules.length > 0 ? rules[0] : "None";
+}
 
 const SIGNUP_ITEM_TYPES: EnumMap = {
   "Input": {i18nKey: "application:Input"},
@@ -188,8 +198,8 @@ export function ApplicationUiCustomizationTab({application, updateField}: Applic
               render: (row: any, _i, patch) => (
                 <SelectField
                   value={row.name}
-                  onChange={(v) => patch({name: v, displayName: v})}
-                  options={["Password", "Verification code", "WebAuthn", "LDAP", "Face ID", "Magic link", "Device login"].map(
+                  onChange={(v) => patch({name: v, displayName: v, rule: getDefaultSigninMethodRule(v)})}
+                  options={["Password", "Verification code", "Magic link", "WebAuthn", "LDAP", "Face ID", "Device login"].map(
                     (item) => ({id: item, name: item}),
                   )}
                 />

@@ -8,7 +8,7 @@ import (
 )
 
 func TestMagicLinkTokenHash(t *testing.T) {
-	token, err := GenerateMagicLinkToken()
+	token, err := generateMagicLinkToken()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -16,14 +16,14 @@ func TestMagicLinkTokenHash(t *testing.T) {
 		t.Fatal("token should not be empty")
 	}
 
-	hash := HashMagicLinkToken(token)
+	hash := HashMagicLinkSecret(token)
 	if hash == "" {
 		t.Fatal("hash should not be empty")
 	}
 	if hash == token {
 		t.Fatal("hash should not equal token")
 	}
-	if hash != HashMagicLinkToken(token) {
+	if hash != HashMagicLinkSecret(token) {
 		t.Fatal("hash should be stable")
 	}
 }
@@ -41,8 +41,11 @@ func TestNewMagicLinkExpireUsesApplicationSetting(t *testing.T) {
 	if link.Owner != application.Organization {
 		t.Fatalf("owner = %s, want %s", link.Owner, application.Organization)
 	}
-	if link.Application != application.GetId() {
-		t.Fatalf("application = %s, want %s", link.Application, application.GetId())
+	if link.Application != application.Name {
+		t.Fatalf("application = %s, want %s", link.Application, application.Name)
+	}
+	if link.IsUsed || link.Binding != MagicLinkBindingNone || link.SessionHash != getUnboundMagicLinkSessionHash(link.TokenHash) {
+		t.Fatalf("a link of the API should be unused and unbound: %+v", link)
 	}
 	if link.TokenHash == "" {
 		t.Fatal("token hash should not be empty")
@@ -102,11 +105,10 @@ func TestApplyPermissionSnapshotToMagicLink(t *testing.T) {
 }
 
 func TestBuildMagicLinkCallbackURLResourceFallback(t *testing.T) {
-	link := &MagicLink{
-		ResponseType: "login",
-		Resources:    []string{"resource-from-permission"},
-	}
-	callbackURL := BuildMagicLinkCallbackURL(link, "token-1", "localhost:8000")
+	link := &MagicLink{}
+	link.ResponseType = "login"
+	link.Resources = []string{"resource-from-permission"}
+	callbackURL := BuildMagicLinkCallbackURL(link, "token-1", "http://localhost:8000")
 	parsed, err := url.Parse(callbackURL)
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +117,7 @@ func TestBuildMagicLinkCallbackURLResourceFallback(t *testing.T) {
 		t.Fatalf("resource = %s, want resource-from-permission", parsed.Query().Get("resource"))
 	}
 	link.Resource = "resource-from-request"
-	callbackURL = BuildMagicLinkCallbackURL(link, "token-2", "localhost:8000")
+	callbackURL = BuildMagicLinkCallbackURL(link, "token-2", "http://localhost:8000/")
 	parsed, err = url.Parse(callbackURL)
 	if err != nil {
 		t.Fatal(err)
@@ -243,31 +245,45 @@ func TestResolveMagicLinkExpireTimeRejectsTooLongExplicitTime(t *testing.T) {
 	}
 }
 
-func TestGetDefaultMagicLinkEmailContentIncludesExpireTime(t *testing.T) {
-	expireTime := "2026-06-17T10:00:00Z"
-	content := GetDefaultMagicLinkEmailContent("https://example.com/magic-link", expireTime)
-	if strings.Contains(content, "%expireTime") {
-		t.Fatal("expected expire time placeholder to be replaced")
-	}
-	if !strings.Contains(content, expireTime) {
-		t.Fatal("expected expire time in default magic link email content")
-	}
-}
+func TestGetApiMagicLinkEmailContent(t *testing.T) {
+	link := &MagicLink{}
+	link.ExpiryTime = "2026-06-17T10:00:00Z"
+	link.AuthAction = MagicLinkAuthActionSigninExistingUser
 
-func TestValidateMagicLinkConfigRejectsSignupWithoutSignin(t *testing.T) {
-	application := &Application{
-		MagicLinkSigninEnabled: false,
-		EnableMagicLinkSignup:  true,
+	content := getApiMagicLinkEmailContent(&Provider{Content: "Your code is %s"}, "https://example.com/magic-link/callback?token=t", nil, link)
+	if strings.Contains(content, "%expireTime") || strings.Contains(content, "%link") {
+		t.Fatal("expected the placeholders of the default content to be replaced")
 	}
-	err := ValidateMagicLinkConfig(application)
-	if err == nil {
-		t.Fatal("expected validation error for signup without sign-in")
+	if !strings.Contains(content, link.ExpiryTime) || !strings.Contains(content, "https://example.com/magic-link/callback?token=t") {
+		t.Fatal("expected the expiry and the link in the default content")
+	}
+
+	provider := &Provider{
+		Content:                "content %link",
+		MagicLinkContent:       "signin %link until %expireTime for %{user.friendlyName}",
+		MagicLinkSignupContent: "signup %link",
+	}
+	content = getApiMagicLinkEmailContent(provider, "https://l", &User{DisplayName: "Alice"}, link)
+	if content != "signin https://l until 2026-06-17T10:00:00Z for Alice" {
+		t.Fatalf("unexpected signin content: %s", content)
+	}
+
+	link.AuthAction = MagicLinkAuthActionSignupNewUser
+	content = getApiMagicLinkEmailContent(provider, "https://l", nil, link)
+	if content != "signup https://l" {
+		t.Fatalf("unexpected signup content: %s", content)
+	}
+
+	provider.MagicLinkContent = ""
+	provider.MagicLinkSignupContent = ""
+	content = getApiMagicLinkEmailContent(provider, "https://l", nil, link)
+	if content != "content https://l" {
+		t.Fatalf("unexpected provider content: %s", content)
 	}
 }
 
 func TestValidateMagicLinkConfigRejectsInvalidExpireMinutes(t *testing.T) {
 	application := &Application{
-		MagicLinkSigninEnabled: true,
 		MagicLinkExpireMinutes: MagicLinkMinExpireMinutes - 1,
 	}
 	err := ValidateMagicLinkConfig(application)
@@ -278,7 +294,6 @@ func TestValidateMagicLinkConfigRejectsInvalidExpireMinutes(t *testing.T) {
 
 func TestValidateMagicLinkConfigRejectsNegativeRateLimits(t *testing.T) {
 	application := &Application{
-		MagicLinkSigninEnabled:          true,
 		MagicLinkRateLimitWindowMinutes: -1,
 	}
 	err := ValidateMagicLinkConfig(application)
@@ -306,7 +321,10 @@ func TestValidateMagicLinkVerifyState(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateMagicLinkVerifyState(&MagicLink{Status: tc.status, ExpireAt: tc.expire}, nowUnix)
+			link := &MagicLink{}
+			link.Status = tc.status
+			link.ExpireAt = tc.expire
+			err := validateMagicLinkVerifyState(link, nowUnix)
 			if tc.hasErr && err == nil {
 				t.Fatal("expected verify state error")
 			}

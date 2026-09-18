@@ -603,63 +603,23 @@ func (application *Application) IsCodeSigninViaSmsEnabled() bool {
 }
 
 func (application *Application) IsMagicLinkEnabled() bool {
-	if application == nil || !application.MagicLinkSigninEnabled {
+	return application.HasSigninMethod("Magic link")
+}
+
+// IsMagicLinkSignupEnabled tells whether a link may also create the account, the
+// application has to allow the signup itself as well.
+func (application *Application) IsMagicLinkSignupEnabled() bool {
+	if !application.EnableSignUp {
 		return false
 	}
-	if len(application.SigninMethods) > 0 {
-		for _, signinMethod := range application.SigninMethods {
-			if signinMethod.Name == "Magic link" {
-				return true
-			}
+
+	for _, signinMethod := range application.SigninMethods {
+		if signinMethod != nil && signinMethod.Name == "Magic link" && signinMethod.Rule == SigninMethodRuleMagicLinkSignup && !signinMethod.IsHidden() {
+			return true
 		}
 	}
+
 	return false
-}
-
-func (application *Application) IsMagicLinkSignupEnabled() bool {
-	return application != nil && application.MagicLinkSigninEnabled && application.EnableMagicLinkSignup
-}
-
-func (application *Application) GetMagicLinkExpireMinutes() int {
-	if application == nil || application.MagicLinkExpireMinutes <= 0 {
-		return MagicLinkDefaultExpireMinutes
-	}
-	return application.MagicLinkExpireMinutes
-}
-
-func (application *Application) GetMagicLinkRateLimitWindowMinutes() int {
-	if application == nil || application.MagicLinkRateLimitWindowMinutes <= 0 {
-		return 15
-	}
-	return application.MagicLinkRateLimitWindowMinutes
-}
-
-func (application *Application) GetMagicLinkRateLimitEmail() int {
-	if application == nil || application.MagicLinkRateLimitEmail <= 0 {
-		return 3
-	}
-	return application.MagicLinkRateLimitEmail
-}
-
-func (application *Application) GetMagicLinkRateLimitIP() int {
-	if application == nil || application.MagicLinkRateLimitIP <= 0 {
-		return 10
-	}
-	return application.MagicLinkRateLimitIP
-}
-
-func (application *Application) GetMagicLinkRateLimitApplication() int {
-	if application == nil || application.MagicLinkRateLimitApplication <= 0 {
-		return 100
-	}
-	return application.MagicLinkRateLimitApplication
-}
-
-func (application *Application) GetMagicLinkCaptchaThreshold() int {
-	if application == nil || application.MagicLinkCaptchaThreshold <= 0 {
-		return 1
-	}
-	return application.MagicLinkCaptchaThreshold
 }
 
 func (application *Application) IsLdapEnabled() bool {

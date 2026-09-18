@@ -78,36 +78,6 @@ func TestRedirectUriMatchesPattern(t *testing.T) {
 	}
 }
 
-func TestIsMagicLinkEnabledRequiresSigninFlag(t *testing.T) {
-	application := &Application{
-		SigninMethods: []*SigninMethod{
-			{Name: "Magic link"},
-		},
-		MagicLinkSigninEnabled: false,
-	}
-	if application.IsMagicLinkEnabled() {
-		t.Fatal("magic link should be disabled when magicLinkSigninEnabled is false")
-	}
-	application.MagicLinkSigninEnabled = true
-	if !application.IsMagicLinkEnabled() {
-		t.Fatal("magic link should be enabled when method exists and magicLinkSigninEnabled is true")
-	}
-}
-
-func TestIsMagicLinkSignupEnabledDependsOnSigninFlag(t *testing.T) {
-	application := &Application{
-		MagicLinkSigninEnabled: false,
-		EnableMagicLinkSignup:  true,
-	}
-	if application.IsMagicLinkSignupEnabled() {
-		t.Fatal("signup should be disabled when sign-in is disabled")
-	}
-	application.MagicLinkSigninEnabled = true
-	if !application.IsMagicLinkSignupEnabled() {
-		t.Fatal("signup should be enabled only when both flags are true")
-	}
-}
-
 func TestApplicationIsMagicLinkEnabled(t *testing.T) {
 	application := &Application{}
 	if application.IsMagicLinkEnabled() {
@@ -120,9 +90,48 @@ func TestApplicationIsMagicLinkEnabled(t *testing.T) {
 		t.Fatal("magic link should be disabled when signin methods do not include magic link")
 	}
 	application.SigninMethods = append(application.SigninMethods, &SigninMethod{Name: "Magic link", Rule: "None"})
-	application.MagicLinkSigninEnabled = true
 	if !application.IsMagicLinkEnabled() {
 		t.Fatal("magic link should be enabled when signin methods include magic link")
+	}
+}
+
+func TestIsMagicLinkApiSignupEnabled(t *testing.T) {
+	application := &Application{EnableMagicLinkSignup: true}
+	if application.IsMagicLinkApiSignupEnabled() {
+		t.Fatal("signup should be disabled when the magic link signin method is missing")
+	}
+
+	application.SigninMethods = []*SigninMethod{{Name: "Magic link", Rule: "None"}}
+	if application.IsMagicLinkSignupEnabled() {
+		t.Fatal("the built-in signup should stay disabled: no rule, no application signup")
+	}
+	if !application.IsMagicLinkApiSignupEnabled() {
+		t.Fatal("the API signup should follow enableMagicLinkSignup")
+	}
+
+	view := application.GetMagicLinkSignupApplication()
+	if !view.IsMagicLinkSignupEnabled() || view == application {
+		t.Fatal("the signup view should satisfy the built-in signup rule")
+	}
+	if application.EnableSignUp || application.SigninMethods[0].Rule != "None" {
+		t.Fatal("the signup view must not change the application itself")
+	}
+	if err := CheckMagicLinkSignup(view, "en"); err != nil {
+		t.Fatalf("unexpected signup check error: %v", err)
+	}
+	view.SignupItems = []*SignupItem{{Name: "Phone", Required: true}}
+	if err := CheckMagicLinkSignup(view, "en"); err == nil {
+		t.Fatal("a required signup item a link cannot answer should reject the signup")
+	}
+
+	application.EnableMagicLinkSignup = false
+	if application.IsMagicLinkApiSignupEnabled() {
+		t.Fatal("signup should be disabled without the switch and without the rule")
+	}
+	application.EnableSignUp = true
+	application.SigninMethods[0].Rule = SigninMethodRuleMagicLinkSignup
+	if !application.IsMagicLinkApiSignupEnabled() || application.GetMagicLinkSignupApplication() != application {
+		t.Fatal("the built-in signup rule should enable the API signup as it is")
 	}
 }
 

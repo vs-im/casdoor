@@ -38,8 +38,8 @@ func TestValidateMagicLinkRequestFormAllowsOptionalFields(t *testing.T) {
 
 func TestShouldCreateUserOnMagicLinkVerify(t *testing.T) {
 	application := &object.Application{
-		MagicLinkSigninEnabled: true,
-		EnableMagicLinkSignup:  true,
+		SigninMethods:         []*object.SigninMethod{{Name: "Magic link", Rule: "None"}},
+		EnableMagicLinkSignup: true,
 	}
 	if !shouldCreateUserOnMagicLinkVerify(application, nil) {
 		t.Fatal("expected user creation to be allowed")
@@ -51,7 +51,8 @@ func TestShouldCreateUserOnMagicLinkVerify(t *testing.T) {
 	if shouldCreateUserOnMagicLinkVerify(application, nil) {
 		t.Fatal("expected no creation when signup is disabled")
 	}
-	application.MagicLinkSigninEnabled = false
+	application.EnableMagicLinkSignup = true
+	application.SigninMethods = nil
 	if shouldCreateUserOnMagicLinkVerify(application, nil) {
 		t.Fatal("expected no creation when sign-in is disabled")
 	}

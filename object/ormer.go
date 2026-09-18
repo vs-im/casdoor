@@ -465,7 +465,8 @@ func (a *Ormer) createTable() {
 		panic(err)
 	}
 
-	err = a.Engine.Sync2(new(MagicLink))
+	// fork: the table predates the built-in model, see magic_link_migrate.go
+	err = a.syncMagicLink()
 	if err != nil {
 		panic(err)
 	}
