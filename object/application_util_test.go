@@ -14,7 +14,11 @@
 
 package object
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/casdoor/casdoor/form"
+)
 
 func TestRedirectUriMatchesPattern(t *testing.T) {
 	tests := []struct {
@@ -120,7 +124,7 @@ func TestIsMagicLinkApiSignupEnabled(t *testing.T) {
 		t.Fatalf("unexpected signup check error: %v", err)
 	}
 
-	// the items of a closed signup page ask nothing of the switch, the built-in rule obeys them
+	// the items of a closed signup page a link cannot answer are left out for the switch, the built-in rule obeys them
 	application.SignupItems = []*SignupItem{{Name: "Phone", Required: true}}
 	if err := CheckMagicLinkSignup(application.GetMagicLinkSignupApplication(), "en"); err != nil {
 		t.Fatalf("the switch should not depend on the signup page: %v", err)
@@ -129,7 +133,26 @@ func TestIsMagicLinkApiSignupEnabled(t *testing.T) {
 	if err := CheckMagicLinkSignup(ruled.GetMagicLinkSignupApplication(), "en"); err == nil {
 		t.Fatal("a required signup item a link cannot answer should reject the built-in signup")
 	}
+
+	// what a link can answer stays in the view, so a required invitation code still holds
+	application.SignupItems = []*SignupItem{{Name: "Phone", Required: true}, {Name: "Invitation code", Required: true}, nil, {Name: "Email", Required: true}}
+	view = application.GetMagicLinkSignupApplication()
+	if len(view.SignupItems) != 2 || !view.IsSignupItemRequired("Invitation code") || view.IsSignupItemRequired("Phone") {
+		t.Fatalf("unexpected signup items of the view: %v", view.SignupItems)
+	}
+	if err := CheckMagicLinkSignup(view, "en"); err != nil {
+		t.Fatalf("unexpected signup check error: %v", err)
+	}
+	if _, msg := CheckInvitationCode(view, &Organization{Name: "org"}, &form.AuthForm{Email: "a@example.com"}, "en"); msg == "" {
+		t.Fatal("a required invitation code should refuse the signup by a link without one")
+	}
+	if len(application.SignupItems) != 4 {
+		t.Fatal("the signup view must not change the application itself")
+	}
 	application.SignupItems = nil
+	if _, msg := CheckInvitationCode(application.GetMagicLinkSignupApplication(), &Organization{Name: "org"}, &form.AuthForm{Email: "a@example.com"}, "en"); msg != "" {
+		t.Fatalf("an application without an invitation code should sign up by a link: %s", msg)
+	}
 
 	application.EnableMagicLinkSignup = false
 	if application.IsMagicLinkApiSignupEnabled() {

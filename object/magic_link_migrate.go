@@ -73,9 +73,17 @@ func (a *Ormer) prepareLegacyMagicLinkTable() error {
 		if !ok {
 			sqlType = column.sqlType[""]
 		}
-		_, err = a.Engine.Exec(fmt.Sprintf("ALTER TABLE %s ADD %s %s", a.Engine.Quote(tableName), a.Engine.Quote(column.name), sqlType))
+		// another instance starting against the same database may add the column in between
+		addColumn := "ADD"
+		if dbType == "postgres" {
+			addColumn = "ADD COLUMN IF NOT EXISTS"
+		}
+		_, err = a.Engine.Exec(fmt.Sprintf("ALTER TABLE %s %s %s %s", a.Engine.Quote(tableName), addColumn, a.Engine.Quote(column.name), sqlType))
 		if err != nil {
-			return err
+			added, checkErr := a.Engine.Dialect().IsColumnExist(a.Engine.DB(), context.Background(), tableName, column.name)
+			if checkErr != nil || !added {
+				return err
+			}
 		}
 	}
 	return nil

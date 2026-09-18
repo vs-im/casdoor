@@ -174,3 +174,12 @@ func TestResolveSignupDisplayNameUsesEmail(t *testing.T) {
 		t.Fatalf("displayName = %s, want user@example.com", displayName)
 	}
 }
+
+func TestMagicLinkListIsScopedToOrganization(t *testing.T) {
+	if isMagicLinkListAllowed("", false) {
+		t.Fatal("a user of the built-in organization who is not a global admin must not list the links of every organization")
+	}
+	if !isMagicLinkListAllowed("", true) || !isMagicLinkListAllowed("org", false) {
+		t.Fatal("the global admin and the organization admin should list the links")
+	}
+}

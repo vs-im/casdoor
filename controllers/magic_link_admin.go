@@ -61,6 +61,10 @@ func (c *ApiController) GetMagicLinks() {
 	if c.IsGlobalAdmin() && owner != "" {
 		organization = owner
 	}
+	if !isMagicLinkListAllowed(organization, c.IsGlobalAdmin()) {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return
+	}
 	if field == "" || value == "" {
 		filterPairs := []struct {
 			field string
@@ -159,4 +163,9 @@ func (c *ApiController) DeleteMagicLink() {
 	}
 	c.Data["json"] = wrapActionResponse(object.DeleteMagicLink(id))
 	c.ServeJSON()
+}
+
+// an empty organization lists the links of every organization, which is for the global admin only
+func isMagicLinkListAllowed(organization string, isGlobalAdmin bool) bool {
+	return organization != "" || isGlobalAdmin
 }

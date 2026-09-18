@@ -389,3 +389,28 @@ func TestLegacyMagicLinkTableIsMigrated(t *testing.T) {
 		t.Fatal("a link used before the migration should stay used")
 	}
 }
+
+func TestLegacyMagicLinkTableIsPreparedOnce(t *testing.T) {
+	a := newMagicLinkTestOrmer(t)
+	if err := a.Engine.Sync2(new(legacyMagicLink)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Engine.Insert(&legacyMagicLink{Owner: "org", Name: "row", Application: "admin/app", Status: MagicLinkStatusUsed}); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 3; i++ {
+		if err := a.prepareLegacyMagicLinkTable(); err != nil {
+			t.Fatalf("run %d: %v", i, err)
+		}
+	}
+	for i := 0; i < 2; i++ {
+		if err := a.syncMagicLink(); err != nil {
+			t.Fatalf("sync %d: %v", i, err)
+		}
+	}
+	count, err := a.Engine.Count(new(MagicLink))
+	if err != nil || count != 1 {
+		t.Fatalf("rows: %d, %v", count, err)
+	}
+}

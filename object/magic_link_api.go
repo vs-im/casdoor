@@ -15,6 +15,7 @@
 package object
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -166,8 +167,9 @@ func (application *Application) IsMagicLinkApiSignupEnabled() bool {
 // GetMagicLinkSignupApplication is the application as the built-in signup has to see it
 // when the signup was allowed by the "enableMagicLinkSignup" switch: CheckMagicLinkSignup()
 // and the built-in user creation are reused as they are. The switch signs up by a link
-// alone, for an application whose signup page is closed, so the items of that page (a new
-// application gets a required "Phone" by default) ask nothing of it.
+// alone, for an application whose signup page is closed, so the items of that page that a
+// link cannot fill in (a new application gets a required "Phone" by default) are left out.
+// The ones CheckMagicLinkSignup() accepts stay, so a required "Invitation code" still holds.
 func (application *Application) GetMagicLinkSignupApplication() *Application {
 	if application.IsMagicLinkSignupEnabled() || !application.IsMagicLinkApiSignupEnabled() {
 		return application
@@ -175,7 +177,12 @@ func (application *Application) GetMagicLinkSignupApplication() *Application {
 
 	res := *application
 	res.EnableSignUp = true
-	res.SignupItems = nil
+	res.SignupItems = make([]*SignupItem, 0, len(application.SignupItems))
+	for _, signupItem := range application.SignupItems {
+		if signupItem != nil && isMagicLinkSignupItem(signupItem.Name) {
+			res.SignupItems = append(res.SignupItems, signupItem)
+		}
+	}
 	res.SigninMethods = make([]*SigninMethod, 0, len(application.SigninMethods))
 	for _, signinMethod := range application.SigninMethods {
 		if signinMethod != nil && signinMethod.Name == "Magic link" {
@@ -186,6 +193,14 @@ func (application *Application) GetMagicLinkSignupApplication() *Application {
 		res.SigninMethods = append(res.SigninMethods, signinMethod)
 	}
 	return &res
+}
+
+func isMagicLinkSignupItem(name string) bool {
+	switch name {
+	case "ID", "Username", "Display name", "Email", "Password", "Confirm password", "Agreement", "Invitation code", "Signup button", "Providers":
+		return true
+	}
+	return false
 }
 
 func ValidateMagicLinkConfig(application *Application) error {
@@ -590,4 +605,24 @@ func ConsumeApiMagicLink(token string, sessionSecret string, browserSessionHash 
 		return nil, nil, err
 	}
 	return claimed, application, nil
+}
+
+// maskMagicLinkSigninCode keeps the token of a built-in magic link sign-in out of the
+// record: a sign-in that fails before the link is consumed leaves the token valid.
+func maskMagicLinkSigninCode(recordObject string) string {
+	var value map[string]interface{}
+	err := json.Unmarshal([]byte(recordObject), &value)
+	if err != nil || value["signinMethod"] != "Magic link" {
+		return recordObject
+	}
+	if _, ok := value["code"]; !ok {
+		return recordObject
+	}
+
+	value["code"] = "***"
+	res, err := json.Marshal(value)
+	if err != nil {
+		return recordObject
+	}
+	return string(res)
 }

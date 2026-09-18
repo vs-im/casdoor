@@ -118,7 +118,8 @@ func isSensitiveRecordField(key string) bool {
 	return strings.EqualFold(key, "password") ||
 		strings.EqualFold(key, "clientSecret") ||
 		strings.EqualFold(key, "client_secret") ||
-		strings.EqualFold(key, "applicationClientSecret")
+		strings.EqualFold(key, "applicationClientSecret") ||
+		strings.EqualFold(key, "sessionSecret")
 }
 
 func NewRecord(ctx *context.Context) (*Record, error) {
@@ -129,7 +130,7 @@ func NewRecord(ctx *context.Context) (*Record, error) {
 	}
 
 	// "id_token_hint" carries a JWT, so it is dropped instead of being persisted in the audit row.
-	requestUri := util.FilterQuery(ctx.Request.RequestURI, []string{"accessToken", "clientSecret", "client_secret", "applicationClientSecret", "id_token_hint"})
+	requestUri := util.FilterQuery(ctx.Request.RequestURI, []string{"accessToken", "clientSecret", "client_secret", "applicationClientSecret", "id_token_hint", "token", "sessionSecret", "magicLinkToken"})
 	if len(requestUri) > 1000 {
 		requestUri = requestUri[0:1000]
 	}
@@ -138,6 +139,8 @@ func NewRecord(ctx *context.Context) (*Record, error) {
 	if ctx.Input.RequestBody != nil && len(ctx.Input.RequestBody) != 0 {
 		object = string(ctx.Input.RequestBody)
 		object = maskSensitiveFields(object)
+		// fork: the "code" of a magic link sign-in is the link token itself
+		object = maskMagicLinkSigninCode(object)
 	}
 
 	respBytes, err := json.Marshal(ctx.Input.Data()["json"])
