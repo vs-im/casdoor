@@ -1734,19 +1734,8 @@ export function isFaceIdEnabled(application) {
   return isSigninMethodEnabled(application, "Face ID");
 }
 
-/**
- * Magic link sign-in is switched on per application; an application saved before
- * the switch existed falls back to listing "Magic link" among its sign-in methods.
- */
 export function isMagicLinkEnabled(application) {
-  if (application?.magicLinkSigninEnabled !== undefined && application?.magicLinkSigninEnabled !== null) {
-    return application.magicLinkSigninEnabled;
-  }
   return isSigninMethodEnabled(application, "Magic link");
-}
-
-export function isMagicLinkSignupEnabled(application) {
-  return isMagicLinkEnabled(application) && application?.enableMagicLinkSignup === true;
 }
 
 

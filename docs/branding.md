@@ -88,7 +88,7 @@ Nothing else changes: the same image with no `brand.env` is upstream Casdoor.
 scripts/check-no-brand.sh                     # no brand in the tree (CI gate)
 scripts/check-no-private.sh                   # no deployment-private data (CI gate)
 go build ./... && go vet ./...
-go test ./conf/... ./object/ -run 'Brand|Totp'
+go test ./conf/... ./object/ ./controllers/ -run 'Brand|Totp|MagicLink'
 cd web && yarn install && yarn run build
 node web/scripts/check-brand-render.mjs "Acme Identity"   # locales render the brand
 ```
@@ -138,7 +138,10 @@ Conflict zones, in the order they usually appear:
 | `conf/brand.go` | does not exist upstream | ours, as it is |
 | `object/init.go` | edits the seeded organization/application | take upstream's structure, then re-apply `conf.GetBrandName/LogoUrl/WebsiteUrl/FaviconUrl` in place of the literals it reintroduces |
 | `object/mfa_totp.go` | may touch the issuer fallback | keep `conf.GetBrandTotpIssuer()` |
-| `object/magic_link.go`, `controllers/magic_link.go`, `routers/lightweight_auth_filter.go` | fork-only files | ours |
+| `object/magic_link.go`, `controllers/magic_link.go` | upstream's magic link sign-in | **upstream's, as they are**, plus two marked `// fork:` hooks in `object/magic_link.go`: the embedded `MagicLinkExtension` at the end of the struct and `isMagicLinkExpired()` in `ConsumeMagicLink()`. Everything else of ours lives in fork-only files and only calls upstream's functions: `object/magic_link_{api,admin,permission,email,migrate}.go`, `controllers/magic_link_{api,admin}.go`. If upstream renames or re-signs `generateMagicLinkToken`, `HashMagicLinkSecret`, `getMagicLinkOrigin`, `getMagicLinkEmailContent`, `ConsumeMagicLink`, `CheckMagicLinkSignup` or the controller's `addMagicLinkUser`/`getMagicLinkSessionHash`, the build breaks in those files, not in a conflict |
+| `object/ormer.go` | syncs the `magic_link` table | keep `a.syncMagicLink()` in place of upstream's `Sync2(new(MagicLink))`: it adds upstream's NOT NULL columns to the fork's older table before the sync and converts the old rows after it |
+| `object/application_util.go`, `web/src/lib/setting.tsx`, `web/src/pages/auth/LoginPage.tsx` | `IsMagicLinkEnabled`, the magic link tab of the sign-in page | upstream's; the fork's API signup switch is `IsMagicLinkApiSignupEnabled()` in `object/magic_link_api.go` and `web/src/lib/magic-link.ts` |
+| `routers/lightweight_auth_filter.go` | fork-only file | ours |
 | `routers/static_filter.go` | changes how the shell is served | keep upstream's serving logic, keep the `applyBrandToIndexHtml` call right after the organization-theme block |
 | `web/index.html` | changes the shell | the `<title>`, the description and `/favicon.png` must stay **byte-identical to the strings `applyBrandToIndexHtml` looks for** |
 | `web/src/locales/*/data.json` | new and changed strings | take upstream's text, then replace the product name in the **values** with `{{brand}}` (keys stay upstream) |
@@ -149,7 +152,7 @@ After the merge, in this order:
 ```
 scripts/check-no-brand.sh
 go build ./... && go vet ./...
-go test ./conf/... ./object/ -run 'Brand|Totp'
+go test ./conf/... ./object/ ./controllers/ -run 'Brand|Totp|MagicLink'
 cd web && yarn install && yarn run typecheck && yarn run lint && yarn run build
 node scripts/check-brand-render.mjs "<the deployment brand>"
 ```

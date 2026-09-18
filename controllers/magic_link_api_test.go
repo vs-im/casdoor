@@ -38,8 +38,8 @@ func TestValidateMagicLinkRequestFormAllowsOptionalFields(t *testing.T) {
 
 func TestShouldCreateUserOnMagicLinkVerify(t *testing.T) {
 	application := &object.Application{
-		MagicLinkSigninEnabled: true,
-		EnableMagicLinkSignup:  true,
+		SigninMethods:         []*object.SigninMethod{{Name: "Magic link", Rule: "None"}},
+		EnableMagicLinkSignup: true,
 	}
 	if !shouldCreateUserOnMagicLinkVerify(application, nil) {
 		t.Fatal("expected user creation to be allowed")
@@ -51,7 +51,8 @@ func TestShouldCreateUserOnMagicLinkVerify(t *testing.T) {
 	if shouldCreateUserOnMagicLinkVerify(application, nil) {
 		t.Fatal("expected no creation when signup is disabled")
 	}
-	application.MagicLinkSigninEnabled = false
+	application.EnableMagicLinkSignup = true
+	application.SigninMethods = nil
 	if shouldCreateUserOnMagicLinkVerify(application, nil) {
 		t.Fatal("expected no creation when sign-in is disabled")
 	}
@@ -171,5 +172,14 @@ func TestResolveSignupDisplayNameUsesEmail(t *testing.T) {
 	displayName := resolveSignupDisplayName("User@Example.com", "generated-id")
 	if displayName != "user@example.com" {
 		t.Fatalf("displayName = %s, want user@example.com", displayName)
+	}
+}
+
+func TestMagicLinkListIsScopedToOrganization(t *testing.T) {
+	if isMagicLinkListAllowed("", false) {
+		t.Fatal("a user of the built-in organization who is not a global admin must not list the links of every organization")
+	}
+	if !isMagicLinkListAllowed("", true) || !isMagicLinkListAllowed("org", false) {
+		t.Fatal("the global admin and the organization admin should list the links")
 	}
 }

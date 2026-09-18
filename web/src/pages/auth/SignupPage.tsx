@@ -28,6 +28,7 @@ import * as InvitationBackend from "@/backend/InvitationBackend";
 import * as AuthBackend from "@/backend/AuthBackend";
 import {getSignupItemField, validateSignupItems} from "@/lib/signup-validation";
 import * as Setting from "@/lib/setting";
+import {isMagicLinkApiSignupEnabled} from "@/lib/magic-link";
 import {cn} from "@/lib/utils";
 
 /** The signup items Casdoor can render; anything else falls back to a text input. */
@@ -663,7 +664,7 @@ export default function SignupPage({application: applicationProp}: {application?
         </Button>
       );
     case "Magic link":
-      if (!Setting.isMagicLinkSignupEnabled(application)) {
+      if (!isMagicLinkApiSignupEnabled(application)) {
         return null;
       }
       return (

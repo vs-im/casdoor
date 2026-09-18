@@ -23,27 +23,12 @@ export function ApplicationAuthenticationTab({application, updateField}: Applica
       <FormRow labelKey="application:Enable signup">
         <Switch checked={!!application.enableSignUp} onCheckedChange={(v) => updateField("enableSignUp", v)} />
       </FormRow>
-      <FormRow labelKey="application:Magic link sign-in enabled">
-        <Switch
-          checked={Setting.isMagicLinkEnabled(application)}
-          onCheckedChange={(v) => {
-            updateField("magicLinkSigninEnabled", v);
-            // sign-up by magic link needs sign-in by magic link
-            if (!v) {
-              updateField("enableMagicLinkSignup", false);
-            }
-          }}
-        />
-      </FormRow>
+      {/* signs an unknown address up through /api/send-magic-link without opening the signup page;
+          the sign-in itself is the "Magic link" sign-in method */}
       <FormRow labelKey="application:Magic link sign-up">
         <Switch
           checked={!!application.enableMagicLinkSignup}
-          onCheckedChange={(v) => {
-            if (v && !Setting.isMagicLinkEnabled(application)) {
-              updateField("magicLinkSigninEnabled", true);
-            }
-            updateField("enableMagicLinkSignup", v);
-          }}
+          onCheckedChange={(v) => updateField("enableMagicLinkSignup", v)}
         />
       </FormRow>
       <FormRow labelKey="application:Disable signin">
