@@ -163,10 +163,11 @@ func (application *Application) IsMagicLinkApiSignupEnabled() bool {
 	return application.EnableMagicLinkSignup || application.IsMagicLinkSignupEnabled()
 }
 
-// GetMagicLinkSignupApplication is the application as the built-in signup checks have to
-// see it when the signup was allowed by IsMagicLinkApiSignupEnabled(): CheckMagicLinkSignup()
-// and the built-in user creation are reused as they are, they only read the two settings
-// the API switch stands for.
+// GetMagicLinkSignupApplication is the application as the built-in signup has to see it
+// when the signup was allowed by the "enableMagicLinkSignup" switch: CheckMagicLinkSignup()
+// and the built-in user creation are reused as they are. The switch signs up by a link
+// alone, for an application whose signup page is closed, so the items of that page (a new
+// application gets a required "Phone" by default) ask nothing of it.
 func (application *Application) GetMagicLinkSignupApplication() *Application {
 	if application.IsMagicLinkSignupEnabled() || !application.IsMagicLinkApiSignupEnabled() {
 		return application
@@ -174,6 +175,7 @@ func (application *Application) GetMagicLinkSignupApplication() *Application {
 
 	res := *application
 	res.EnableSignUp = true
+	res.SignupItems = nil
 	res.SigninMethods = make([]*SigninMethod, 0, len(application.SigninMethods))
 	for _, signinMethod := range application.SigninMethods {
 		if signinMethod != nil && signinMethod.Name == "Magic link" {

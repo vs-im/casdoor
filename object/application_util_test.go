@@ -119,10 +119,17 @@ func TestIsMagicLinkApiSignupEnabled(t *testing.T) {
 	if err := CheckMagicLinkSignup(view, "en"); err != nil {
 		t.Fatalf("unexpected signup check error: %v", err)
 	}
-	view.SignupItems = []*SignupItem{{Name: "Phone", Required: true}}
-	if err := CheckMagicLinkSignup(view, "en"); err == nil {
-		t.Fatal("a required signup item a link cannot answer should reject the signup")
+
+	// the items of a closed signup page ask nothing of the switch, the built-in rule obeys them
+	application.SignupItems = []*SignupItem{{Name: "Phone", Required: true}}
+	if err := CheckMagicLinkSignup(application.GetMagicLinkSignupApplication(), "en"); err != nil {
+		t.Fatalf("the switch should not depend on the signup page: %v", err)
 	}
+	ruled := &Application{EnableSignUp: true, SigninMethods: []*SigninMethod{{Name: "Magic link", Rule: SigninMethodRuleMagicLinkSignup}}, SignupItems: application.SignupItems}
+	if err := CheckMagicLinkSignup(ruled.GetMagicLinkSignupApplication(), "en"); err == nil {
+		t.Fatal("a required signup item a link cannot answer should reject the built-in signup")
+	}
+	application.SignupItems = nil
 
 	application.EnableMagicLinkSignup = false
 	if application.IsMagicLinkApiSignupEnabled() {
