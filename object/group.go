@@ -353,10 +353,11 @@ func GetGroupUserCount(groupId string, field, value string) (int64, error) {
 		return int64(len(names)), nil
 	} else {
 		tableNamePrefix := conf.GetConfigString("tableNamePrefix")
-		session := ormer.Engine.Table(tableNamePrefix+"user").
+		prefixedUserTable := tableNamePrefix + "user"
+		session := ormer.Engine.Table(prefixedUserTable).
 			Where("owner = ?", owner).In("name", names)
 		if util.FilterField(field) {
-			session = session.And(fmt.Sprintf("user.%s like ?", util.CamelToSnakeCase(field)), "%"+value+"%")
+			session = session.And(fmt.Sprintf("%s.%s like ?", quoteColumn(prefixedUserTable), quoteColumn(util.CamelToSnakeCase(field))), "%"+value+"%")
 		}
 		return session.Count()
 	}
@@ -383,14 +384,14 @@ func GetPaginationGroupUsers(groupId string, offset, limit int, field, value, so
 	}
 
 	if field != "" && value != "" && util.FilterField(field) {
-		session = session.And(fmt.Sprintf("%s.%s like ?", prefixedUserTable, util.CamelToSnakeCase(field)), "%"+value+"%")
+		session = session.And(fmt.Sprintf("%s.%s like ?", quoteColumn(prefixedUserTable), quoteColumn(util.CamelToSnakeCase(field))), "%"+value+"%")
 	}
 
 	if sortField == "" || sortOrder == "" || !util.FilterField(sortField) {
 		sortField = "created_time"
 	}
 
-	orderQuery := fmt.Sprintf("%s.%s", prefixedUserTable, util.CamelToSnakeCase(sortField))
+	orderQuery := fmt.Sprintf("%s.%s", quoteColumn(prefixedUserTable), quoteColumn(util.CamelToSnakeCase(sortField)))
 
 	if sortOrder == "ascend" {
 		session = session.Asc(orderQuery)
