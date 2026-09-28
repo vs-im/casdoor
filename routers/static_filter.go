@@ -19,8 +19,10 @@ import (
 	stdcontext "context"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +31,7 @@ import (
 	"github.com/beego/beego/v2/core/logs"
 	"github.com/beego/beego/v2/server/web/context"
 	"github.com/casdoor/casdoor/conf"
+	"github.com/casdoor/casdoor/controllers"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
 )
@@ -68,7 +71,7 @@ func getWebBuildFolder() string {
 
 func fastAutoSignin(ctx *context.Context) (string, error) {
 	userId := getSessionUser(ctx)
-	if userId == "" {
+	if userId == "" || isSessionExpired(ctx) {
 		return "", nil
 	}
 
@@ -96,20 +99,19 @@ func fastAutoSignin(ctx *context.Context) (string, error) {
 		return "", nil
 	}
 
-	isAllowed, err := object.CheckLoginPermission(userId, application)
-	if err != nil {
-		return "", err
-	}
-
-	if !isAllowed {
-		return "", nil
-	}
-
 	user, err := object.GetUser(userId)
 	if err != nil {
 		return "", err
 	}
 	if user == nil {
+		return "", nil
+	}
+
+	isAllowed, err := isFastAutoSigninAllowed(ctx, user, application)
+	if err != nil {
+		return "", err
+	}
+	if !isAllowed {
 		return "", nil
 	}
 
@@ -133,8 +135,59 @@ func fastAutoSignin(ctx *context.Context) (string, error) {
 	if strings.Contains(redirectUri, "?") {
 		sep = "&"
 	}
-	res := fmt.Sprintf("%s%scode=%s&state=%s", redirectUri, sep, code.Code, state)
+	res := fmt.Sprintf("%s%scode=%s&state=%s", redirectUri, sep, url.QueryEscape(code.Code), url.QueryEscape(state))
 	return res, nil
+}
+
+func isFastAutoSigninAllowed(ctx *context.Context, user *object.User, application *object.Application) (bool, error) {
+	if user.NeedUpdatePassword {
+		return false, nil
+	}
+
+	err := object.CheckApplicationSignin(application, user, util.GetClientIpFromRequest(ctx.Request), getAcceptLanguage(ctx))
+	if err != nil {
+		return false, nil
+	}
+
+	organization, err := object.GetOrganizationByUser(user)
+	if err != nil {
+		return false, err
+	}
+	if object.IsNeedPromptMfa(organization, user) {
+		return false, nil
+	}
+
+	if user.Type == "paid-user" && !user.IsGlobalAdmin() && !user.IsAdmin {
+		return hasActiveSubscription(user)
+	}
+	return true, nil
+}
+
+func hasActiveSubscription(user *object.User) (bool, error) {
+	subscriptions, err := object.GetSubscriptionsByUser(user.Owner, user.Name)
+	if err != nil {
+		return false, err
+	}
+
+	for _, subscription := range subscriptions {
+		if subscription.State == object.SubStateActive {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func isSessionExpired(ctx *context.Context) bool {
+	session, ok := ctx.Input.Session("SessionData").(string)
+	if !ok {
+		return false
+	}
+
+	sessionData := &controllers.SessionData{}
+	if err := util.JsonToStruct(session, sessionData); err != nil {
+		return true
+	}
+	return sessionData.ExpireTime != 0 && sessionData.ExpireTime < time.Now().Unix()
 }
 
 func StaticFilter(ctx *context.Context) {
@@ -200,7 +253,7 @@ func StaticFilter(ctx *context.Context) {
 		fmt.Println(err)
 	}
 
-	if strings.Contains(path, "/../") || !util.FileExist(path) {
+	if !filepath.IsLocal(strings.TrimPrefix(urlPath, "/")) || !util.FileExist(path) {
 		path = webBuildFolder + "/index.html"
 	}
 	if strings.HasSuffix(path, "/index.html") {
@@ -269,8 +322,8 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, o
 	oldContent := util.ReadStringFromPath(name)
 	newContent := oldContent
 	if organizationThemeCookie != nil {
-		newContent = strings.ReplaceAll(newContent, indexHtmlFaviconPlaceholder, organizationThemeCookie.Favicon)
-		newContent = strings.ReplaceAll(newContent, fmt.Sprintf("<title>%s</title>", conf.DefaultBrandName), fmt.Sprintf("<title>%s</title>", organizationThemeCookie.DisplayName))
+		newContent = strings.ReplaceAll(newContent, indexHtmlFaviconPlaceholder, html.EscapeString(organizationThemeCookie.Favicon))
+		newContent = strings.ReplaceAll(newContent, fmt.Sprintf("<title>%s</title>", conf.DefaultBrandName), fmt.Sprintf("<title>%s</title>", html.EscapeString(organizationThemeCookie.DisplayName)))
 	}
 
 	// Whatever the organization did not override is branded for the deployment

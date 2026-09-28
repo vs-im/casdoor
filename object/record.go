@@ -27,10 +27,24 @@ import (
 )
 
 var (
-	logPostOnly   bool
-	passwordRegex *regexp.Regexp
-	secretRegex   *regexp.Regexp
+	logPostOnly          bool
+	passwordRegex        *regexp.Regexp
+	secretRegex          *regexp.Regexp
+	secretJsonRegex      *regexp.Regexp
+	secretFormRegex      *regexp.Regexp
+	secretMultipartRegex *regexp.Regexp
 )
+
+var secretRecordKeys = []string{
+	"password", "oldPassword", "newPassword", "masterPassword", "defaultPassword",
+	"clientSecret", "client_secret", "accessSecret", "refreshToken", "refresh_token",
+	"code_verifier", "passcode", "recoveryCode",
+}
+
+var secretRecordQueries = append([]string{"accessToken", "access_token", "id_token_hint"}, secretRecordKeys...)
+
+// fork: the query secrets of the fork's endpoints (magic link token, session secret)
+var forkSecretRecordQueries = append(append([]string{}, secretRecordQueries...), "applicationClientSecret", "token", "sessionSecret", "magicLinkToken")
 
 // alwaysLoggedActions lists the actions that are always recorded, even for GET
 // requests when "logPostOnly" is enabled. These endpoints accept GET by design
@@ -46,6 +60,10 @@ func init() {
 	logPostOnly = conf.GetConfigBool("logPostOnly")
 	passwordRegex = regexp.MustCompile("\"password\"\\s*:\\s*\"([^\"]*?)\"")
 	secretRegex = regexp.MustCompile("\"(clientSecret|client_secret|applicationClientSecret)\"\\s*:\\s*\"([^\"]*?)\"")
+	keys := strings.Join(secretRecordKeys, "|")
+	secretJsonRegex = regexp.MustCompile(`"(` + keys + `)"\s*:\s*"(?:[^"\\]|\\.)*"`)
+	secretFormRegex = regexp.MustCompile(`(^|&)(` + keys + `)=[^&]*`)
+	secretMultipartRegex = regexp.MustCompile(`(name="(?:` + keys + `)"\r?\n\r?\n)[^\r\n]*`)
 }
 
 type Record struct {
@@ -79,8 +97,10 @@ type Response struct {
 	Data interface{} `json:"data"`
 }
 
-func maskPassword(recordString string) string {
-	return passwordRegex.ReplaceAllString(recordString, "\"password\":\"***\"")
+func maskSecrets(recordString string) string {
+	recordString = secretJsonRegex.ReplaceAllString(recordString, `"$1":"***"`)
+	recordString = secretFormRegex.ReplaceAllString(recordString, "${1}${2}=***")
+	return secretMultipartRegex.ReplaceAllString(recordString, "${1}***")
 }
 
 func maskSensitiveFields(recordString string) string {
@@ -93,7 +113,7 @@ func maskSensitiveFields(recordString string) string {
 			return string(bytes)
 		}
 	}
-	recordString = maskPassword(recordString)
+	recordString = passwordRegex.ReplaceAllString(recordString, "\"password\":\"***\"")
 	return secretRegex.ReplaceAllString(recordString, "\"$1\":\"***\"")
 }
 
@@ -130,7 +150,8 @@ func NewRecord(ctx *context.Context) (*Record, error) {
 	}
 
 	// "id_token_hint" carries a JWT, so it is dropped instead of being persisted in the audit row.
-	requestUri := util.FilterQuery(ctx.Request.RequestURI, []string{"accessToken", "clientSecret", "client_secret", "applicationClientSecret", "id_token_hint", "token", "sessionSecret", "magicLinkToken"})
+	// fork: also drop the query secrets of the fork's endpoints (magic link token, session secret)
+	requestUri := util.FilterQuery(ctx.Request.RequestURI, forkSecretRecordQueries)
 	if len(requestUri) > 1000 {
 		requestUri = requestUri[0:1000]
 	}
@@ -138,7 +159,7 @@ func NewRecord(ctx *context.Context) (*Record, error) {
 	object := ""
 	if ctx.Input.RequestBody != nil && len(ctx.Input.RequestBody) != 0 {
 		object = string(ctx.Input.RequestBody)
-		object = maskSensitiveFields(object)
+		object = maskSecrets(maskSensitiveFields(object))
 		// fork: the "code" of a magic link sign-in is the link token itself
 		object = maskMagicLinkSigninCode(object)
 	}
@@ -167,11 +188,7 @@ func NewRecord(ctx *context.Context) (*Record, error) {
 		dataResp = fmt.Sprintf(", data:%s", string(dataByte))
 	}
 
-	language := ctx.Request.Header.Get("Accept-Language")
-	if len(language) > 2 {
-		language = language[0:2]
-	}
-	languageCode := conf.GetLanguage(language)
+	languageCode := conf.GetAcceptLanguage(ctx.Request.Header.Get("Accept-Language"))
 
 	record := Record{
 		Name:        util.GenerateId(),
@@ -188,6 +205,31 @@ func NewRecord(ctx *context.Context) (*Record, error) {
 		IsTriggered: false,
 	}
 	return &record, nil
+}
+
+// SetUser sets the record's organization and user from the subject's user ID. An M2M
+// credential ("app/<name>") is recorded in the application's organization, because the
+// pseudo organization "app" is shown by no organization's audit log.
+func (record *Record) SetUser(userId string) error {
+	if IsAppUser(userId) {
+		appUser, err := GetAppUser(userId)
+		if err != nil {
+			return err
+		}
+
+		if appUser != nil {
+			record.Organization, record.User = appUser.Owner, appUser.Name
+			return nil
+		}
+	}
+
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(userId)
+	if err != nil {
+		return err
+	}
+
+	record.Organization, record.User = owner, name
+	return nil
 }
 
 // recordObjectOrgField maps user/organization management actions to the JSON
@@ -228,6 +270,36 @@ func addRecord(record *Record) (int64, error) {
 	return affected, err
 }
 
+// retargetAppRecord attributes a successful user/organization management call made with the
+// client credentials of a "built-in" application (the provisioning back office) to the
+// organization of the object it changed, so that the provisioning webhooks of that
+// organization fire. A refused call, or the credentials of an organization's own application,
+// stay attributed where SetUser() put them: otherwise anyone could fire another
+// organization's webhooks with a request that was never carried out.
+func retargetAppRecord(record *Record) bool {
+	if !IsAppUser(record.User) || isErrorRecordResponse(record.Response) {
+		return false
+	}
+
+	appUser, err := GetAppUser(record.User)
+	if err != nil || appUser == nil || appUser.Owner != "built-in" {
+		return false
+	}
+
+	targetOrganization := getRecordTargetOrganization(record)
+	if targetOrganization == "" {
+		return false
+	}
+
+	record.Organization = targetOrganization
+	return true
+}
+
+// isErrorRecordResponse tells a refused call by the response NewRecord() and ApiFilter() write
+func isErrorRecordResponse(response string) bool {
+	return strings.HasPrefix(strings.TrimSpace(response), `{status:"error"`)
+}
+
 func AddRecord(record *Record) bool {
 	if logPostOnly {
 		if record.Method == "GET" && !alwaysLoggedActions[record.Action] {
@@ -235,20 +307,15 @@ func AddRecord(record *Record) bool {
 		}
 	}
 
-	if record.Organization == "app" {
-		// API calls authenticated with client credentials produce records with
-		// organization == "app". Most of them are noise and are dropped, but
-		// user/organization management actions must keep triggering provisioning
-		// webhooks, so re-attribute them to the organization of the target object.
-		targetOrganization := getRecordTargetOrganization(record)
-		if targetOrganization == "" {
-			return false
-		}
-		record.Organization = targetOrganization
-	}
+	// fork: see retargetAppRecord()
+	retargetAppRecord(record)
 
+	// an empty owner matches no audit log query and no retention policy
+	if record.Organization == "" {
+		record.Organization = "built-in"
+	}
 	record.Owner = record.Organization
-	record.Object = maskPassword(record.Object)
+	record.Object = maskSecrets(record.Object)
 
 	errWebhook := SendWebhooks(record)
 	if errWebhook == nil {
@@ -270,9 +337,9 @@ func GetRecordCount(field, value string, filterRecord *Record) (int64, error) {
 	return session.Count(filterRecord)
 }
 
-func GetRecords() ([]*Record, error) {
+func GetRecords(organization string) ([]*Record, error) {
 	records := []*Record{}
-	err := ormer.Engine.Desc("id").Find(&records)
+	err := ormer.Engine.Desc("id").Find(&records, &Record{Organization: organization})
 	if err != nil {
 		return records, err
 	}

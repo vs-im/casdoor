@@ -153,21 +153,9 @@ func UpdateKey(id string, key *Key) (bool, error) {
 		return false, nil
 	}
 
-	// a client that does not carry the credentials must not blank out the ones of a
-	// live key, and a key that lost them gets new ones
-	if key.AccessKey == "" {
-		if oldKey.AccessKey != "" {
-			key.AccessKey = oldKey.AccessKey
-		} else {
-			key.AccessKey = util.GenerateId()
-		}
-	}
-	if key.AccessSecret == "" {
-		if oldKey.AccessSecret != "" {
-			key.AccessSecret = oldKey.AccessSecret
-		} else {
-			key.AccessSecret = util.GenerateId()
-		}
+	key.AccessKey, key.AccessSecret = oldKey.AccessKey, oldKey.AccessSecret
+	if key.AccessKey == "" || key.AccessSecret == "" {
+		key.AccessKey, key.AccessSecret = util.GenerateId(), util.GenerateId()
 	}
 
 	key.UpdatedTime = util.GetCurrentTime()
@@ -181,12 +169,8 @@ func UpdateKey(id string, key *Key) (bool, error) {
 }
 
 func AddKey(key *Key) (bool, error) {
-	if key.AccessKey == "" {
-		key.AccessKey = util.GenerateId()
-	}
-	if key.AccessSecret == "" {
-		key.AccessSecret = util.GenerateId()
-	}
+	key.AccessKey = util.GenerateId()
+	key.AccessSecret = util.GenerateId()
 
 	affected, err := ormer.Engine.Insert(key)
 	if err != nil {
@@ -207,6 +191,22 @@ func DeleteKey(key *Key) (bool, error) {
 
 func (key *Key) GetId() string {
 	return fmt.Sprintf("%s/%s", key.Owner, key.Name)
+}
+
+func (key *Key) IsUserActive() (bool, error) {
+	if key.User == "" {
+		return true, nil
+	}
+
+	user, err := getUser(key.Organization, key.User)
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, nil
+	}
+
+	return !user.IsForbidden && !user.IsDeleted, nil
 }
 
 // ValidateKeyByType checks whether the given accessKey/accessSecret pair refers to a

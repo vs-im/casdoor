@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/beego/beego/v2/server/web/context"
+	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/mcpself"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/util"
@@ -117,7 +118,7 @@ func AutoSigninFilter(ctx *context.Context) {
 
 		var userId string
 		if token.GrantType == "client_credentials" {
-			userId = fmt.Sprintf("app/%s", token.Application)
+			userId = object.GetAppUserId(application)
 		} else {
 			userId = util.GetId(token.Organization, token.User)
 		}
@@ -152,13 +153,7 @@ func AutoSigninFilter(ctx *context.Context) {
 	userId = ctx.Input.Query("username")
 	password := ctx.Input.Query("password")
 	if userId != "" && password != "" && ctx.Input.Query("grant_type") == "" {
-		owner, name, err := util.GetOwnerAndNameFromIdWithError(userId)
-		if err != nil {
-			responseError(ctx, err.Error())
-			return
-		}
-
-		_, err = object.CheckUserPassword(owner, name, password, "en")
+		err = checkUserPasswordWithoutMfa(userId, password, util.GetClientIpFromRequest(ctx.Request), getAcceptLanguage(ctx))
 		if err != nil {
 			responseError(ctx, err.Error())
 			return
@@ -166,4 +161,41 @@ func AutoSigninFilter(ctx *context.Context) {
 
 		setSessionUser(ctx, userId)
 	}
+}
+
+func checkUserPasswordWithoutMfa(userId string, password string, clientIp string, lang string) error {
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(userId)
+	if err != nil {
+		return err
+	}
+
+	user, err := object.CheckUserPassword(owner, name, password, lang)
+	if err != nil {
+		return err
+	}
+
+	if user.IsMfaEnabled() {
+		return fmt.Errorf("the user: %s has MFA enabled and cannot sign in with a password in the URL", userId)
+	}
+	return checkUrlSigninPolicy(user, clientIp, lang)
+}
+
+func checkUrlSigninPolicy(user *object.User, clientIp string, lang string) error {
+	organization, err := object.GetOrganizationByUser(user)
+	if err != nil {
+		return err
+	}
+	if organization != nil && organization.DisableSignin {
+		return fmt.Errorf(i18n.Translate(lang, "auth:The organization: %s has disabled users to signin"), organization.Name)
+	}
+
+	err = object.CheckEntryIp(clientIp, user, nil, organization, lang)
+	if err != nil {
+		return err
+	}
+
+	if user.NeedUpdatePassword || object.IsNeedPromptMfa(organization, user) {
+		return fmt.Errorf("the user: %s must update the password or set up MFA on the login page first", user.GetId())
+	}
+	return nil
 }

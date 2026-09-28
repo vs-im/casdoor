@@ -35,8 +35,8 @@ func StartLdapServer() {
 	serverSsl := ldap.NewServer()
 	routes := ldap.NewRouteMux()
 
-	routes.Bind(handleBind)
-	routes.Search(handleSearch).Label(" SEARCH****")
+	routes.Bind(withRecover(handleBind, func() message.ProtocolOp { return ldap.NewBindResponse(ldap.LDAPResultOperationsError) }))
+	routes.Search(withRecover(handleSearch, func() message.ProtocolOp { return ldap.NewSearchResultDoneResponse(ldap.LDAPResultOperationsError) })).Label(" SEARCH****")
 
 	server.Handle(routes)
 	serverSsl.Handle(routes)
@@ -71,6 +71,18 @@ func StartLdapServer() {
 			log.Printf("StartLdapsServer() failed, err = %s", err.Error())
 		}
 	}()
+}
+
+func withRecover(handler ldap.HandlerFunc, newErrorResponse func() message.ProtocolOp) ldap.HandlerFunc {
+	return func(w ldap.ResponseWriter, m *ldap.Message) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("LDAP request failed, panic: %v", r)
+				w.Write(newErrorResponse())
+			}
+		}()
+		handler(w, m)
+	}
 }
 
 func getTLSconfig(ldapsCertId string) (*tls.Config, error) {
@@ -118,9 +130,17 @@ func handleBind(w ldap.ResponseWriter, m *ldap.Message) {
 
 		bindUser, err := object.CheckUserPassword(bindOrg, bindUsername, bindPassword, "en", enableCaptcha, isSigninViaLdap, isPasswordWithLdapEnabled)
 		if err != nil {
-			log.Printf("Bind failed User=%s, Pass=%#v, ErrMsg=%s", string(r.Name()), r.Authentication(), err)
+			log.Printf("Bind failed User=%s, ErrMsg=%s", string(r.Name()), err)
 			res.SetResultCode(ldap.LDAPResultInvalidCredentials)
 			res.SetDiagnosticMessage("invalid credentials ErrMsg: " + err.Error())
+			w.Write(res)
+			return
+		}
+
+		if bindUser.IsMfaEnabled() {
+			log.Printf("Bind failed User=%s, ErrMsg=the user has MFA enabled", string(r.Name()))
+			res.SetResultCode(ldap.LDAPResultInvalidCredentials)
+			res.SetDiagnosticMessage("the user has MFA enabled and cannot bind with a password")
 			w.Write(res)
 			return
 		}

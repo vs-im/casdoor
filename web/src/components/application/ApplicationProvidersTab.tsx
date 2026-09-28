@@ -20,7 +20,7 @@ import {
 import * as Setting from "@/lib/setting";
 
 /** the provider kinds a user account can be linked to */
-const LINKABLE_PROVIDER_CATEGORIES = ["OAuth", "Web3", "SAML"];
+const LINKABLE_PROVIDER_CATEGORIES = ["OAuth", "SAML"];
 
 /** the methods an Email or SMS provider row can be picked for, "All" being the absence of one */
 const CODE_PROVIDER_METHODS = Object.keys(PROVIDER_CODE_RULES).filter((rule) => rule !== "all");
@@ -152,7 +152,13 @@ export function ApplicationProvidersTab({
                 return (
                   <SelectField
                     value={row.name}
-                    onChange={(v) => patch({name: v})}
+                    onChange={(v) => {
+                      // the row carries its provider, which would otherwise still be the previous one
+                      const provider = providerObjs.find((item: any) => item.name === v);
+                      patch(provider?.category === "Email" || provider?.category === "SMS"
+                        ? {name: v, provider, rule: "all"}
+                        : {name: v, provider});
+                    }}
                     options={providers
                       .filter((option) => !taken.has(option.value))
                       .map((option) => ({id: option.value, name: option.label as string}))}
@@ -164,25 +170,28 @@ export function ApplicationProvidersTab({
               key: "canSignUp",
               title: i18next.t("provider:Can signup"),
               width: 110,
-              render: (row: any, _i, patch) => (
-                <Switch checked={!!row.canSignUp} onCheckedChange={(v) => patch({canSignUp: v})} />
-              ),
+              render: (row: any, _i, patch) =>
+                LINKABLE_PROVIDER_CATEGORIES.includes(resolveProvider(row)?.category) ? (
+                  <Switch checked={!!row.canSignUp} onCheckedChange={(v) => patch({canSignUp: v})} />
+                ) : null,
             },
             {
               key: "canSignIn",
               title: i18next.t("provider:Can signin"),
               width: 110,
-              render: (row: any, _i, patch) => (
-                <Switch checked={!!row.canSignIn} onCheckedChange={(v) => patch({canSignIn: v})} />
-              ),
+              render: (row: any, _i, patch) =>
+                LINKABLE_PROVIDER_CATEGORIES.includes(resolveProvider(row)?.category) ? (
+                  <Switch checked={!!row.canSignIn} onCheckedChange={(v) => patch({canSignIn: v})} />
+                ) : null,
             },
             {
               key: "canUnlink",
               title: i18next.t("provider:Can unlink"),
               width: 110,
-              render: (row: any, _i, patch) => (
-                <Switch checked={!!row.canUnlink} onCheckedChange={(v) => patch({canUnlink: v})} />
-              ),
+              render: (row: any, _i, patch) =>
+                LINKABLE_PROVIDER_CATEGORIES.includes(resolveProvider(row)?.category) ? (
+                  <Switch checked={!!row.canUnlink} onCheckedChange={(v) => patch({canUnlink: v})} />
+                ) : null,
             },
             {
               key: "prompted",
@@ -249,7 +258,7 @@ export function ApplicationProvidersTab({
               render: (row: any, _i, patch) =>
                 LINKABLE_PROVIDER_CATEGORIES.includes(resolveProvider(row)?.category) ? (
                   <MultiSelect
-                    value={row.bindingRule?.length ? row.bindingRule : ["Email", "Phone", "Name"]}
+                    value={row.bindingRule ?? ["Email", "Phone"]}
                     onChange={(v) => patch({bindingRule: v})}
                     options={enumOptions(PROVIDER_BINDING_RULES)}
                   />
@@ -260,7 +269,7 @@ export function ApplicationProvidersTab({
               title: i18next.t("provider:Signup group"),
               width: 150,
               render: (row: any, _i, patch) =>
-                ["OAuth", "Web3"].includes(resolveProvider(row)?.category) ? (
+                resolveProvider(row)?.category === "OAuth" ? (
                   <Input value={row.signupGroup ?? ""} onChange={(e) => patch({signupGroup: e.target.value})} />
                 ) : null,
             },
@@ -315,7 +324,7 @@ export function ApplicationProvidersTab({
                 );
               },
             },
-          ]}
+          ].filter((column) => application.enableSignUp || column.key !== "canSignUp")}
         />
       </FormRow>
     </>

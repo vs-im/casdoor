@@ -94,6 +94,7 @@ func (c *ApiController) WebAuthnSignupFinish() {
 		c.ResponseError(c.T("webauthn:Please call WebAuthnSigninBegin first"))
 		return
 	}
+	c.DelSession("registration")
 	c.Ctx.Request.Body = io.NopCloser(bytes.NewBuffer(c.Ctx.Input.RequestBody))
 
 	credential, err := webauthnObj.FinishRegistration(user, sessionData, c.Ctx.Request)
@@ -185,6 +186,7 @@ func (c *ApiController) WebAuthnSigninFinish() {
 		c.ResponseError(c.T("webauthn:Please call WebAuthnSigninBegin first"))
 		return
 	}
+	c.DelSession("authentication")
 	c.Ctx.Request.Body = io.NopCloser(bytes.NewBuffer(c.Ctx.Input.RequestBody))
 
 	var user *object.User
@@ -213,8 +215,6 @@ func (c *ApiController) WebAuthnSigninFinish() {
 		c.ResponseError(err.Error())
 		return
 	}
-	c.SetSessionUsername(user.GetId())
-	util.LogInfo(c.Ctx, "API: [%s] signed in", user.GetId())
 
 	var application *object.Application
 
@@ -232,9 +232,30 @@ func (c *ApiController) WebAuthnSigninFinish() {
 		return
 	}
 
+	if c.checkWebAuthnSigninMfa(user) {
+		return
+	}
+
 	var authForm form.AuthForm
 	authForm.Type = responseType
 	resp := c.HandleLoggedIn(application, user, &authForm)
+	if resp == nil {
+		return
+	}
+	if resp.Status == "ok" {
+		c.SetSessionUsername(user.GetId())
+		util.LogInfo(c.Ctx, "API: [%s] signed in", user.GetId())
+	}
 	c.Data["json"] = resp
 	c.ServeJSON()
+}
+
+func (c *ApiController) checkWebAuthnSigninMfa(user *object.User) bool {
+	organization, err := object.GetOrganizationByUser(user)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return true
+	}
+
+	return checkMfaEnable(c, user, organization, "")
 }

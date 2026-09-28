@@ -89,6 +89,8 @@ type Organization struct {
 	UseEmailAsUsername     bool       `json:"useEmailAsUsername"`
 	EnableTour             bool       `json:"enableTour"`
 	DisableSignin          bool       `json:"disableSignin"`
+	EnableExclusiveSignin  bool       `json:"enableExclusiveSignin"`
+	MaxSessions            int        `json:"maxSessions"`
 	DisableConsole         bool       `json:"disableConsole"`
 	IpRestriction          string     `json:"ipRestriction"`
 	NavItems               []string   `xorm:"mediumtext" json:"navItems"`
@@ -207,6 +209,9 @@ func GetMaskedOrganization(isAdmin bool, organization *Organization, errs ...err
 	if organization.MasterVerificationCode != "" {
 		organization.MasterVerificationCode = "***"
 	}
+	if organization.KerberosKeytab != "" {
+		organization.KerberosKeytab = "***"
+	}
 	if !isAdmin {
 		if organization.PasswordObfuscatorKey != "" {
 			organization.PasswordObfuscatorKey = "***"
@@ -247,7 +252,7 @@ func (organization *Organization) hashMasterPassword() {
 	}
 }
 
-func UpdateOrganization(id string, organization *Organization, isGlobalAdmin bool) (bool, error) {
+func UpdateOrganization(id string, organization *Organization, isGlobalAdmin bool, lang string) (bool, error) {
 	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
 	if err != nil {
 		return false, err
@@ -257,6 +262,13 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 		return false, err
 	} else if org == nil {
 		return false, nil
+	}
+
+	if !isGlobalAdmin && organization.DefaultApplication != org.DefaultApplication {
+		err = checkDefaultApplication(org.Name, organization.DefaultApplication, lang)
+		if err != nil {
+			return false, err
+		}
 	}
 
 	if name == "built-in" {
@@ -276,6 +288,10 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 		organization.NavItems = org.NavItems
 		organization.UserNavItems = org.UserNavItems
 		organization.WidgetItems = org.WidgetItems
+		organization.OrgBalance = org.OrgBalance
+		organization.UserBalance = org.UserBalance
+		organization.BalanceCredit = org.BalanceCredit
+		organization.BalanceCurrency = org.BalanceCurrency
 	}
 
 	session := ormer.Engine.ID(core.PK{owner, name}).AllCols()
@@ -289,6 +305,9 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 	if organization.MasterVerificationCode == "***" {
 		session.Omit("master_verification_code")
 	}
+	if organization.KerberosKeytab == "***" {
+		session.Omit("kerberos_keytab")
+	}
 
 	affected, err := session.Update(organization)
 	if err != nil {
@@ -296,6 +315,22 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 	}
 
 	return affected != 0, nil
+}
+
+func checkDefaultApplication(organizationName string, applicationName string, lang string) error {
+	if applicationName == "" {
+		return nil
+	}
+
+	application := &Application{Owner: "admin", Name: applicationName}
+	existed, err := ormer.Engine.Cols("organization", "is_shared").Get(application)
+	if err != nil {
+		return err
+	}
+	if !existed || (application.Organization != organizationName && !application.IsShared) {
+		return fmt.Errorf("%s", i18n.Translate(lang, "auth:Unauthorized operation"))
+	}
+	return nil
 }
 
 func AddOrganization(organization *Organization) (bool, error) {
@@ -308,6 +343,9 @@ func AddOrganization(organization *Organization) (bool, error) {
 	}
 	if organization.MasterVerificationCode == "***" {
 		organization.MasterVerificationCode = ""
+	}
+	if organization.KerberosKeytab == "***" {
+		organization.KerberosKeytab = ""
 	}
 
 	organization.hashMasterPassword()
@@ -693,6 +731,18 @@ func replaceIdOwnerInId(id string, oldOwner string, newOwner string, changed boo
 	return id, changed
 }
 
+func IsSigninPending(user *User) (bool, error) {
+	if user.NeedUpdatePassword {
+		return true, nil
+	}
+
+	organization, err := GetOrganizationByUser(user)
+	if err != nil {
+		return false, err
+	}
+	return IsNeedPromptMfa(organization, user), nil
+}
+
 func IsNeedPromptMfa(org *Organization, user *User) bool {
 	if org == nil || user == nil {
 		return false
@@ -743,23 +793,20 @@ func UpdateOrganizationBalance(owner string, name string, balance float64, curre
 	}
 	convertedBalance := ConvertCurrency(balance, currency, balanceCurrency)
 
-	var columns []string
-	var newBalance float64
-	if isOrgBalance {
-		newBalance = AddPrices(organization.OrgBalance, convertedBalance)
-		// Check organization balance credit limit
-		if newBalance < organization.BalanceCredit {
-			return fmt.Errorf(i18n.Translate(lang, "general:Insufficient balance: new organization balance %v would be below credit limit %v"), newBalance, organization.BalanceCredit)
-		}
-		organization.OrgBalance = newBalance
-		columns = []string{"org_balance"}
-	} else {
+	if !isOrgBalance {
 		// User balance is just a sum of all users' balances, no credit limit check here
 		// Individual user credit limits are checked in UpdateUserBalance
-		organization.UserBalance = AddPrices(organization.UserBalance, convertedBalance)
-		columns = []string{"user_balance"}
+		_, err = ormer.Engine.ID(core.PK{owner, name}).Incr("user_balance", convertedBalance).Update(&Organization{})
+		return err
 	}
 
-	_, err = ormer.Engine.ID(core.PK{owner, name}).Cols(columns...).Update(organization)
-	return err
+	affected, err := incrBalance(ormer.Engine.ID(core.PK{owner, name}), "org_balance", convertedBalance, organization.BalanceCredit, &Organization{})
+	if err != nil {
+		return err
+	}
+	if !affected {
+		newBalance := AddPrices(organization.OrgBalance, convertedBalance)
+		return fmt.Errorf(i18n.Translate(lang, "general:Insufficient balance: new organization balance %v would be below credit limit %v"), newBalance, organization.BalanceCredit)
+	}
+	return nil
 }

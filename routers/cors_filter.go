@@ -29,14 +29,21 @@ const (
 	headerAllowMethods     = "Access-Control-Allow-Methods"
 	headerAllowHeaders     = "Access-Control-Allow-Headers"
 	headerAllowCredentials = "Access-Control-Allow-Credentials"
+	headerVary             = "Vary"
 )
 
 func setCorsHeaders(ctx *context.Context, origin string) {
+	setCorsHeadersWithCredentials(ctx, origin, true)
+}
+
+func setCorsHeadersWithCredentials(ctx *context.Context, origin string, allowCredentials bool) {
 	if origin != "" {
 		ctx.Output.Header(headerAllowOrigin, origin)
 		ctx.Output.Header(headerAllowMethods, "POST, GET, OPTIONS, DELETE")
 		ctx.Output.Header(headerAllowHeaders, "Content-Type, Authorization")
-		ctx.Output.Header(headerAllowCredentials, "true")
+		if allowCredentials {
+			ctx.Output.Header(headerAllowCredentials, "true")
+		}
 	}
 
 	if ctx.Input.Method() == "OPTIONS" {
@@ -45,6 +52,9 @@ func setCorsHeaders(ctx *context.Context, origin string) {
 }
 
 func CorsFilter(ctx *context.Context) {
+	// The CORS headers vary by Origin, so caches in front of Casdoor must key on it.
+	ctx.ResponseWriter.Header().Add(headerVary, headerOrigin)
+
 	origin := ctx.Input.Header(headerOrigin)
 	originConf := conf.GetConfigString("origin")
 	originHostname := getHostname(origin)
@@ -60,51 +70,36 @@ func CorsFilter(ctx *context.Context) {
 		responseError(ctx, err.Error())
 		return
 	}
-	if isValid {
-		setCorsHeaders(ctx, origin)
-		return
-	}
 
 	if originHostname == "appleid.apple.com" {
 		setCorsHeaders(ctx, origin)
 		return
 	}
 
-	if ctx.Request.Method == "POST" && ctx.Request.RequestURI == "/api/login/oauth/access_token" {
-		setCorsHeaders(ctx, origin)
-		return
-	}
-
-	if ctx.Request.Method == "POST" && ctx.Request.RequestURI == "/api/acs" {
-		setCorsHeaders(ctx, origin)
-		return
-	}
-
 	if ctx.Request.RequestURI == "/api/userinfo" {
-		setCorsHeaders(ctx, origin)
+		setCorsHeadersWithCredentials(ctx, origin, origin == originConf || originHostname == host)
 		return
 	}
 
 	if origin != "" {
-		if origin == originConf {
+		if util.IsCredentialedOrigin(origin, originConf, host) {
 			setCorsHeaders(ctx, origin)
-		} else if originHostname == host {
-			setCorsHeaders(ctx, origin)
-		} else if util.IsHostIntranet(host) {
-			setCorsHeaders(ctx, origin)
-		} else {
-			ok, err := object.IsOriginAllowed(origin)
-			if err != nil {
-				panic(err)
-			}
-
-			if ok {
-				setCorsHeaders(ctx, origin)
-			} else {
-				ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
-				return
-			}
+			return
 		}
+
+		ok, err := isOriginAllowedWithoutCredentials(ctx, origin, isValid)
+		if err != nil {
+			ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
+			responseError(ctx, err.Error())
+			return
+		}
+
+		if ok {
+			setCorsHeadersWithCredentials(ctx, origin, false)
+		} else {
+			ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
+		}
+		return
 	}
 
 	if ctx.Input.Method() == "OPTIONS" {
@@ -113,4 +108,16 @@ func CorsFilter(ctx *context.Context) {
 		ctx.ResponseWriter.WriteHeader(http.StatusOK)
 		return
 	}
+}
+
+func isOriginAllowedWithoutCredentials(ctx *context.Context, origin string, isValidOrigin bool) (bool, error) {
+	if isValidOrigin {
+		return true, nil
+	}
+
+	if ctx.Request.Method == "POST" && (ctx.Request.RequestURI == "/api/login/oauth/access_token" || ctx.Request.RequestURI == "/api/acs") {
+		return true, nil
+	}
+
+	return object.IsOriginAllowed(origin)
 }

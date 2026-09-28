@@ -52,9 +52,8 @@ func generateLogoutToken(application *Application, user *User, sessionId string,
 		},
 	}
 
-	if sessionId != "" {
-		claims.Sid = sessionId
-	}
+	// fork: the same hashed "sid" as the ID token carries (getSessionIdClaim), not the session cookie
+	claims.Sid = getSessionIdClaim(sessionId)
 
 	cert, err := getCertByApplication(application)
 	if err != nil {
@@ -124,15 +123,29 @@ func sendBackchannelLogoutForTokens(user *User, tokens []*Token, sessionId strin
 			continue
 		}
 
-		go postBackchannelLogout(application.BackchannelLogoutUri, logoutToken)
+		go postLogoutForm(application, application.BackchannelLogoutUri, url.Values{"logout_token": {logoutToken}})
 	}
 }
 
-func postBackchannelLogout(logoutUri, logoutToken string) {
-	body := url.Values{"logout_token": {logoutToken}}
-	resp, err := http.PostForm(logoutUri, body)
+func postLogoutForm(application *Application, logoutUrl string, form url.Values) {
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	if application.Organization != "built-in" {
+		client.Transport = util.NewNonLocalHttpTransport(30 * time.Second)
+	}
+
+	resp, err := client.PostForm(logoutUrl, form)
 	if err != nil {
+		fmt.Printf("postLogoutForm() error: %s\n", err.Error())
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		fmt.Printf("postLogoutForm() error: unexpected status: %s from: %s\n", resp.Status, logoutUrl)
+	}
 }

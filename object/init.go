@@ -18,6 +18,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/util"
@@ -44,6 +45,7 @@ func InitDb() {
 		initBuiltInUserEnforcer()
 	}
 
+	warnPublicBuiltInCert()
 	initWebAuthn()
 }
 
@@ -267,7 +269,7 @@ func initBuiltInApplication() {
 	if redirectURI := os.Getenv("HASURA_REDIRECT_URI"); redirectURI != "" {
 		application.RedirectUris = []string{redirectURI}
 	}
-	_, err = AddApplication(application)
+	_, err = AddApplication(application, "en")
 	if err != nil {
 		panic(err)
 	}
@@ -288,7 +290,6 @@ func readTokenFromFile() (string, string) {
 }
 
 func initBuiltInCert() {
-	tokenJwtCertificate, tokenJwtPrivateKey := readTokenFromFile()
 	cert, err := getCert("admin", "cert-built-in")
 	if err != nil {
 		panic(err)
@@ -298,6 +299,8 @@ func initBuiltInCert() {
 		return
 	}
 
+	// the Certificate and PrivateKey are left empty for AddCert() to generate a new key pair,
+	// the one in "object/token_jwt_key.key" is public in the repository
 	cert = &Cert{
 		Owner:           "admin",
 		Name:            "cert-built-in",
@@ -308,12 +311,22 @@ func initBuiltInCert() {
 		CryptoAlgorithm: "RS256",
 		BitSize:         4096,
 		ExpireInYears:   20,
-		Certificate:     tokenJwtCertificate,
-		PrivateKey:      tokenJwtPrivateKey,
 	}
 	_, err = AddCert(cert)
 	if err != nil {
 		panic(err)
+	}
+}
+
+func warnPublicBuiltInCert() {
+	cert, err := getCert("admin", "cert-built-in")
+	if err != nil || cert == nil {
+		return
+	}
+
+	_, publicPrivateKey := readTokenFromFile()
+	if publicPrivateKey != "" && strings.TrimSpace(cert.PrivateKey) == strings.TrimSpace(publicPrivateKey) {
+		fmt.Printf("WARNING: the cert: %s signs tokens with the private key published in the Casdoor repository, anyone can forge its tokens, please generate a new key pair for it\n", cert.GetId())
 	}
 }
 

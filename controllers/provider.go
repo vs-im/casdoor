@@ -51,7 +51,7 @@ func (c *ApiController) GetProviders() {
 			return
 		}
 
-		c.ResponseOk(object.GetMaskedProviders(providers, isMaskEnabled))
+		c.ResponseOk(c.getMaskedProviders(providers, isMaskEnabled))
 	} else {
 		limit := util.ParseInt(limit)
 		count, err := object.GetProviderCount(owner, field, value)
@@ -67,7 +67,7 @@ func (c *ApiController) GetProviders() {
 			return
 		}
 
-		providers := object.GetMaskedProviders(paginationProviders, isMaskEnabled)
+		providers := c.getMaskedProviders(paginationProviders, isMaskEnabled)
 		c.ResponseOk(providers, paginator.Nums())
 	}
 }
@@ -79,6 +79,10 @@ func (c *ApiController) GetProviders() {
 // @Success 200 {array} object.Provider The Response object
 // @router /get-global-providers [get]
 func (c *ApiController) GetGlobalProviders() {
+	if !c.requireGlobalAdmin() {
+		return
+	}
+
 	limit := c.Ctx.Input.Query("pageSize")
 	page := c.Ctx.Input.Query("p")
 	field := c.Ctx.Input.Query("field")
@@ -98,7 +102,7 @@ func (c *ApiController) GetGlobalProviders() {
 			return
 		}
 
-		c.ResponseOk(object.GetMaskedProviders(globalProviders, isMaskEnabled))
+		c.ResponseOk(c.getMaskedProviders(globalProviders, isMaskEnabled))
 	} else {
 		limit := util.ParseInt(limit)
 		count, err := object.GetGlobalProviderCount(field, value)
@@ -114,7 +118,7 @@ func (c *ApiController) GetGlobalProviders() {
 			return
 		}
 
-		providers := object.GetMaskedProviders(paginationGlobalProviders, isMaskEnabled)
+		providers := c.getMaskedProviders(paginationGlobalProviders, isMaskEnabled)
 		c.ResponseOk(providers, paginator.Nums())
 	}
 }
@@ -139,7 +143,7 @@ func (c *ApiController) GetProvider() {
 		return
 	}
 
-	c.ResponseOk(object.GetMaskedProvider(provider, isMaskEnabled))
+	c.ResponseOk(c.getMaskedProvider(provider, isMaskEnabled))
 }
 
 // GetIdpDiscovery
@@ -150,9 +154,13 @@ func (c *ApiController) GetProvider() {
 // @Success 200 {object} idp.OidcDiscovery The Response object
 // @router /get-idp-discovery [get]
 func (c *ApiController) GetIdpDiscovery() {
+	if _, ok := c.RequireAdmin(); !ok {
+		return
+	}
+
 	issuer := c.Ctx.Input.Query("issuer")
 
-	discovery, err := idp.GetOidcDiscovery(issuer)
+	discovery, err := idp.GetOidcDiscoveryByAdmin(issuer, c.IsGlobalAdmin())
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
@@ -175,6 +183,44 @@ func (c *ApiController) requireProviderPermission(provider *object.Provider) boo
 	return true
 }
 
+func (c *ApiController) requireProviderSavePermission(provider *object.Provider) bool {
+	if !c.requireProviderPermission(provider) {
+		return false
+	}
+
+	isServerLocalLog := provider.Category == "Log" && (provider.Type == "System Log" || provider.Type == "SELinux Log" || provider.Type == "Agent")
+	if isServerLocalLog && !c.IsGlobalAdmin() {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return false
+	}
+
+	return true
+}
+
+func isProviderVisibleToUser(provider *object.Provider, user *object.User) bool {
+	return provider.Owner == "admin" || provider.Owner == user.Owner
+}
+
+func (c *ApiController) getMaskedProviders(providers []*object.Provider, isMaskEnabled bool) []*object.Provider {
+	if isMaskEnabled {
+		return object.GetMaskedProviders(providers, true)
+	}
+
+	isGlobalAdmin, user := c.isGlobalAdmin()
+	for _, provider := range providers {
+		isOwnProvider := isGlobalAdmin || (user != nil && user.IsAdmin && user.Owner == provider.Owner)
+		object.GetMaskedProvider(provider, !isOwnProvider)
+	}
+	return providers
+}
+
+func (c *ApiController) getMaskedProvider(provider *object.Provider, isMaskEnabled bool) *object.Provider {
+	if provider == nil {
+		return nil
+	}
+	return c.getMaskedProviders([]*object.Provider{provider}, isMaskEnabled)[0]
+}
+
 // UpdateProvider
 // @Title UpdateProvider
 // @Tag Provider API
@@ -193,7 +239,7 @@ func (c *ApiController) UpdateProvider() {
 		return
 	}
 
-	ok := c.requireProviderPermission(&provider)
+	ok := c.requireProviderSavePermission(&provider)
 	if !ok {
 		return
 	}
@@ -229,7 +275,7 @@ func (c *ApiController) AddProvider() {
 		return
 	}
 
-	ok := c.requireProviderPermission(&provider)
+	ok := c.requireProviderSavePermission(&provider)
 	if !ok {
 		return
 	}

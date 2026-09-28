@@ -80,15 +80,19 @@ type VerificationRecord struct {
 	IsUsed     bool   `xorm:"notnull" json:"isUsed"`
 }
 
-func IsAllowSend(user *User, remoteAddr, recordType string, application *Application) error {
-	var record VerificationRecord
-	record.RemoteAddr = remoteAddr
-	record.Type = recordType
+func IsAllowSend(user *User, remoteAddr, recordType string, application *Application, lang string) error {
+	userId := ""
 	if user != nil {
-		record.User = user.GetId()
+		userId = user.GetId()
 	}
 
-	has, err := ormer.Engine.Desc("created_time").Get(&record)
+	// the "user" condition has to be spelled out: as a struct field an empty user is
+	// dropped from the WHERE, and an anonymous send is then throttled by every other
+	// user's record coming from the same address
+	record := VerificationRecord{}
+	has, err := ormer.Engine.Where("remote_addr = ? and type = ?", remoteAddr, recordType).
+		And(fmt.Sprintf("%s = ?", quoteColumn("user")), userId).
+		Desc("created_time").Get(&record)
 	if err != nil {
 		return err
 	}
@@ -101,13 +105,13 @@ func IsAllowSend(user *User, remoteAddr, recordType string, application *Applica
 
 	now := time.Now().Unix()
 	if has && now-record.Time < resendTimeoutInSeconds {
-		return fmt.Errorf("you can only send one code in %ds", resendTimeoutInSeconds)
+		return fmt.Errorf(i18n.Translate(lang, "verification:you can only send one code in %ds"), resendTimeoutInSeconds)
 	}
 
 	return nil
 }
 
-func SendVerificationCodeToEmail(organization *Organization, user *User, provider *Provider, remoteAddr string, dest string, method string, host string, applicationName string, application *Application) error {
+func SendVerificationCodeToEmail(organization *Organization, user *User, provider *Provider, remoteAddr string, dest string, method string, host string, applicationName string, application *Application, lang string) error {
 	sender := organization.DisplayName
 	title := provider.Title
 
@@ -119,9 +123,8 @@ func SendVerificationCodeToEmail(organization *Organization, user *User, provide
 	// "You have requested a verification code at Casdoor. Here is your code: %s, please enter in 5 minutes."
 	content := strings.Replace(provider.Content, "%s", code, 1)
 
-	if method == "forget" {
-		originFrontend, _ := getOriginFromHost(host)
-
+	originFrontend, isOriginTrusted := getTrustedOriginFrontend(host)
+	if method == "forget" && isOriginTrusted {
 		query := url.Values{}
 		query.Add("code", code)
 		query.Add("username", user.Name)
@@ -142,7 +145,7 @@ func SendVerificationCodeToEmail(organization *Organization, user *User, provide
 	}
 	content = strings.Replace(content, "%{user.friendlyName}", userString, 1)
 
-	err := IsAllowSend(user, remoteAddr, provider.Category, application)
+	err := IsAllowSend(user, remoteAddr, provider.Category, application, lang)
 	if err != nil {
 		return err
 	}
@@ -160,8 +163,8 @@ func SendVerificationCodeToEmail(organization *Organization, user *User, provide
 	return nil
 }
 
-func SendVerificationCodeToPhone(organization *Organization, user *User, provider *Provider, remoteAddr string, dest string, application *Application) error {
-	err := IsAllowSend(user, remoteAddr, provider.Category, application)
+func SendVerificationCodeToPhone(organization *Organization, user *User, provider *Provider, remoteAddr string, dest string, application *Application, lang string) error {
+	err := IsAllowSend(user, remoteAddr, provider.Category, application, lang)
 	if err != nil {
 		return err
 	}
@@ -223,6 +226,10 @@ func filterRecordIn24Hours(record *VerificationRecord) *VerificationRecord {
 }
 
 func getVerificationRecord(dest string) (*VerificationRecord, error) {
+	if dest == "" {
+		return nil, nil
+	}
+
 	record := &VerificationRecord{}
 	record.Receiver = dest
 
@@ -261,6 +268,10 @@ func getVerificationRecord(dest string) (*VerificationRecord, error) {
 }
 
 func getUnusedVerificationRecord(dest string) (*VerificationRecord, error) {
+	if dest == "" {
+		return nil, nil
+	}
+
 	record := &VerificationRecord{}
 	record.Receiver = dest
 
@@ -440,13 +451,30 @@ func CheckVerifyCodeWithLimit(user *User, dest, code, lang string) error {
 	}
 }
 
+func CheckFaceIdWithLimit(user *User, check func() error, lang string) error {
+	err := checkSigninErrorTimes(user, lang)
+	if err != nil {
+		return err
+	}
+
+	err = check()
+	if err != nil {
+		if recordErr := recordSigninErrorInfo(user, lang); recordErr != nil {
+			return fmt.Errorf("%s, %s", err.Error(), recordErr.Error())
+		}
+		return err
+	}
+
+	return resetUserSigninErrorTimes(user)
+}
+
 func CheckFaceId(user *User, faceId []float64, lang string) error {
 	if len(user.FaceIds) == 0 {
 		return errors.New(i18n.Translate(lang, "check:Face data does not exist, cannot log in"))
 	}
 
 	for _, userFaceId := range user.FaceIds {
-		if faceId == nil || len(userFaceId.FaceIdData) != len(faceId) {
+		if len(faceId) == 0 || len(userFaceId.FaceIdData) != len(faceId) {
 			continue
 		}
 		var sumOfSquares float64
@@ -460,6 +488,20 @@ func CheckFaceId(user *User, faceId []float64, lang string) error {
 	}
 
 	return errors.New(i18n.Translate(lang, "check:Face data mismatch"))
+}
+
+// IsUserVerifyDest checks that dest, the email or E.164 phone a code is checked against, is the
+// user's own: the user is looked up by name first, so it may not be the owner of the typed address
+func IsUserVerifyDest(user *User, dest string, countryCode string) bool {
+	if strings.Contains(dest, "@") {
+		return user.Email != "" && strings.EqualFold(user.Email, dest)
+	}
+
+	if user.CountryCode != "" {
+		countryCode = user.CountryCode
+	}
+	phone, _ := util.GetE164Number(user.Phone, countryCode)
+	return user.Phone != "" && phone == dest
 }
 
 func GetVerifyType(username string) (verificationCodeType string) {

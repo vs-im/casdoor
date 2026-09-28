@@ -12,6 +12,12 @@ import type {ApplicationTabProps} from "@/components/application/types";
 import * as Setting from "@/lib/setting";
 
 const SAML_HASH_ALGORITHMS = ["SHA1", "SHA256", "SHA512"];
+const SAML_NAME_FORMATS = [
+  {id: "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified", name: "Unspecified"},
+  {id: "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", name: "Basic"},
+  {id: "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", name: "UriReference"},
+  {id: "urn:oasis:names:tc:SAML:2.0:attrname-format:X500", name: "x500AttributeName"},
+];
 
 interface ApplicationSamlTabProps extends ApplicationTabProps {
   mode: string;
@@ -33,6 +39,12 @@ export function ApplicationSamlTab({
     <>
       <FormRow labelKey="application:SAML reply URL">
         <Input value={application.samlReplyUrl ?? ""} onChange={(e) => updateField("samlReplyUrl", e.target.value)} />
+      </FormRow>
+      <FormRow labelKey="application:SAML single logout URL">
+        <Input
+          value={application.samlSingleLogoutUrl ?? ""}
+          onChange={(e) => updateField("samlSingleLogoutUrl", e.target.value)}
+        />
       </FormRow>
       <FormRow labelKey="application:Enable SAML compression">
         <Switch
@@ -107,7 +119,11 @@ export function ApplicationSamlTab({
               title: i18next.t("general:Name format"),
               width: 220,
               render: (row: any, _i, patch) => (
-                <Input value={row.nameFormat ?? ""} onChange={(e) => patch({nameFormat: e.target.value})} />
+                <SelectField
+                  value={row.nameFormat}
+                  onChange={(v) => patch({nameFormat: v})}
+                  options={SAML_NAME_FORMATS}
+                />
               ),
             },
             {

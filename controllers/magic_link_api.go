@@ -487,6 +487,21 @@ func (c *ApiController) VerifyMagicLink() {
 		authForm.Type = ResponseTypeLogin
 	}
 
+	// the same MFA gate as the built-in magic link sign-in (Login(): checkMfaEnable() before
+	// HandleLoggedIn()): the link proves the email, a user with MFA still owes the second factor,
+	// which is answered by /api/login with the MFA session this response starts
+	organization, err := object.GetOrganizationByUser(user)
+	if err != nil {
+		_ = object.UpdateMagicLinkStatus(link, object.MagicLinkStatusFailed, err.Error())
+		c.ResponseError(err.Error())
+		return
+	}
+	if checkMfaEnable(c, user, organization, "email") {
+		c.logMagicLinkStatus("mfa-required", link, application, user.Email, "")
+		_ = object.UpdateMagicLinkStatus(link, object.MagicLinkStatusUsed, "")
+		return
+	}
+
 	resp := c.HandleLoggedIn(application, user, &authForm)
 	if resp == nil {
 		c.logMagicLinkStatus("login-failed", link, application, user.Email, "magic link login failed")

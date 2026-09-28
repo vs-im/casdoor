@@ -16,6 +16,7 @@ package object
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/beego/beego/v2/core/logs"
@@ -42,15 +43,51 @@ func checkPricingIsAllowed(owner string, pricingName string, user *User) error {
 	return nil
 }
 
+func checkOrderPlan(owner string, productInfo ProductInfo, product Product) error {
+	if productInfo.PricingName == "" || productInfo.PlanName == "" {
+		return nil
+	}
+
+	pricing, err := GetPricing(util.GetId(owner, productInfo.PricingName))
+	if err != nil {
+		return err
+	}
+	if pricing == nil || !util.InSlice(pricing.Plans, productInfo.PlanName) {
+		return fmt.Errorf("the plan: %s does not belong to the pricing: %s", productInfo.PlanName, productInfo.PricingName)
+	}
+
+	plan, err := GetPlan(util.GetId(owner, productInfo.PlanName))
+	if err != nil {
+		return err
+	}
+	if plan == nil || plan.Product != product.Name {
+		return fmt.Errorf("the plan: %s is not sold by the product: %s", productInfo.PlanName, product.Name)
+	}
+	return nil
+}
+
+func checkOrderUser(owner string, user *User) error {
+	if user.Owner != owner {
+		return fmt.Errorf("the user: %s does not belong to the organization: %s", user.GetId(), owner)
+	}
+	return nil
+}
+
 func PlaceOrder(owner string, reqProductInfos []ProductInfo, user *User, couponCode string) (*Order, error) {
 	if len(reqProductInfos) == 0 {
 		return nil, fmt.Errorf("order has no products")
+	}
+	if err := checkOrderUser(owner, user); err != nil {
+		return nil, err
 	}
 
 	productNames := make([]string, 0, len(reqProductInfos))
 	for _, reqInfo := range reqProductInfos {
 		if reqInfo.Name == "" {
 			return nil, fmt.Errorf("product name cannot be empty")
+		}
+		if reqInfo.Quantity < 1 {
+			return nil, fmt.Errorf("the quantity of product: %s should be at least 1", reqInfo.Name)
 		}
 		err := checkPricingIsAllowed(owner, reqInfo.PricingName, user)
 		if err != nil {
@@ -82,10 +119,15 @@ func PlaceOrder(owner string, reqProductInfos []ProductInfo, user *User, couponC
 	for _, productInfo := range reqProductInfos {
 		product := productMap[productInfo.Name]
 
+		err = checkOrderPlan(owner, productInfo, product)
+		if err != nil {
+			return nil, err
+		}
+
 		var productPrice float64
 		if product.IsRecharge {
 			productPrice = productInfo.Price
-			if productPrice <= 0 {
+			if !isValidCustomPrice(productPrice) {
 				return nil, fmt.Errorf("the custom price should be greater than zero")
 			}
 		} else {
@@ -112,6 +154,10 @@ func PlaceOrder(owner string, reqProductInfos []ProductInfo, user *User, couponC
 	var couponName string
 	var couponDiscount float64
 	if couponCode != "" {
+		if hasRechargeProduct(productInfos) {
+			return nil, fmt.Errorf("a coupon cannot be used for an order containing a recharge product")
+		}
+
 		coupon, err := ValidateCoupon(owner, couponCode, user.Name, productNames, orderPrice, orderCurrency)
 		if err != nil {
 			return nil, err
@@ -154,6 +200,21 @@ func PlaceOrder(owner string, reqProductInfos []ProductInfo, user *User, couponC
 	return order, nil
 }
 
+func getOrderProvider(products []Product, providerName string) (*Provider, error) {
+	provider, err := products[0].getProvider(providerName)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, product := range products[1:] {
+		err = product.isValidProvider(provider)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return provider, nil
+}
+
 func PayOrder(providerName, host, paymentEnv string, order *Order, lang string) (payment *Payment, attachInfo map[string]interface{}, err error) {
 	if order.State != "Created" {
 		return nil, nil, fmt.Errorf("cannot pay for order: %s, current state is %s", order.GetId(), order.State)
@@ -186,12 +247,17 @@ func PayOrder(providerName, host, paymentEnv string, order *Order, lang string) 
 
 	// For multi-product orders, the payment provider is determined by the first product
 	baseProduct := products[0]
-	provider, err := baseProduct.getProvider(providerName)
+	provider, err := getOrderProvider(products, providerName)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	pProvider, err := GetPaymentProvider(provider)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = checkBalanceForPayment(provider, order, lang)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -321,15 +387,6 @@ func PayOrder(providerName, host, paymentEnv string, order *Order, lang string) 
 		payment.State = pp.PaymentStatePaid
 	}
 
-	affected, err := AddPayment(payment)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if !affected {
-		return nil, nil, fmt.Errorf("failed to add payment: %s", util.StructToJson(payment))
-	}
-
 	if provider.Type == "Balance" {
 		transaction := &Transaction{
 			Owner:       payment.Owner,
@@ -347,7 +404,7 @@ func PayOrder(providerName, host, paymentEnv string, order *Order, lang string) 
 			State:       string(pp.PaymentStatePaid),
 		}
 
-		affected, err = AddInternalPaymentTransaction(transaction, lang)
+		affected, err := AddInternalPaymentTransaction(transaction, lang)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -391,6 +448,16 @@ func PayOrder(providerName, host, paymentEnv string, order *Order, lang string) 
 		}
 	}
 
+	// the balance is spent before the payment is recorded as paid, so a refused spending leaves no paid payment behind
+	affected, err := AddPayment(payment)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !affected {
+		return nil, nil, fmt.Errorf("failed to add payment: %s", util.StructToJson(payment))
+	}
+
 	order.Payment = payment.Name
 	if provider.Type == "Balance" {
 		order.State = "Paid"
@@ -422,6 +489,22 @@ func PayOrder(providerName, host, paymentEnv string, order *Order, lang string) 
 	return payment, payResp.AttachInfo, nil
 }
 
+// checkBalanceForPayment refuses a balance payment the user can't afford before anything is
+// recorded: the payment is stored as paid right away, which activates its subscription
+func checkBalanceForPayment(provider *Provider, order *Order, lang string) error {
+	if provider.Type != "Balance" {
+		return nil
+	}
+
+	transaction := &Transaction{
+		Owner:    order.Owner,
+		Currency: order.Currency,
+		Tag:      "User",
+		User:     order.User,
+	}
+	return validateBalanceForTransaction(transaction, -order.Price, lang)
+}
+
 func CancelOrder(order *Order) (bool, error) {
 	if order.State != "Created" {
 		return false, fmt.Errorf("cannot cancel order in state: %s", order.State)
@@ -431,4 +514,19 @@ func CancelOrder(order *Order) (bool, error) {
 	order.Message = "Canceled by user"
 	order.UpdateTime = util.GetCurrentTime()
 	return UpdateOrder(order.GetId(), order)
+}
+
+// hasRechargeProduct reports an order that credits the balance with the price of its recharge
+// products, a coupon would let it credit more than it is paid
+func hasRechargeProduct(productInfos []ProductInfo) bool {
+	for _, productInfo := range productInfos {
+		if productInfo.IsRecharge {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidCustomPrice(price float64) bool {
+	return price > 0 && !math.IsInf(price, 1)
 }

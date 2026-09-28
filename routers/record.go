@@ -15,6 +15,7 @@
 package routers
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/beego/beego/v2/server/web/context"
@@ -22,39 +23,17 @@ import (
 	"github.com/casdoor/casdoor/util"
 )
 
-func getUser(ctx *context.Context) (username string) {
-	defer func() {
-		if r := recover(); r != nil {
-			username = getUserByClientIdSecret(ctx)
-		}
-	}()
-
-	username = ctx.Input.Session("username").(string)
-
-	if username == "" {
-		username = getUserByClientIdSecret(ctx)
+func getUser(ctx *context.Context) string {
+	if username, ok := ctx.Input.Session("username").(string); ok && username != "" {
+		return username
 	}
 
-	return
-}
-
-func getUserByClientIdSecret(ctx *context.Context) string {
-	clientId := ctx.Input.Query("clientId")
-	clientSecret := ctx.Input.Query("clientSecret")
-	if clientId == "" || clientSecret == "" {
-		return ""
-	}
-
-	application, err := object.GetApplicationByClientId(clientId)
+	username, err := getUsernameByClientIdSecret(ctx)
 	if err != nil {
-		panic(err)
-	}
-
-	if application == nil || application.ClientSecret != clientSecret {
 		return ""
 	}
 
-	return util.GetId(application.Organization, application.Name)
+	return username
 }
 
 func RecordMessage(ctx *context.Context) {
@@ -83,6 +62,55 @@ func RecordMessage(ctx *context.Context) {
 	ctx.Input.SetParam("recordUserId", userId)
 }
 
+// getOrganizationFromRequest derives the organization of a request that has no authenticated
+// subject, from the organization or application that the request names.
+func getOrganizationFromRequest(ctx *context.Context) string {
+	var body struct {
+		Organization string `json:"organization"`
+		Application  string `json:"application"`
+		ClientId     string `json:"clientId"`
+	}
+	if len(ctx.Input.RequestBody) != 0 {
+		_ = json.Unmarshal(ctx.Input.RequestBody, &body)
+	}
+
+	// the name is caller-controlled, so a made-up one must not become an owner
+	for _, name := range []string{body.Organization, ctx.Input.Query("organization")} {
+		if name == "" {
+			continue
+		}
+
+		organization, err := object.GetOrganization(util.GetId("admin", name))
+		if err == nil && organization != nil {
+			return organization.Name
+		}
+	}
+
+	applicationId := ctx.Input.Query("applicationId")
+	if body.Application != "" {
+		applicationId = util.GetId("admin", body.Application)
+	}
+	if applicationId != "" {
+		application, err := object.GetApplication(applicationId)
+		if err == nil && application != nil {
+			return application.Organization
+		}
+	}
+
+	clientId := body.ClientId
+	if clientId == "" {
+		clientId = ctx.Input.Query("clientId")
+	}
+	if clientId != "" {
+		application, err := object.GetApplicationByClientId(clientId)
+		if err == nil && application != nil {
+			return application.Organization
+		}
+	}
+
+	return ""
+}
+
 func AfterRecordMessage(ctx *context.Context) {
 	record, err := object.NewRecord(ctx)
 	if err != nil {
@@ -109,11 +137,14 @@ func AfterRecordMessage(ctx *context.Context) {
 			record.Organization, record.User = owner, user
 		}
 	} else if userId != "" {
-		owner, user, err := util.GetOwnerAndNameFromIdWithError(userId)
+		err = record.SetUser(userId)
 		if err != nil {
 			panic(err)
 		}
-		record.Organization, record.User = owner, user
+	}
+
+	if record.Organization == "" {
+		record.Organization = getOrganizationFromRequest(ctx)
 	}
 
 	var record2 *object.Record

@@ -31,29 +31,67 @@ type DatabaseSyncerProvider struct {
 	Syncer *Syncer
 }
 
+func (syncer *Syncer) isSshTunneled() bool {
+	return syncer.SshType != "" && (syncer.DatabaseType == "mysql" || syncer.DatabaseType == "postgres" || syncer.DatabaseType == "mssql")
+}
+
+func (syncer *Syncer) isDatabaseSyncer() bool {
+	switch GetSyncerProvider(syncer).(type) {
+	case *DatabaseSyncerProvider, *KeycloakSyncerProvider:
+		return true
+	}
+	return false
+}
+
+func CheckSyncerDatabaseHost(syncer *Syncer) error {
+	if !syncer.isDatabaseSyncer() || syncer.DatabaseType == "sqlite3" || syncer.DatabaseType == "sqlite" {
+		return nil
+	}
+	if syncer.isSshTunneled() {
+		return util.CheckInternetHost(syncer.SshHost)
+	}
+	return util.CheckInternetHost(syncer.Host)
+}
+
+func checkTenantSyncerHost(syncer *Syncer) error {
+	if syncer.Organization == "built-in" {
+		return nil
+	}
+	return CheckSyncerDatabaseHost(syncer)
+}
+
 // InitAdapter initializes the database adapter
 func (p *DatabaseSyncerProvider) InitAdapter() error {
 	if p.Syncer.Ormer != nil {
 		return nil
 	}
 
+	err := checkDataSourceFields(map[string]string{"host": p.Syncer.Host, "user": p.Syncer.User, "database": p.Syncer.Database, "SSL mode": p.Syncer.SslMode})
+	if err != nil {
+		return err
+	}
+
+	err = checkTenantSyncerHost(p.Syncer)
+	if err != nil {
+		return err
+	}
+
 	var dataSourceName string
 	if p.Syncer.DatabaseType == "mssql" {
-		dataSourceName = fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s", p.Syncer.User, p.Syncer.Password, p.Syncer.Host, p.Syncer.Port, p.Syncer.Database)
+		dataSourceName = getMssqlDataSourceName(p.Syncer.User, p.Syncer.Password, p.Syncer.Host, p.Syncer.Port, p.Syncer.Database)
 	} else if p.Syncer.DatabaseType == "postgres" {
 		sslMode := "disable"
 		if p.Syncer.SslMode != "" {
 			sslMode = p.Syncer.SslMode
 		}
-		dataSourceName = fmt.Sprintf("user=%s password=%s host=%s port=%d sslmode=%s dbname=%s", p.Syncer.User, p.Syncer.Password, p.Syncer.Host, p.Syncer.Port, sslMode, p.Syncer.Database)
+		dataSourceName = fmt.Sprintf("user=%s password=%s host=%s port=%d sslmode=%s dbname=%s", p.Syncer.User, quotePostgresDataSourceValue(p.Syncer.Password), p.Syncer.Host, p.Syncer.Port, sslMode, p.Syncer.Database)
 	} else {
 		dataSourceName = fmt.Sprintf("%s:%s@tcp(%s:%d)/", p.Syncer.User, p.Syncer.Password, p.Syncer.Host, p.Syncer.Port)
 	}
 
 	var db *sql.DB
-	var err error
 
-	if p.Syncer.SshType != "" && (p.Syncer.DatabaseType == "mysql" || p.Syncer.DatabaseType == "postgres" || p.Syncer.DatabaseType == "mssql") {
+	if p.Syncer.isSshTunneled() {
 		var dial *ssh.Client
 		if p.Syncer.SshType == "password" {
 			dial, err = DialWithPassword(p.Syncer.SshUser, p.Syncer.SshPassword, p.Syncer.SshHost, p.Syncer.SshPort)

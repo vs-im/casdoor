@@ -535,16 +535,6 @@ export const OtherProviderInfo = {
       url: "https://platform.openai.com",
     },
   },
-  Web3: {
-    "MetaMask": {
-      logo: `${StaticBaseUrl}/img/social_metamask.svg`,
-      url: "https://metamask.io/",
-    },
-    "Web3Onboard": {
-      logo: `${StaticBaseUrl}/img/social_web3onboard.svg`,
-      url: "https://onboard.blocknative.com/",
-    },
-  },
   Notification: {
     "Telegram": {
       logo: `${StaticBaseUrl}/img/social_telegram.png`,
@@ -696,7 +686,7 @@ export const UserFields = ["owner", "name", "password", "display_name", "id", "t
   "eveonline", "fitbit", "gitea", "heroku", "influxcloud", "instagram", "intercom", "kakao", "lastfm", "mailru",
   "meetup", "microsoftonline", "naver", "nextcloud", "onedrive", "oura", "patreon", "paypal", "salesforce", "shopify",
   "soundcloud", "spotify", "strava", "stripe", "tiktok", "tumblr", "twitch", "twitter", "typetalk", "uber", "vk",
-  "wepay", "xero", "yahoo", "yammer", "yandex", "zoom", "metamask", "web3onboard", "oidc", "custom", "webauthnCredentials",
+  "wepay", "xero", "yahoo", "yammer", "yandex", "zoom", "oidc", "custom", "webauthnCredentials",
   "preferred_mfa_type", "recovery_codes", "totp_secret", "mfa_phone_enabled", "mfa_email_enabled", "invitation",
   "invitation_code", "face_ids", "ldap", "properties", "roles", "permissions", "groups", "last_change_password_time",
   "last_signin_wrong_time", "signin_wrong_times", "managedAccounts", "mfaAccounts", "mfaItems", "need_update_password",
@@ -918,7 +908,7 @@ export function isProviderVisible(providerItem) {
     return false;
   }
 
-  if (!["OAuth", "SAML", "Web3"].includes(providerItem.provider.category)) {
+  if (!["OAuth", "SAML"].includes(providerItem.provider.category)) {
     return false;
   }
 
@@ -1118,13 +1108,13 @@ export const MfaRuleOptional = "Optional";
 
 export const RequiredUpdatePassword = "RequiredUpdatePassword";
 
-export function goToUpdatePassword() {
+export function goToUpdatePassword(applicationName?: string) {
   // remember where the login was started from, to go back after the password is updated
   const signinUrl = localStorage.getItem("signinUrl");
   if (signinUrl) {
     sessionStorage.setItem("signinUrl", signinUrl);
   }
-  goToLink("/account");
+  goToLink(applicationName ? `/update-password/${encodeURIComponent(applicationName)}` : "/update-password");
 }
 
 export function isRequiredEnableMfa(user, organization) {
@@ -1173,13 +1163,28 @@ export function myParseInt(i) {
   return isNaN(res) ? 0 : res;
 }
 
+export function isScriptUrl(link) {
+  try {
+    const protocol = new URL(link, window.location.href).protocol;
+    return protocol === "javascript:" || protocol === "data:" || protocol === "vbscript:";
+  } catch (e) {
+    return false;
+  }
+}
+
 export function openLink(link) {
+  if (isScriptUrl(link)) {
+    return;
+  }
   // this.props.history.push(link);
   const w = window.open("about:blank");
   w.location.href = link;
 }
 
 export function openLinkSafe(link) {
+  if (isScriptUrl(link)) {
+    return;
+  }
   // Javascript window.open issue in safari
   // https://stackoverflow.com/questions/45569893/javascript-window-open-issue-in-safari
   const a = document.createElement("a");
@@ -1189,6 +1194,9 @@ export function openLinkSafe(link) {
 }
 
 export function goToLink(link) {
+  if (isScriptUrl(link)) {
+    return;
+  }
   window.location.href = link;
 }
 
@@ -1562,11 +1570,6 @@ export function getProviderTypeOptions(category) {
       {id: "GEETEST", name: "GEETEST"},
       {id: "Cloudflare Turnstile", name: "Cloudflare Turnstile"},
     ]);
-  } else if (category === "Web3") {
-    return ([
-      {id: "MetaMask", name: "MetaMask"},
-      {id: "Web3Onboard", name: "Web3-Onboard"},
-    ]);
   } else if (category === "Notification") {
     return ([
       {id: "Telegram", name: "Telegram"},
@@ -1797,10 +1800,6 @@ export function getApplicationDisplayName(application) {
 
 export function getRandomName() {
   return Math.random().toString(36).slice(-6);
-}
-
-export function getRandomNumber() {
-  return Math.random().toString(10).slice(-11);
 }
 
 export function getFromLink() {
@@ -2699,6 +2698,9 @@ export function getRepoUrl(name) {
 }
 
 export function createFormAndSubmit(url, params) {
+  if (isScriptUrl(url)) {
+    return;
+  }
   const form = document.createElement("form");
   form.method = "post";
   form.action = url;

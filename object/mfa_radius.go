@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/casdoor/casdoor/radius/authenticator"
 	"layeh.com/radius"
 	"layeh.com/radius/rfc2865"
 )
@@ -36,7 +37,7 @@ func (mfa *RadiusMfa) Initiate(userId string, issuer string) (*MfaProps, error) 
 	return &mfaProps, nil
 }
 
-func (mfa *RadiusMfa) SetupVerify(passCode string) error {
+func (mfa *RadiusMfa) SetupVerify(passCode string, lang string) error {
 	if mfa.Secret == "" {
 		return errors.New("RADIUS username is required")
 	}
@@ -72,7 +73,7 @@ func (mfa *RadiusMfa) Enable(user *User) error {
 	return nil
 }
 
-func (mfa *RadiusMfa) Verify(passCode string) error {
+func (mfa *RadiusMfa) Verify(passCode string, lang string) error {
 	if mfa.Secret == "" {
 		return errors.New("RADIUS username is required")
 	}
@@ -109,6 +110,9 @@ func (mfa *RadiusMfa) authenticateWithRadius(username, password string) error {
 	if err := rfc2865.UserPassword_SetString(packet, password); err != nil {
 		return fmt.Errorf("failed to set RADIUS password: %v", err)
 	}
+	if err := authenticator.Sign(packet); err != nil {
+		return fmt.Errorf("failed to sign RADIUS request: %v", err)
+	}
 
 	// Send request to RADIUS server
 	address := fmt.Sprintf("%s:%d", mfa.provider.Host, mfa.provider.Port)
@@ -118,6 +122,12 @@ func (mfa *RadiusMfa) authenticateWithRadius(username, password string) error {
 	response, err := radius.Exchange(ctx, packet, address)
 	if err != nil {
 		return fmt.Errorf("RADIUS authentication failed: %v", err)
+	}
+
+	if mfa.provider.RequireMessageAuthenticator {
+		if err = authenticator.VerifyResponse(response, packet); err != nil {
+			return fmt.Errorf("RADIUS authentication failed: %v", err)
+		}
 	}
 
 	if response.Code == radius.CodeAccessAccept {

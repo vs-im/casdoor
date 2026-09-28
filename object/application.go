@@ -123,6 +123,7 @@ type Application struct {
 	EnableAutoSignin             bool            `json:"enableAutoSignin"`
 	EnableCodeSignin             bool            `json:"enableCodeSignin"`
 	EnableExclusiveSignin        bool            `json:"enableExclusiveSignin"`
+	MaxSessions                  int             `json:"maxSessions"`
 	EnableSamlCompress           bool            `json:"enableSamlCompress"`
 	EnableSamlC14n10             bool            `json:"enableSamlC14n10"`
 	EnableSamlPostBinding        bool            `json:"enableSamlPostBinding"`
@@ -133,6 +134,7 @@ type Application struct {
 	EnableLinkWithEmail          bool            `json:"enableLinkWithEmail"`
 	OrgChoiceMode                string          `json:"orgChoiceMode"`
 	SamlReplyUrl                 string          `xorm:"varchar(500)" json:"samlReplyUrl"`
+	SamlSingleLogoutUrl          string          `xorm:"mediumtext" json:"samlSingleLogoutUrl"`
 	Providers                    []*ProviderItem `xorm:"mediumtext" json:"providers"`
 	SigninMethods                []*SigninMethod `xorm:"varchar(2000)" json:"signinMethods"`
 	SignupItems                  []*SignupItem   `xorm:"varchar(3000)" json:"signupItems"`
@@ -367,7 +369,7 @@ func GetApplicationByUserId(userId string) (application *Application, err error)
 		return nil, err
 	}
 	if IsAppUser(userId) {
-		application, err = getApplication("admin", name)
+		application, err = getAppUserApplication(name)
 		return
 	}
 
@@ -446,6 +448,8 @@ func UpdateApplication(id string, application *Application, isGlobalAdmin bool, 
 		KeepApplicationCustomHtml(application, oldApplication)
 	}
 
+	application.Owner = owner
+
 	// The fork renames the seeded application (fc6f319a); upstream guards
 	// "app-built-in" here for the same reason.
 	if name == "hasura" {
@@ -507,10 +511,8 @@ func UpdateApplication(id string, application *Application, isGlobalAdmin bool, 
 	return affected != 0, nil
 }
 
-func AddApplication(application *Application) (bool, error) {
-	if application.Owner == "" {
-		application.Owner = "admin"
-	}
+func AddApplication(application *Application, lang string) (bool, error) {
+	application.Owner = "admin"
 	if application.Organization == "" {
 		application.Organization = "built-in"
 	}
@@ -550,7 +552,7 @@ func AddApplication(application *Application) (bool, error) {
 		return false, fmt.Errorf("only applications belonging to built-in organization can be shared")
 	}
 
-	err = checkMultipleCaptchaProviders(application, "en")
+	err = checkMultipleCaptchaProviders(application, lang)
 	if err != nil {
 		return false, err
 	}
@@ -571,7 +573,7 @@ func AddApplication(application *Application) (bool, error) {
 		return false, err
 	}
 
-	err = validateCustomScopes(application.CustomScopes, "en")
+	err = validateCustomScopes(application.CustomScopes, lang)
 	if err != nil {
 		return false, err
 	}
