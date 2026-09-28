@@ -69,6 +69,11 @@ func (c *ApiController) checkStorageProvider(provider *object.Provider, owner st
 		return true
 	}
 
+	if isDirect && provider.Type == object.ProviderTypeLocalFileSystem {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return false
+	}
+
 	if provider.Category == "Storage" && (provider.Owner == owner || (!isDirect && provider.Owner == "admin")) {
 		return true
 	}
@@ -79,7 +84,8 @@ func (c *ApiController) checkStorageProvider(provider *object.Provider, owner st
 
 // checkUploadPath keeps a non-global admin's upload inside the paths the frontend uses for
 // the target user, so that it cannot overwrite the files of other users or organizations.
-func (c *ApiController) checkUploadPath(tag string, owner string, username string, fullFilePath string) bool {
+// A "Direct" upload writes to the bucket itself, which is limited to admins as in GetResources().
+func (c *ApiController) checkUploadPath(tag string, owner string, username string, fullFilePath string, isDirect bool) bool {
 	if c.IsGlobalAdmin() {
 		return true
 	}
@@ -87,6 +93,8 @@ func (c *ApiController) checkUploadPath(tag string, owner string, username strin
 	filePath := strings.TrimPrefix(fullFilePath, "/")
 	isAllowed := false
 	switch {
+	case isDirect:
+		isAllowed = c.IsAdmin()
 	case tag == "avatar" || strings.HasPrefix(tag, "idCard"):
 		// e.g., "avatar/built-in/admin.png"
 		dir, file := path.Split(filePath)
@@ -429,8 +437,9 @@ func (c *ApiController) UploadResource() {
 		c.ResponseError(err.Error())
 		return
 	}
-	_, fullFilePath = refineFullFilePath(fullFilePath)
-	if !c.checkStorageProvider(provider, owner, false) || !c.checkUploadPath(tag, owner, username, fullFilePath) {
+	directProviderName, fullFilePath := refineFullFilePath(fullFilePath)
+	isDirect := directProviderName != ""
+	if !c.checkStorageProvider(provider, owner, isDirect) || !c.checkUploadPath(tag, owner, username, fullFilePath, isDirect) {
 		return
 	}
 

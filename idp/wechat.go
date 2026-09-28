@@ -17,6 +17,7 @@ package idp
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -45,6 +46,18 @@ type WeChatIdProvider struct {
 type WechatCacheMapValue struct {
 	IsScanned     bool
 	WechatUnionId string
+	ProviderName  string
+}
+
+func IsWechatTicketOfProvider(code string, providerName string) bool {
+	if !strings.HasPrefix(code, "wechat_oa:") {
+		return true
+	}
+
+	Lock.RLock()
+	defer Lock.RUnlock()
+	mapValue, ok := WechatCacheMap[code[10:]]
+	return ok && mapValue.ProviderName == providerName
 }
 
 func NewWeChatIdProvider(clientId string, clientSecret string, redirectUrl string) *WeChatIdProvider {
@@ -338,5 +351,5 @@ func VerifyWechatSignature(token string, nonce string, timestamp string, signatu
 
 	b := sha1.Sum([]byte(tmpStr))
 	res := hex.EncodeToString(b[:])
-	return res == signature
+	return subtle.ConstantTimeCompare([]byte(res), []byte(signature)) == 1
 }

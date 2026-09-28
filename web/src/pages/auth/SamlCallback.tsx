@@ -110,7 +110,7 @@ export default function SamlCallback() {
     // Same second-factor / password-update handling the OAuth callback does.
     const checkMfa = (res: any, onDone: (res: any) => void) => {
       if (res.data === Setting.RequiredUpdatePassword) {
-        Setting.goToUpdatePassword();
+        Setting.goToUpdatePassword(applicationName || undefined);
       } else if (res.data === "RequiredMfa") {
         localStorage.setItem("mfaRedirectUrl", window.location.origin);
         Setting.goToLink(window.location.origin);
@@ -127,7 +127,7 @@ export default function SamlCallback() {
           values: {...body, providerBack: body.provider, provider: ""},
           // the same params antd hands MfaAuthVerifyForm, so the re-post keeps the OAuth context
           authParams: {clientId, responseType, redirectUri, state},
-          onSuccess: onDone,
+          onSuccess: (mfaRes: any) => checkMfa(mfaRes, onDone),
         });
       } else if (res.data === "SelectPlan") {
         const pricing = res.data2;

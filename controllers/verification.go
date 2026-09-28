@@ -440,7 +440,7 @@ func (c *ApiController) SendVerificationCode() {
 		if vform.Method == MagicLinkVerification {
 			sendResp = object.SendMagicLinkToEmail(organization, user, provider, clientIp, vform.Dest, c.Ctx.Request.Host, vform.SigninPath, application, c.newMagicLinkSessionHash(), c.GetAcceptLanguage())
 		} else {
-			sendResp = object.SendVerificationCodeToEmail(organization, user, provider, clientIp, vform.Dest, vform.Method, c.Ctx.Request.Host, application.Name, application)
+			sendResp = object.SendVerificationCodeToEmail(organization, user, provider, clientIp, vform.Dest, vform.Method, c.Ctx.Request.Host, application.Name, application, c.GetAcceptLanguage())
 		}
 	case object.VerifyTypePhone:
 		if vform.Method == SignupVerification {
@@ -506,7 +506,7 @@ func (c *ApiController) SendVerificationCode() {
 			c.ResponseError(fmt.Sprintf(c.T("verification:Phone number is invalid in your region %s"), vform.CountryCode))
 			return
 		} else {
-			sendResp = object.SendVerificationCodeToPhone(organization, user, provider, clientIp, phone, application)
+			sendResp = object.SendVerificationCodeToPhone(organization, user, provider, clientIp, phone, application, c.GetAcceptLanguage())
 		}
 	}
 
@@ -750,20 +750,18 @@ func (c *ApiController) VerifyCode() {
 		}
 	}
 
-	passed, err := c.checkOrgMasterVerificationCode(user, authForm.Code)
-	if err != nil {
-		c.ResponseError(c.T(err.Error()))
+	if !object.IsUserVerifyDest(user, checkDest, authForm.CountryCode) {
+		c.ResponseError(fmt.Sprintf(c.T("general:The user: %s doesn't exist"), util.GetId(authForm.Organization, authForm.Username)))
 		return
 	}
 
-	if !passed {
-		clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
-		err = object.CheckVerifyCodeWithLimitAndIp(user, clientIp, checkDest, authForm.Code, c.GetAcceptLanguage())
-		if err != nil {
-			c.ResponseError(err.Error())
-			return
-		}
+	isMasterCode, err := c.checkVerifyCodeOrOrgMasterCode(user, checkDest, authForm.Code)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
 
+	if !isMasterCode {
 		err = object.DisableVerificationCode(checkDest)
 		if err != nil {
 			c.ResponseError(err.Error())

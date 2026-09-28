@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/beego/beego/v2/core/logs"
+	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/controllers"
 	"github.com/casdoor/casdoor/object"
 
@@ -55,6 +56,19 @@ var organizationParamObject = []string{
 	"/api/get-webhook-events",
 }
 
+var ownerParamObject = []string{
+	"/api/get-dashboard",
+	"/api/get-dashboard-providers",
+	"/api/get-dashboard-mfa",
+	"/api/get-dashboard-heatmap",
+	"/api/get-user-count",
+}
+
+var sessionPkIdObject = []string{
+	"/api/get-session",
+	"/api/is-session-duplicated",
+}
+
 // sessionObject lists the APIs whose controllers ignore the request parameters and
 // act on the signed-in user's organization (false) or on the user themselves (true),
 // which makes that the object to authorize against.
@@ -79,6 +93,15 @@ func getSessionObject(ctx *context.Context, withName bool) (string, string, erro
 		name = ""
 	}
 	return owner, name, nil
+}
+
+func getSessionPkIdObject(ctx *context.Context) (string, string, error) {
+	sessionPkId := ctx.Input.Query("sessionPkId")
+	tokens := strings.Split(sessionPkId, "/")
+	if len(tokens) != 3 || tokens[0] == "" || tokens[1] == "" {
+		return "", "", fmt.Errorf("invalid sessionPkId: %s", sessionPkId)
+	}
+	return tokens[0], tokens[1], nil
 }
 
 type Object struct {
@@ -148,9 +171,29 @@ func getUsername(ctx *context.Context) (username string) {
 	return
 }
 
+const requestCredentialUserKey = "requestCredentialUser"
+
+func isCrossOriginCookieRequest(ctx *context.Context) bool {
+	method := ctx.Request.Method
+	if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
+		return false
+	}
+	if strings.HasPrefix(ctx.Request.URL.Path, "/api/saml/logout/") {
+		return false
+	}
+
+	origin := ctx.Request.Header.Get("Origin")
+	if origin == "" || util.IsCredentialedOrigin(origin, conf.GetConfigString("origin"), ctx.Request.Host) {
+		return false
+	}
+
+	requestCredentialUser, _ := ctx.Input.GetData(requestCredentialUserKey).(string)
+	return requestCredentialUser == ""
+}
+
 func getSubject(ctx *context.Context) (string, string) {
 	username := getUsername(ctx)
-	if username == "" {
+	if username == "" || isCrossOriginCookieRequest(ctx) {
 		return "anonymous", "anonymous"
 	}
 
@@ -175,6 +218,14 @@ func getObject(ctx *context.Context) (string, string, error) {
 	}
 
 	if method == http.MethodGet {
+		if util.InSlice(sessionPkIdObject, path) {
+			return getSessionPkIdObject(ctx)
+		}
+
+		if util.InSlice(ownerParamObject, path) {
+			return ctx.Input.Query("owner"), "", nil
+		}
+
 		if ctx.Request.URL.Path == "/api/get-policies" {
 			// GetPolicies() works on the adapter as soon as "adapterId" is given and
 			// falls back to the enforcer of "id", so authorize the same way.
@@ -255,6 +306,10 @@ func getObject(ctx *context.Context) (string, string, error) {
 		if id := ctx.Input.Query("id"); id != "" && (!isOwnerObjPath || strings.HasSuffix(path, "update-organization")) {
 			owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
 			if err == nil {
+				// an organization row is owned by "admin", authorize it by its own name
+				if strings.HasSuffix(path, "-organization") {
+					return name, name, nil
+				}
 				return owner, name, nil
 			}
 		}
@@ -343,11 +398,25 @@ func getObjects(ctx *context.Context) ([]Object, error) {
 	}
 
 	bodyOwner, bodyName := getObjectFromBody(ctx, path)
-	if bodyOwner != "" && (bodyOwner != owner || bodyName != name) {
-		objects = append(objects, Object{Owner: bodyOwner, Name: bodyName})
-	}
+	objects = appendObject(objects, bodyOwner, bodyName)
+
+	formOwner, formName := ownerNameFromForm(ctx)
+	objects = appendObject(objects, formOwner, formName)
 
 	return objects, nil
+}
+
+func appendObject(objects []Object, owner string, name string) []Object {
+	if owner == "" {
+		return objects
+	}
+
+	for _, obj := range objects {
+		if obj.Owner == owner && obj.Name == name {
+			return objects
+		}
+	}
+	return append(objects, Object{Owner: owner, Name: name})
 }
 
 func willLog(subOwner string, subName string, method string, urlPath string, objOwner string, objName string) bool {
@@ -382,6 +451,10 @@ func getUrlPath(ctx *context.Context) string {
 
 	if strings.HasPrefix(urlPath, "/api/saml/redirect") {
 		return "/api/saml/redirect"
+	}
+
+	if strings.HasPrefix(urlPath, "/api/saml/logout") {
+		return "/api/saml/logout"
 	}
 
 	return urlPath
@@ -460,6 +533,9 @@ func ApiFilter(ctx *context.Context) {
 
 	method := ctx.Request.Method
 	urlPath := getUrlPath(ctx)
+	if !checkDynamicClientSession(ctx, urlPath) {
+		return
+	}
 	extraInfo := getExtraInfo(ctx, urlPath)
 
 	objects := []Object{{}}
@@ -521,14 +597,78 @@ func ApiFilter(ctx *context.Context) {
 			return
 		}
 
-		record.Organization = subOwner
-		record.User = subName // auth:Unauthorized operation
+		// "anonymous" is the sentinel subject of an unauthenticated request, not a real user
+		if subOwner == "anonymous" {
+			record.User = subName
+			record.Organization = getOrganizationFromRequest(ctx)
+		} else {
+			err = record.SetUser(util.GetId(subOwner, subName))
+			if err != nil {
+				return
+			}
+		}
 		record.Response = fmt.Sprintf("{status:\"error\", msg:\"%s\"}", T(ctx, "auth:Unauthorized operation"))
 
 		util.SafeGoroutine(func() {
 			object.AddRecord(record)
 		})
 	}
+}
+
+// dynamicClientApis are the only APIs a session signed in with the access token of a dynamically
+// registered client may call: anyone can register such a client and get users to authorize it
+var dynamicClientApis = []string{
+	"/api/userinfo",
+	"/api/user",
+	"/api/mcp",
+	"/api/login/oauth",
+}
+
+// crossOrgClientApis are the only APIs a session signed in with the access token of another
+// organization's application may call: its admin gets the token of any global admin signing in to it
+var crossOrgClientApis = []string{
+	"/api/userinfo",
+	"/api/user",
+	"/api/login/oauth",
+}
+
+// checkDynamicClientSession keys on the "aud" that AutoSigninFilter stores in the session, so the
+// session cookie returned with a token-authenticated response is limited the same as the token
+func checkDynamicClientSession(ctx *context.Context, urlPath string) bool {
+	aud, ok := ctx.Input.Session("aud").(string)
+	if !ok || aud == "" {
+		return true
+	}
+
+	application, err := object.GetApplicationByClientId(aud)
+	if err != nil {
+		responseError(ctx, err.Error())
+		return false
+	}
+	if application == nil || isClientSessionApiAllowed(application, getSessionUser(ctx), urlPath) {
+		return true
+	}
+
+	denyRequest(ctx)
+	return false
+}
+
+func isClientSessionApiAllowed(application *object.Application, userId string, urlPath string) bool {
+	if isCrossOrgClient(application, userId) {
+		return util.InSlice(crossOrgClientApis, urlPath)
+	}
+	if application.IsDynamicClient() {
+		return util.InSlice(dynamicClientApis, urlPath) || strings.HasPrefix(urlPath, "/api/server/")
+	}
+	return true
+}
+
+func isCrossOrgClient(application *object.Application, userId string) bool {
+	if application.Organization == "built-in" || userId == "" || object.IsAppUser(userId) {
+		return false
+	}
+	owner, _ := util.GetOwnerAndNameFromIdNoCheck(userId)
+	return owner != application.Organization
 }
 
 func writePermissionLog(objOwner, subOwner, subName, method, urlPath string, allowed bool) {

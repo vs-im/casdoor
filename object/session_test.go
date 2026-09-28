@@ -71,7 +71,7 @@ func addPasswordGrantFixtures(t *testing.T) (*Application, *User) {
 		RefreshExpireInHours: 720,
 		GrantTypes:           []string{"password", "refresh_token"},
 	}
-	if _, err = AddApplication(application); err != nil {
+	if _, err = AddApplication(application, "en"); err != nil {
 		t.Fatal(err)
 	}
 	user := &User{
@@ -97,7 +97,7 @@ func TestPasswordGrantCreatesSessionAndSidClaim(t *testing.T) {
 	application, user := addPasswordGrantFixtures(t)
 	const beegoSessionId = "beego-sid-cas6"
 
-	token, tokenError, err := GetPasswordToken(application, user.Name, "correct horse", "", "localhost", &SessionInfo{
+	token, tokenError, err := GetPasswordToken(application, user.Name, "correct horse", "", "localhost", "127.0.0.1", "en", &SessionInfo{
 		SessionId: beegoSessionId,
 		Ip:        "203.0.113.7",
 		UserAgent: "Mozilla/5.0 (cas6-test)",
@@ -215,7 +215,7 @@ func TestPasswordGrantWithoutSessionKeepsOldBehaviour(t *testing.T) {
 	initPasswordGrantTestDb(t)
 	application, user := addPasswordGrantFixtures(t)
 
-	token, tokenError, err := GetPasswordToken(application, user.Name, "correct horse", "", "localhost", nil)
+	token, tokenError, err := GetPasswordToken(application, user.Name, "correct horse", "", "localhost", "127.0.0.1", "en", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

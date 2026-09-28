@@ -144,6 +144,10 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 		}
 	}
 
+	if msg := checkSignupTag(application, authForm.Tag, lang); msg != "" {
+		return msg
+	}
+
 	for _, signupItem := range application.SignupItems {
 		if signupItem.Regex == "" {
 			continue
@@ -165,6 +169,22 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 		}
 	}
 
+	return ""
+}
+
+func checkSignupTag(application *Application, tag string, lang string) string {
+	signupItem := application.getSignupItem("Tag")
+	if tag == "" || signupItem == nil {
+		return ""
+	}
+
+	options := signupItem.Options
+	if len(options) == 0 {
+		options = application.Tags
+	}
+	if !util.InSlice(options, tag) {
+		return fmt.Sprintf(i18n.Translate(lang, "auth:User's tag: %s is not listed in the application's tags"), tag)
+	}
 	return ""
 }
 
@@ -482,6 +502,10 @@ func CheckUserPermission(requestUserId, userId string, strict bool, lang string)
 }
 
 func CheckApiPermission(userId string, organization string, path string, method string) (bool, error) {
+	if organization == "" {
+		return false, nil
+	}
+
 	permissions, err := GetPermissions(organization)
 	if err != nil {
 		return false, err
@@ -601,6 +625,79 @@ func CheckApiPermission(userId string, organization string, path string, method 
 		return false, nil
 	}
 	return false, nil
+}
+
+func IsUserOfApplication(user *User, application *Application) (bool, error) {
+	if user.IsGlobalAdmin() || user.Owner == application.Organization || application.IsShared {
+		return true, nil
+	}
+
+	organization, err := getOrganization("admin", user.Owner)
+	if err != nil {
+		return false, err
+	}
+	return organization != nil && organization.DefaultApplication == application.Name && application.Organization == "built-in", nil
+}
+
+func CheckApplicationSignin(application *Application, user *User, clientIp string, lang string) error {
+	if user.IsForbidden {
+		return errors.New(i18n.Translate(lang, "check:The user is forbidden to sign in, please contact the administrator"))
+	}
+
+	if user.IsDeleted {
+		return errors.New(i18n.Translate(lang, "check:The user has been deleted and cannot be used to sign in, please contact the administrator"))
+	}
+
+	err := CheckEntryIp(clientIp, user, application, application.OrganizationObj, lang)
+	if err != nil {
+		return err
+	}
+
+	if application.DisableSignin {
+		return fmt.Errorf(i18n.Translate(lang, "auth:The application: %s has disabled users to signin"), application.Name)
+	}
+
+	if application.OrganizationObj != nil && application.OrganizationObj.DisableSignin {
+		return fmt.Errorf(i18n.Translate(lang, "auth:The organization: %s has disabled users to signin"), application.Organization)
+	}
+
+	err = checkUserOrganizationSignin(application, user, clientIp, lang)
+	if err != nil {
+		return err
+	}
+
+	allowed, err := CheckLoginPermission(user.GetId(), application)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return errors.New(i18n.Translate(lang, "auth:Unauthorized operation"))
+	}
+
+	if !user.IsGlobalAdmin() && !user.IsAdmin && len(application.Tags) > 0 && !util.HasTagInSlice(application.Tags, user.Tag) {
+		return fmt.Errorf(i18n.Translate(lang, "auth:User's tag: %s is not listed in the application's tags"), user.Tag)
+	}
+
+	return nil
+}
+
+func checkUserOrganizationSignin(application *Application, user *User, clientIp string, lang string) error {
+	if application.OrganizationObj != nil && application.OrganizationObj.Name == user.Owner {
+		return nil
+	}
+
+	organization, err := GetOrganizationByUser(user)
+	if err != nil {
+		return err
+	}
+	if organization == nil {
+		return nil
+	}
+
+	if organization.DisableSignin {
+		return fmt.Errorf(i18n.Translate(lang, "auth:The organization: %s has disabled users to signin"), organization.Name)
+	}
+	return CheckEntryIp(clientIp, nil, nil, organization, lang)
 }
 
 func CheckLoginPermission(userId string, application *Application) (bool, error) {
@@ -832,8 +929,36 @@ func CheckUpdateUser(oldUser, user *User, lang string) string {
 			return err.Error()
 		}
 	}
+	if msg := checkUserGroups(oldUser, user, lang); msg != "" {
+		return msg
+	}
 
 	return ""
+}
+
+// checkUserGroups keeps a user out of the groups of other organizations: a group grants the
+// roles and permissions of the organization owning it
+func checkUserGroups(oldUser, user *User, lang string) string {
+	for _, group := range user.Groups {
+		if !util.InSlice(oldUser.Groups, group) && !strings.HasPrefix(group, user.Owner+"/") {
+			return i18n.Translate(lang, "auth:Unauthorized operation")
+		}
+	}
+	return ""
+}
+
+func getOrganizationGroups(owner string, groups []string) []string {
+	if len(groups) == 0 {
+		return groups
+	}
+
+	res := []string{}
+	for _, group := range groups {
+		if strings.HasPrefix(group, owner+"/") {
+			res = append(res, group)
+		}
+	}
+	return res
 }
 
 func CheckToEnableCaptcha(application *Application, organization, username string, clientIp string) (bool, error) {

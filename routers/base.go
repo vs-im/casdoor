@@ -68,8 +68,7 @@ func responseError(ctx *context.Context, error string, data ...interface{}) {
 }
 
 func getAcceptLanguage(ctx *context.Context) string {
-	language := ctx.Request.Header.Get("Accept-Language")
-	return conf.GetLanguage(language)
+	return conf.GetAcceptLanguage(ctx.Request.Header.Get("Accept-Language"))
 }
 
 func T(ctx *context.Context, error string) string {
@@ -151,12 +150,7 @@ func getUsernameByClientIdSecret(ctx *context.Context) (string, error) {
 		return "", fmt.Errorf("Incorrect client secret for application: %s", application.Name)
 	}
 
-	for _, tag := range application.Tags {
-		if tag == "dcr" {
-			return fmt.Sprintf("app-dcr/%s", application.Name), nil
-		}
-	}
-	return fmt.Sprintf("app/%s", application.Name), nil
+	return object.GetAppUserId(application), nil
 }
 
 func getUsernameByAccessKey(ctx *context.Context) (string, error) {
@@ -194,6 +188,13 @@ func getUsernameByAccessKey(ctx *context.Context) (string, error) {
 	}
 
 	if key.User != "" {
+		isUserActive, err := key.IsUserActive()
+		if err != nil {
+			return "", err
+		}
+		if !isUserActive {
+			return "", fmt.Errorf("The user of access key: %s is forbidden or deleted", key.Name)
+		}
 		return util.GetId(key.Organization, key.User), nil
 	}
 
@@ -214,6 +215,8 @@ func getSessionUser(ctx *context.Context) string {
 }
 
 func setSessionUser(ctx *context.Context, user string) {
+	ctx.Input.SetData(requestCredentialUserKey, user)
+
 	err := ctx.Input.CruSession.Set(stdcontext.Background(), "username", user)
 	if err != nil {
 		panic(err)

@@ -33,9 +33,9 @@ type MfaProps struct {
 
 type MfaInterface interface {
 	Initiate(userId string, issuer string) (*MfaProps, error)
-	SetupVerify(passcode string) error
+	SetupVerify(passcode string, lang string) error
 	Enable(user *User) error
-	Verify(passcode string) error
+	Verify(passcode string, lang string) error
 }
 
 const (
@@ -66,6 +66,28 @@ func GetMfaUtil(mfaType string, config *MfaProps) MfaInterface {
 		return NewPushMfaUtil(config)
 	}
 
+	return nil
+}
+
+// mfaErrorKey counts the failed MFA passcodes and recovery codes of a user apart from the
+// password failures, which a correct password resets before every new MFA attempt
+const mfaErrorKey = "mfa"
+
+func VerifyMfaWithLimit(user *User, verify func() error, lang string) error {
+	err := checkVerifyCodeErrorTimes(user, mfaErrorKey, lang)
+	if err != nil {
+		return err
+	}
+
+	err = verify()
+	if err != nil {
+		if limitErr := recordVerifyCodeErrorInfo(user, mfaErrorKey, lang); limitErr != nil {
+			return fmt.Errorf("%s, %s", err.Error(), limitErr.Error())
+		}
+		return err
+	}
+
+	resetVerifyCodeErrorTimes(user, mfaErrorKey)
 	return nil
 }
 

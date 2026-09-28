@@ -55,7 +55,7 @@ func newMagicLinkTestApplication() *Application {
 func addMagicLinkTestLink(t *testing.T, application *Application, email string, expireAt time.Time) (string, *MagicLink) {
 	t.Helper()
 
-	token, link, err := NewApiMagicLink(application, nil, email, "10.0.0.1", "", map[string]string{}, expireAt)
+	token, link, err := NewApiMagicLink(application, nil, email, "192.0.2.1", "", map[string]string{}, expireAt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestMagicLinkConsumeBinding(t *testing.T) {
 		t.Fatalf("unexpected error for an unbound link: %v", err)
 	}
 
-	token, link, err := NewApiMagicLink(application, nil, "b@example.com", "10.0.0.2", "", map[string]string{}, time.Time{})
+	token, link, err := NewApiMagicLink(application, nil, "b@example.com", "192.0.2.2", "", map[string]string{}, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,38 +231,38 @@ func TestMagicLinkRateLimit(t *testing.T) {
 	application.MagicLinkRateLimitIP = 3
 	application.MagicLinkRateLimitWindowMinutes = 5
 
-	if err := IsMagicLinkAllowSend("a@example.com", "10.0.0.1", application); err != nil {
+	if err := IsMagicLinkAllowSend("a@example.com", "192.0.2.1", application); err != nil {
 		t.Fatalf("unexpected limit on an empty table: %v", err)
 	}
 	addMagicLinkTestLink(t, application, "a@example.com", time.Time{})
 	addMagicLinkTestLink(t, application, "a@example.com", time.Time{})
 
-	err := IsMagicLinkAllowSend("a@example.com", "10.0.0.9", application)
+	err := IsMagicLinkAllowSend("a@example.com", "192.0.2.9", application)
 	if err == nil || !strings.Contains(err.Error(), "too many magic links requested for this email") {
 		t.Fatalf("expected the email limit, got: %v", err)
 	}
-	if err = IsMagicLinkAllowSend("b@example.com", "10.0.0.1", application); err != nil {
+	if err = IsMagicLinkAllowSend("b@example.com", "192.0.2.1", application); err != nil {
 		t.Fatalf("two links from the IP are within its limit: %v", err)
 	}
 	addMagicLinkTestLink(t, application, "b@example.com", time.Time{})
-	err = IsMagicLinkAllowSend("c@example.com", "10.0.0.1", application)
+	err = IsMagicLinkAllowSend("c@example.com", "192.0.2.1", application)
 	if err == nil || !strings.Contains(err.Error(), "too many magic links requested from this IP") {
 		t.Fatalf("expected the IP limit, got: %v", err)
 	}
 
 	// a request that was turned down counts as well, a link outside the window does not
-	failed := NewMagicLink(application, nil, "d@example.com", "10.0.0.4", "", "", map[string]string{}, time.Time{})
+	failed := NewMagicLink(application, nil, "d@example.com", "192.0.2.4", "", "", map[string]string{}, time.Time{})
 	if err = AddFailedMagicLink(failed, "no such user"); err != nil {
 		t.Fatal(err)
 	}
-	required, err := IsMagicLinkCaptchaRequired("d@example.com", "10.0.0.5", application)
+	required, err := IsMagicLinkCaptchaRequired("d@example.com", "192.0.2.5", application)
 	if err != nil || !required {
 		t.Fatalf("captcha required = %v, %v", required, err)
 	}
 	if _, err = ormer.Engine.Where("email = ?", "a@example.com").Cols("time").Update(&MagicLink{Time: time.Now().Add(-6 * time.Minute).Unix()}); err != nil {
 		t.Fatal(err)
 	}
-	if err = IsMagicLinkAllowSend("a@example.com", "10.0.0.9", application); err != nil {
+	if err = IsMagicLinkAllowSend("a@example.com", "192.0.2.9", application); err != nil {
 		t.Fatalf("links outside the window should not count: %v", err)
 	}
 

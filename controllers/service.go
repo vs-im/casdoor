@@ -46,21 +46,30 @@ type NotificationForm struct {
 	Recipient string `json:"recipient"`
 }
 
-// checkServiceProvider checks that a non-global admin only sends with a provider of the category
-// that their organization can use: its own one, or a global one unless isOwnOnly. The authz filter
-// authorizes the "owner" of the request, while the provider is picked by its name.
+// checkServiceProvider checks that a non-global admin is an org admin sending with a provider of the
+// category that their organization can use: its own one, or a global one unless isOwnOnly. The authz
+// filter authorizes the "owner" of the request, while the provider is picked by its name.
 func (c *ApiController) checkServiceProvider(provider *object.Provider, category string, isOwnOnly bool) bool {
 	isGlobalAdmin, user := c.isGlobalAdmin()
 	if isGlobalAdmin {
 		return true
 	}
 
-	if user != nil && provider.Category == category && (provider.Owner == user.Owner || (!isOwnOnly && provider.Owner == "admin")) {
+	if user != nil && user.IsAdmin && provider.Category == category && (provider.Owner == user.Owner || (!isOwnOnly && provider.Owner == "admin")) {
 		return true
 	}
 
 	c.ResponseError(c.T("auth:Unauthorized operation"))
 	return false
+}
+
+// pinProviderObjectOwner makes a provider posted by a non-global admin one of their own organization,
+// so that its hosts are checked like the saved providers of that organization
+func (c *ApiController) pinProviderObjectOwner(providerObject *object.Provider) {
+	isGlobalAdmin, user := c.isGlobalAdmin()
+	if !isGlobalAdmin && user != nil {
+		providerObject.Owner = user.Owner
+	}
 }
 
 // SendEmail
@@ -119,13 +128,17 @@ func (c *ApiController) SendEmail() {
 	}
 
 	if emailForm.ProviderObject.Name != "" {
-		if emailForm.ProviderObject.ClientSecret == "***" {
+		if emailForm.ProviderObject.ClientSecret == "***" || object.IsHttpHeadersMasked(emailForm.ProviderObject.HttpHeaders) {
 			// the real secret is sent to the host of providerObject, so only for the provider's own organization
 			if !c.checkServiceProvider(provider, "Email", true) {
 				return
 			}
-			emailForm.ProviderObject.ClientSecret = provider.ClientSecret
+			if emailForm.ProviderObject.ClientSecret == "***" {
+				emailForm.ProviderObject.ClientSecret = provider.ClientSecret
+			}
+			emailForm.ProviderObject.HttpHeaders = object.RestoreMaskedHttpHeaders(emailForm.ProviderObject.HttpHeaders, provider.HttpHeaders)
 		}
+		c.pinProviderObjectOwner(&emailForm.ProviderObject)
 		provider = &emailForm.ProviderObject
 	}
 

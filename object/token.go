@@ -35,8 +35,10 @@ type Token struct {
 	Code             string `xorm:"varchar(100) index" json:"code"`
 	AccessToken      string `xorm:"mediumtext" json:"accessToken"`
 	RefreshToken     string `xorm:"mediumtext" json:"refreshToken"`
+	IdToken          string `xorm:"mediumtext" json:"idToken"`
 	AccessTokenHash  string `xorm:"varchar(100) index" json:"accessTokenHash"`
 	RefreshTokenHash string `xorm:"varchar(100) index" json:"refreshTokenHash"`
+	IdTokenHash      string `xorm:"varchar(100) index" json:"idTokenHash"`
 	ExpiresIn        int    `json:"expiresIn"`
 	Scope            string `xorm:"varchar(300)" json:"scope"`
 	TokenType        string `xorm:"varchar(100)" json:"tokenType"`
@@ -145,6 +147,19 @@ func GetTokenByRefreshToken(refreshToken string) (*Token, error) {
 	return &token, nil
 }
 
+func GetTokenByIdToken(idToken string) (*Token, error) {
+	token := Token{IdTokenHash: getTokenHash(idToken)}
+	existed, err := ormer.Engine.Get(&token)
+	if err != nil {
+		return nil, err
+	}
+
+	if !existed {
+		return nil, nil
+	}
+	return &token, nil
+}
+
 func GetTokenByTokenValue(tokenValue, tokenTypeHint string) (*Token, error) {
 	switch tokenTypeHint {
 	case "access_token", "access-token":
@@ -169,7 +184,16 @@ func GetTokenByTokenValue(tokenValue, tokenTypeHint string) (*Token, error) {
 }
 
 func updateUsedByCode(token *Token) (bool, error) {
-	affected, err := ormer.Engine.Where("code=?", token.Code).Cols("code_is_used").Update(token)
+	affected, err := ormer.Engine.Where("code=?", token.Code).Cols("code_is_used", "grant_type").Update(token)
+	if err != nil {
+		return false, err
+	}
+
+	return affected != 0, nil
+}
+
+func claimAuthorizationCode(code string) (bool, error) {
+	affected, err := ormer.Engine.Where("code = ? and code_is_used = ?", code, false).Cols("code_is_used").Update(&Token{CodeIsUsed: true})
 	if err != nil {
 		return false, err
 	}
@@ -204,6 +228,9 @@ func (token *Token) popularHashes() {
 	}
 	if token.RefreshTokenHash == "" && token.RefreshToken != "" {
 		token.RefreshTokenHash = getTokenHash(token.RefreshToken)
+	}
+	if token.IdTokenHash == "" && token.IdToken != "" {
+		token.IdTokenHash = getTokenHash(token.IdToken)
 	}
 }
 
@@ -279,6 +306,19 @@ func ExpireTokensBySessionIds(owner string, username string, sessionIds []string
 	}
 
 	affected, err := ormer.Engine.In("session_id", ids).Where(fmt.Sprintf("organization = ? and %s = ? and expires_in > 0", quoteColumn("user")), owner, username).Cols("expires_in").Update(&Token{ExpiresIn: 0})
+	if err != nil {
+		return false, err
+	}
+
+	return affected != 0, nil
+}
+
+func ExpireTokensByApplicationAndSessionIds(owner string, username string, application string, sessionIds []string) (bool, error) {
+	if len(sessionIds) == 0 {
+		return false, nil
+	}
+
+	affected, err := ormer.Engine.In("session_id", sessionIds).Where(fmt.Sprintf("organization = ? and %s = ? and application = ? and expires_in > 0", quoteColumn("user")), owner, username, application).Cols("expires_in").Update(&Token{ExpiresIn: 0})
 	if err != nil {
 		return false, err
 	}

@@ -61,7 +61,7 @@ const defaultSmsMapping: Record<string, string> = {
 
 const CATEGORIES = [
   "Captcha", "Email", "Face ID", "ID Verification", "Log", "MFA", "Notification",
-  "OAuth", "Payment", "SAML", "Scan", "SMS", "Storage", "Web3",
+  "OAuth", "Payment", "SAML", "Scan", "SMS", "Storage",
 ].sort((a, b) => a.localeCompare(b));
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE"];
@@ -73,19 +73,6 @@ const SMS_PROVIDERS_WITHOUT_TEMPLATE_CODE = ["Infobip SMS"];
 const SCAN_HOST_OPTIONS = ["127.0.0.1/32", "10.0.0.0/24", "172.16.0.0/24", "192.168.1.0/24"];
 const SCAN_PORT_OPTIONS = ["80", "3000", "8080"];
 const SCAN_PATH_OPTIONS = ["/", "/mcp", "/sse", "/mcp/sse"];
-
-/** the keys of web3Wallets in web/src/auth/Web3Auth.js — the values the backend stores in `metadata` */
-const WEB3_ONBOARD_WALLETS = [
-  {value: "injected", label: "Injected"},
-  {value: "phantom", label: "Phantom"},
-  {value: "coinbase", label: "Coinbase"},
-  {value: "trust", label: "Trust"},
-  {value: "gnosis", label: "Gnosis"},
-  {value: "sequence", label: "Sequence"},
-  {value: "taho", label: "Taho"},
-  {value: "frontier", label: "Frontier"},
-  {value: "infinityWallet", label: "Infinity Wallet"},
-];
 
 function isDefaultProviderName(name: string) {
   return /^provider_[a-z0-9]+$/.test(name ?? "");
@@ -322,7 +309,6 @@ function hasClientIdRow(provider: any) {
 
 function hasCredentialRows(provider: any) {
   if ((provider.category === "Captcha" && provider.type === "Default") ||
-      provider.category === "Web3" ||
       provider.category === "MFA" ||
       provider.category === "Log" ||
       provider.category === "Scan" ||
@@ -705,8 +691,6 @@ export default function ProviderEditPage() {
       defaultType = "PayPal";
     } else if (value === "Captcha") {
       defaultType = "Default";
-    } else if (value === "Web3") {
-      defaultType = "MetaMask";
     } else if (value === "Notification") {
       defaultType = "Telegram";
     } else if (value === "Face ID") {
@@ -715,6 +699,7 @@ export default function ProviderEditPage() {
       defaultType = "RADIUS";
       patch.host = "";
       patch.port = 1812;
+      patch.requireMessageAuthenticator = true;
     } else if (value === "ID Verification") {
       defaultType = "Jumio";
       patch.endpoint = "";
@@ -1048,11 +1033,11 @@ export default function ProviderEditPage() {
               value={provider.content ?? ""}
               onChange={(v) => updateProviderField("content", v)}
             />
-            <div
-              className="overflow-auto rounded-md border bg-background p-3"
-              dangerouslySetInnerHTML={{
-                __html: String(provider.content ?? "").replace("%s", "123456").replace("%{user.friendlyName}", account ? Setting.getFriendlyUserName(account) : ""),
-              }}
+            <iframe
+              title="email-content-preview"
+              sandbox=""
+              className="h-[300px] w-full rounded-md border bg-background"
+              srcDoc={String(provider.content ?? "").replace("%s", "123456").replace("%{user.friendlyName}", account ? Setting.getFriendlyUserName(account) : "")}
             />
           </div>
         </div>
@@ -1082,9 +1067,11 @@ export default function ProviderEditPage() {
               value={provider.metadata ?? ""}
               onChange={(v) => updateProviderField("metadata", v)}
             />
-            <div
-              className="overflow-auto rounded-md border bg-background p-3"
-              dangerouslySetInnerHTML={{__html: String(provider.metadata ?? "").replace("%code", "123456").replace("%s", "123456")}}
+            <iframe
+              title="invitation-email-content-preview"
+              sandbox=""
+              className="h-[300px] w-full rounded-md border bg-background"
+              srcDoc={String(provider.metadata ?? "").replace("%code", "123456").replace("%s", "123456")}
             />
           </div>
         </div>
@@ -1295,6 +1282,9 @@ export default function ProviderEditPage() {
       <FormRow label={i18next.t("provider:Client secret")} tooltip={i18next.t("provider:RADIUS Shared Secret - Tooltip")}>
         <Input value={provider.clientSecret ?? ""} placeholder="Shared secret" onChange={(e) => updateProviderField("clientSecret", e.target.value)} />
       </FormRow>
+      <FormRow label={i18next.t("provider:Require Message-Authenticator")} tooltip={i18next.t("provider:Require Message-Authenticator - Tooltip")}>
+        <Switch checked={!!provider.requireMessageAuthenticator} onCheckedChange={(v) => updateProviderField("requireMessageAuthenticator", v)} />
+      </FormRow>
     </React.Fragment>
   );
 
@@ -1322,10 +1312,13 @@ export default function ProviderEditPage() {
               <SearchableSelect
                 value={provider.providerUrl ?? ""}
                 onChange={(v) => updateProviderField("providerUrl", v)}
-                options={storageProviders.map((item: any) => ({
-                  value: item.name,
-                  label: item.displayName || item.name,
-                }))}
+                options={[
+                  {value: "", label: i18next.t("general:None")},
+                  ...storageProviders.map((item: any) => ({
+                    value: item.name,
+                    label: item.displayName || item.name,
+                  })),
+                ]}
               />
             </FormRow>
           </React.Fragment>
@@ -1572,32 +1565,6 @@ export default function ProviderEditPage() {
     </React.Fragment>
   );
 
-  const getWalletValue = () => {
-    try {
-      const parsed = JSON.parse(provider.metadata);
-      return Array.isArray(parsed) ? parsed : ["injected"];
-    } catch {
-      return ["injected"];
-    }
-  };
-
-  const renderWeb3Fields = () => (
-    <React.Fragment>
-      <FormRow labelKey="provider:Enable proxy">
-        <Switch checked={!!provider.enableProxy} onCheckedChange={(v) => updateProviderField("enableProxy", v)} />
-      </FormRow>
-      {provider.type === "Web3Onboard" ? (
-        <FormRow labelKey="provider:Wallets">
-          <MultiSelect
-            value={getWalletValue()}
-            onChange={(options) => updateProviderField("metadata", JSON.stringify(options))}
-            options={WEB3_ONBOARD_WALLETS}
-          />
-        </FormRow>
-      ) : null}
-    </React.Fragment>
-  );
-
   const renderStorageFields = () => (
     <React.Fragment>
       {!["Local File System", "MinIO", "Tencent Cloud COS", "Google Cloud Storage", "Qiniu Cloud Kodo", "Synology", "Casdoor"].includes(provider.type) ? (
@@ -1816,7 +1783,6 @@ export default function ProviderEditPage() {
       {provider.category === "Scan" ? renderScanFields() : null}
       {provider.category === "SAML" ? renderSamlFields() : null}
       {provider.category === "Payment" ? renderPaymentFields() : null}
-      {provider.category === "Web3" ? renderWeb3Fields() : null}
       {provider.category === "Storage" ? renderStorageFields() : null}
       {provider.category === "Face ID" ? renderEndpointOnlyField() : null}
       {provider.category === "ID Verification" ? renderEndpointOnlyField() : null}

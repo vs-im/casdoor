@@ -17,6 +17,7 @@ package object
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"regexp"
 	"strings"
@@ -216,6 +217,22 @@ func extendApplicationWithSignupItems(application *Application) (err error) {
 	return
 }
 
+func isApplicationAdmin(user *User, application *Application) (bool, error) {
+	if user.IsGlobalAdmin() {
+		return true, nil
+	}
+	if !user.IsAdmin || user.Owner != application.Organization {
+		return false, nil
+	}
+
+	storedApplication := &Application{Owner: application.Owner, Name: application.Name}
+	existed, err := ormer.Engine.Cols("organization").Get(storedApplication)
+	if err != nil {
+		return false, err
+	}
+	return existed && storedApplication.Organization == user.Owner, nil
+}
+
 func GetMaskedApplication(application *Application, userId string) *Application {
 	if application == nil {
 		return nil
@@ -247,7 +264,11 @@ func GetMaskedApplication(application *Application, userId string) *Application 
 			panic(err)
 		}
 		if user != nil {
-			if user.IsApplicationAdmin(application) {
+			isAdmin, err := isApplicationAdmin(user, application)
+			if err != nil {
+				panic(err)
+			}
+			if isAdmin {
 				return application
 			}
 
@@ -273,6 +294,7 @@ func GetMaskedApplication(application *Application, userId string) *Application 
 	application.EnableWebAuthn = false
 	application.EnableLinkWithEmail = false
 	application.SamlReplyUrl = "***"
+	application.SamlSingleLogoutUrl = "***"
 
 	providerItems := []*ProviderItem{}
 	for _, providerItem := range application.Providers {
@@ -281,7 +303,7 @@ func GetMaskedApplication(application *Application, userId string) *Application 
 		}
 
 		category := providerItem.Provider.Category
-		if category == "OAuth" || category == "Web3" || category == "Captcha" || category == "SAML" || category == "Face ID" {
+		if category == "OAuth" || category == "Captcha" || category == "SAML" || category == "Face ID" {
 			providerItems = append(providerItems, providerItem)
 		} else if category == "Email" || category == "SMS" {
 			// The login pages need to know whether an Email or SMS provider is available,
@@ -405,10 +427,16 @@ func GetAllowedApplications(applications []*Application, userId string, lang str
 		if err != nil {
 			return nil, err
 		}
-
-		if allowed {
-			res = append(res, application)
+		if !allowed {
+			continue
 		}
+
+		// same tag rule as the login check in controllers/auth.go
+		if len(application.Tags) > 0 && !util.HasTagInSlice(application.Tags, user.Tag) {
+			continue
+		}
+
+		res = append(res, application)
 	}
 	return res, nil
 }
@@ -483,12 +511,8 @@ func (application *Application) GetId() string {
 }
 
 func (application *Application) IsRedirectUriValid(redirectUri string) bool {
-	isValid, err := util.IsValidOrigin(redirectUri)
-	if err != nil {
-		panic(err)
-	}
-	if isValid {
-		return true
+	if isScriptUrl(redirectUri) {
+		return false
 	}
 
 	for _, targetUri := range application.RedirectUris {
@@ -541,7 +565,7 @@ func redirectUriMatchesTarget(redirectUri, targetUri *url.URL) bool {
 	if redirectUri.Scheme != targetUri.Scheme {
 		return false
 	}
-	if redirectUri.Port() != targetUri.Port() {
+	if redirectUri.Port() != targetUri.Port() && !isSameLoopbackHost(redirectUri, targetUri) {
 		return false
 	}
 	redirectHost := redirectUri.Hostname()
@@ -622,6 +646,16 @@ func (application *Application) IsMagicLinkSignupEnabled() bool {
 	return false
 }
 
+func (application *Application) IsSignupAllowedFor(organization string) bool {
+	if organization == "built-in" {
+		return false
+	}
+	if application.IsShared {
+		return true
+	}
+	return organization == application.Organization
+}
+
 func (application *Application) IsLdapEnabled() bool {
 	return application.HasSigninMethod("LDAP")
 }
@@ -631,14 +665,6 @@ func (application *Application) IsFaceIdEnabled() bool {
 }
 
 func (application *Application) IsOriginValid(origin string) bool {
-	isValid, err := util.IsValidOrigin(origin)
-	if err != nil {
-		panic(err)
-	}
-	if isValid {
-		return true
-	}
-
 	originObj, err := url.Parse(origin)
 	if err != nil || originObj.Host == "" {
 		return false
@@ -659,12 +685,20 @@ func (application *Application) IsOriginValid(origin string) bool {
 		if originHost != targetHost && !strings.HasSuffix(originHost, "."+targetHost) {
 			continue
 		}
-		if originObj.Port() != targetObj.Port() {
+		if originObj.Port() != targetObj.Port() && !isSameLoopbackHost(originObj, targetObj) {
 			continue
 		}
 		return true
 	}
 	return false
+}
+
+func isSameLoopbackHost(uri *url.URL, targetUri *url.URL) bool {
+	host := uri.Hostname()
+	if host != targetUri.Hostname() {
+		return false
+	}
+	return host == "localhost" || net.ParseIP(host).IsLoopback()
 }
 
 func IsOriginAllowed(origin string) (bool, error) {
@@ -674,7 +708,7 @@ func IsOriginAllowed(origin string) (bool, error) {
 	}
 
 	for _, application := range applications {
-		if application.IsOriginValid(origin) {
+		if !application.IsDynamicClient() && application.IsOriginValid(origin) {
 			return true, nil
 		}
 	}

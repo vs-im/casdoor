@@ -275,6 +275,10 @@ func (c *ApiController) AddApplication() {
 		return
 	}
 
+	if !c.requireOrganizationPermission(application.Organization) {
+		return
+	}
+
 	count, err := object.GetApplicationCount("", "", "")
 	if err != nil {
 		c.ResponseError(err.Error())
@@ -315,7 +319,7 @@ func (c *ApiController) AddApplication() {
 		object.KeepApplicationCustomHtml(&application, nil)
 	}
 
-	c.Data["json"] = wrapActionResponse(object.AddApplication(&application))
+	c.Data["json"] = wrapActionResponse(object.AddApplication(&application, c.GetAcceptLanguage()))
 	c.ServeJSON()
 }
 

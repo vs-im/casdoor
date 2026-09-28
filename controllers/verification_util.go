@@ -17,8 +17,25 @@ package controllers
 import (
 	"fmt"
 
+	"github.com/casdoor/casdoor/captcha"
+	"github.com/casdoor/casdoor/form"
 	"github.com/casdoor/casdoor/object"
+	"github.com/casdoor/casdoor/util"
 )
+
+// verifyAuthFormCaptcha verifies the captcha with the type of the application's provider, a
+// client-chosen type with a client-supplied secret would let any test secret key pass
+func verifyAuthFormCaptcha(captchaProvider *object.Provider, authForm *form.AuthForm) (bool, error) {
+	if authForm.CaptchaType != captchaProvider.Type {
+		return false, nil
+	}
+
+	clientSecret := authForm.ClientSecret
+	if captchaProvider.Type != "Default" {
+		clientSecret = captchaProvider.ClientSecret
+	}
+	return captcha.VerifyCaptchaByCaptchaType(captchaProvider.Type, authForm.CaptchaToken, captchaProvider.ClientId, clientSecret, captchaProvider.ClientId2)
+}
 
 func (c *ApiController) checkOrgMasterVerificationCode(user *object.User, code string) (bool, error) {
 	organization, err := object.GetOrganizationByUser(user)
@@ -33,4 +50,25 @@ func (c *ApiController) checkOrgMasterVerificationCode(user *object.User, code s
 		return true, nil
 	}
 	return false, nil
+}
+
+func (c *ApiController) checkVerifyCodeOrOrgMasterCode(user *object.User, dest string, code string) (bool, error) {
+	organization, err := object.GetOrganizationByUser(user)
+	if err != nil {
+		return false, err
+	}
+	if organization == nil {
+		return false, fmt.Errorf("The organization: %s does not exist", user.Owner)
+	}
+
+	clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
+	return object.CheckVerifyCodeOrMasterCodeWithLimitAndIp(user, organization.MasterVerificationCode, clientIp, dest, code, c.GetAcceptLanguage())
+}
+
+func (c *ApiController) verifyMfaPasscode(user *object.User, mfaUtil object.MfaInterface, passcode string) error {
+	passed, err := c.checkOrgMasterVerificationCode(user, passcode)
+	if err != nil || passed {
+		return err
+	}
+	return mfaUtil.Verify(passcode, c.GetAcceptLanguage())
 }

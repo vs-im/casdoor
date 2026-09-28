@@ -81,16 +81,25 @@ func isLoopbackHost(host string) bool {
 	return hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" || strings.HasSuffix(hostname, ".localhost")
 }
 
-// getMagicLinkOrigin is the site the sign-in link points at. It is never taken from
-// the request's "Host" header alone: a forged header would mail the one-time token to
-// the attacker's own site, so without a configured origin only a loopback host, which
-// nobody else can receive, is trusted.
-func getMagicLinkOrigin(host string, lang string) (string, error) {
+// getTrustedOriginFrontend is the site a link mailed to a user may point at. It is never
+// taken from the request's "Host" header alone: a forged header would mail the one-time
+// token or code in the link to the attacker's own site, so without a configured origin
+// only a loopback host, which nobody else can receive, is trusted.
+func getTrustedOriginFrontend(host string) (string, bool) {
 	if conf.GetConfigString("origin") == "" && conf.GetConfigString("originFrontend") == "" && !isLoopbackHost(host) {
-		return "", errors.New(i18n.Translate(lang, "verification:please set \"origin\" in conf/app.conf to send magic links"))
+		return "", false
 	}
 
 	originFrontend, _ := getOriginFromHost(host)
+	return originFrontend, true
+}
+
+func getMagicLinkOrigin(host string, lang string) (string, error) {
+	originFrontend, ok := getTrustedOriginFrontend(host)
+	if !ok {
+		return "", errors.New(i18n.Translate(lang, "verification:please set \"origin\" in conf/app.conf to send magic links"))
+	}
+
 	return originFrontend, nil
 }
 
@@ -156,7 +165,7 @@ func getDefaultMagicLinkEmailContent() string {
 
 // isAllowSendMagicLink throttles the links the same way IsAllowSend() throttles the
 // verification codes, an issued link leaves no verification record of its own.
-func isAllowSendMagicLink(application *Application, email string, remoteAddr string) error {
+func isAllowSendMagicLink(application *Application, email string, remoteAddr string, lang string) error {
 	resendTimeoutInSeconds := int64(60)
 	if application != nil && application.CodeResendTimeout > 0 {
 		resendTimeoutInSeconds = int64(application.CodeResendTimeout)
@@ -174,7 +183,7 @@ func isAllowSendMagicLink(application *Application, email string, remoteAddr str
 		}
 
 		if has && now-magicLink.Time < resendTimeoutInSeconds {
-			return fmt.Errorf("you can only send one code in %ds", resendTimeoutInSeconds)
+			return fmt.Errorf(i18n.Translate(lang, "verification:you can only send one code in %ds"), resendTimeoutInSeconds)
 		}
 	}
 
@@ -212,12 +221,12 @@ func SendMagicLinkToEmail(organization *Organization, user *User, provider *Prov
 		return errors.New(i18n.Translate(lang, "verification:Please open the magic link in the browser you requested it from"))
 	}
 
-	err = IsAllowSend(user, remoteAddr, provider.Category, application)
+	err = IsAllowSend(user, remoteAddr, provider.Category, application, lang)
 	if err != nil {
 		return err
 	}
 
-	err = isAllowSendMagicLink(application, dest, remoteAddr)
+	err = isAllowSendMagicLink(application, dest, remoteAddr, lang)
 	if err != nil {
 		return err
 	}
@@ -282,7 +291,7 @@ func ConsumeMagicLink(token string, sessionHash string, application *Application
 // CheckMagicLinkSignup rejects a magic link signup for an application that asks the
 // signup page for more than the link itself can answer.
 func CheckMagicLinkSignup(application *Application, lang string) error {
-	if !application.EnableSignUp {
+	if !application.EnableSignUp || !application.IsSignupAllowedFor(application.Organization) {
 		return errors.New(i18n.Translate(lang, "account:The application does not allow to sign up new account"))
 	}
 

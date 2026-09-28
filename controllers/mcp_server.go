@@ -15,10 +15,13 @@
 package controllers
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/casdoor/casdoor/mcpself"
 	"github.com/casdoor/casdoor/object"
@@ -41,6 +44,10 @@ func (c *ApiController) ProxyServer() {
 	err := json.Unmarshal(c.Ctx.Input.RequestBody, &mcpReq)
 	if err != nil {
 		c.McpResponseError(1, -32700, "Parse error", err.Error())
+		return
+	}
+	if mcpReq == nil || isAmbiguousMcpRequest(c.Ctx.Input.RequestBody, mcpReq) {
+		c.McpResponseError(1, -32600, "Invalid request", "duplicate or case-variant keys are not allowed")
 		return
 	}
 	if util.IsStringsEmpty(owner, name) {
@@ -100,6 +107,9 @@ func (c *ApiController) ProxyServer() {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(targetUrl)
+	if server.Owner != "built-in" {
+		proxy.Transport = util.NewInternetOnlyHttpClient(30 * time.Second).Transport
+	}
 	proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, proxyErr error) {
 		c.Ctx.Output.SetStatus(http.StatusBadGateway)
 		c.McpResponseError(mcpReq.ID, -32603, "failed to proxy server request: %s", proxyErr.Error())
@@ -122,4 +132,46 @@ func (c *ApiController) ProxyServer() {
 	}
 
 	proxy.ServeHTTP(c.Ctx.ResponseWriter, c.Ctx.Request)
+}
+
+func isAmbiguousMcpRequest(body []byte, mcpReq *mcpself.McpRequest) bool {
+	if hasAmbiguousJsonKeys(body, "method", "params") {
+		return true
+	}
+	return len(mcpReq.Params) > 0 && hasAmbiguousJsonKeys(mcpReq.Params, "name")
+}
+
+func hasAmbiguousJsonKeys(data []byte, keys ...string) bool {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('{') {
+		return false
+	}
+
+	seen := map[string]bool{}
+	for decoder.More() {
+		token, err = decoder.Token()
+		if err != nil {
+			return true
+		}
+		key, ok := token.(string)
+		if !ok {
+			return true
+		}
+
+		for _, k := range keys {
+			if strings.EqualFold(key, k) {
+				if key != k || seen[k] {
+					return true
+				}
+				seen[k] = true
+			}
+		}
+
+		var value json.RawMessage
+		if err = decoder.Decode(&value); err != nil {
+			return true
+		}
+	}
+	return false
 }

@@ -298,3 +298,33 @@ func TestExtendApplicationWithSigninMethodsNormalizesLegacyHideRule(t *testing.T
 		t.Errorf("got rule=%s, want %s", application.SigninMethods[1].Rule, "All")
 	}
 }
+
+// fork: a magic link requested by either of two peer admin sites carries that site's callback,
+// and both must pass CheckOAuthLogin's redirect check after upstream tightened the matching.
+func TestRedirectUriValidForPeerAdminSites(t *testing.T) {
+	application := &Application{RedirectUris: []string{
+		"https://admin-a.example.com/api/new-auth/callback",
+		"https://admin-b.example.com/api/new-auth/callback",
+	}}
+
+	for _, uri := range []string{
+		"https://admin-a.example.com/api/new-auth/callback",
+		"https://admin-b.example.com/api/new-auth/callback",
+	} {
+		if !application.IsRedirectUriValid(uri) {
+			t.Fatalf("expected %s to be a valid redirect URI", uri)
+		}
+	}
+
+	for _, uri := range []string{
+		"https://admin-c.example.com/api/new-auth/callback",
+		"http://admin-a.example.com/api/new-auth/callback",
+		"https://admin-a.example.com/api/other",
+		"https://admin-a.example.com.evil.test/api/new-auth/callback",
+		"javascript:alert(1)//admin-a.example.com/api/new-auth/callback",
+	} {
+		if application.IsRedirectUriValid(uri) {
+			t.Fatalf("expected %s to be rejected", uri)
+		}
+	}
+}

@@ -136,12 +136,6 @@ export default function AuthCallback() {
     // Providers disagree on the parameter name for the authorization code.
     let code =
       params.get("code") ?? params.get("auth_code") ?? params.get("authCode") ?? null;
-    if (code === null) {
-      const web3Key = params.get("web3AuthTokenKey");
-      if (web3Key) {
-        code = localStorage.getItem(web3Key);
-      }
-    }
     const isSteam = params.get("openid.mode");
     if (isSteam !== null && code === null) {
       code = location.search;
@@ -218,14 +212,14 @@ export default function AuthCallback() {
         if (responseMode === "form_post") {
           Setting.createFormAndSubmit(oAuthParams?.redirectUri, {
             token: responseTypes.includes("token") ? res.data : null,
-            id_token: responseTypes.includes("id_token") ? res.data : null,
+            id_token: responseTypes.includes("id_token") ? res.data3 : null,
             token_type: "bearer",
             state: oAuthParams?.state,
           });
         } else {
           Setting.goToLink(
             `${oAuthParams.redirectUri}${concatChar}${type}=${encodeURIComponent(
-              res.data,
+              type === "id_token" ? res.data3 : res.data,
             )}&state=${encodeURIComponent(oAuthParams.state)}&token_type=bearer`,
           );
         }
@@ -252,7 +246,7 @@ export default function AuthCallback() {
 
     const checkMfa = (res: any, authParams: any, onDone: (res: any) => void) => {
       if (res.data === Setting.RequiredUpdatePassword) {
-        Setting.goToUpdatePassword();
+        Setting.goToUpdatePassword(applicationName ?? undefined);
       } else if (res.data === "RequiredMfa") {
         // the account reload in the console then bounces to /mfa/setup
         localStorage.setItem("mfaRedirectUrl", window.location.origin);
@@ -269,7 +263,7 @@ export default function AuthCallback() {
           props: res.data2,
           values: {...body, providerBack: body.provider, provider: ""},
           authParams,
-          onSuccess: onDone,
+          onSuccess: (mfaRes: any) => checkMfa(mfaRes, authParams, onDone),
         });
       } else if (res.data === "SelectPlan") {
         const pricing = res.data2;
@@ -291,7 +285,7 @@ export default function AuthCallback() {
       if (service !== "") {
         const newUrl = new URL(service);
         newUrl.searchParams.append("ticket", ok.data);
-        window.location.href = newUrl.toString();
+        Setting.goToLink(newUrl.toString());
       }
     };
 
@@ -322,6 +316,11 @@ export default function AuthCallback() {
           setMsg(res.msg);
         }
       });
+      return;
+    }
+
+    if (responseType === "link" && !Util.consumeLinkNonce(innerParams.get("linkNonce"))) {
+      setMsg(i18next.t("general:Unauthorized"));
       return;
     }
 
