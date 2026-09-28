@@ -120,15 +120,16 @@ func TestPasswordGrantCreatesSessionAndSidClaim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if claims.Sid != beegoSessionId {
-		t.Fatalf("access token sid = %q, want %q", claims.Sid, beegoSessionId)
+	sidHash := GetSessionIdHash(beegoSessionId)
+	if claims.Sid != sidHash {
+		t.Fatalf("access token sid = %q, want the hash %q", claims.Sid, sidHash)
 	}
 	refreshClaims, err := ParseJwtToken(token.RefreshToken, cert)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if refreshClaims.Sid != beegoSessionId {
-		t.Fatalf("refresh token sid = %q, want %q", refreshClaims.Sid, beegoSessionId)
+	if refreshClaims.Sid != sidHash {
+		t.Fatalf("refresh token sid = %q, want %q", refreshClaims.Sid, sidHash)
 	}
 
 	sessions, err := GetPaginationSessions("clients", 0, 10, "user", user.Name, "", "")
@@ -148,6 +149,17 @@ func TestPasswordGrantCreatesSessionAndSidClaim(t *testing.T) {
 	if info.SessionId != beegoSessionId || info.Ip != "203.0.113.7" || info.UserAgent != "Mozilla/5.0 (cas6-test)" {
 		t.Fatalf("unexpected session info: %+v", info)
 	}
+
+	// the "sid" of the token is exactly the id get-sessions shows (MaskSessionIds), so a client
+	// can find the row of its own sign-in and revoke every other one
+	masked := *sessions[0]
+	masked.SessionId = append([]string{}, sessions[0].SessionId...)
+	masked.SessionInfos = []*SessionInfo{{SessionId: info.SessionId}}
+	MaskSessionIds(&masked)
+	if masked.SessionId[0] != claims.Sid || masked.SessionInfos[0].SessionId != claims.Sid {
+		t.Fatalf("get-sessions id %q / %q != token sid %q", masked.SessionId[0], masked.SessionInfos[0].SessionId, claims.Sid)
+	}
+
 	expireTime, err := time.Parse(time.RFC3339, info.ExpireTime)
 	if err != nil {
 		t.Fatalf("expireTime %q is not RFC3339: %v", info.ExpireTime, err)
@@ -169,8 +181,8 @@ func TestPasswordGrantCreatesSessionAndSidClaim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if newClaims.Sid != beegoSessionId {
-		t.Fatalf("refreshed access token sid = %q, want %q", newClaims.Sid, beegoSessionId)
+	if newClaims.Sid != sidHash {
+		t.Fatalf("refreshed access token sid = %q, want %q", newClaims.Sid, sidHash)
 	}
 	newToken, err := GetTokenByRefreshToken(wrapper.RefreshToken)
 	if err != nil || newToken == nil {
@@ -180,8 +192,8 @@ func TestPasswordGrantCreatesSessionAndSidClaim(t *testing.T) {
 		t.Fatalf("refreshed Token.SessionId = %q, want %q", newToken.SessionId, beegoSessionId)
 	}
 
-	// delete-session?sessionId= → токены с этим session_id получают expires_in=0 → refresh падает
-	affected, err := DeleteSessionId(util.GetSessionId("clients", user.Name, application.Name), beegoSessionId)
+	// delete-session?sessionId=<sid из токена> → токены с этим session_id получают expires_in=0 → refresh падает
+	affected, err := DeleteSessionId(util.GetSessionId("clients", user.Name, application.Name), claims.Sid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,17 +257,36 @@ func TestPasswordGrantWithoutSessionKeepsOldBehaviour(t *testing.T) {
 	}
 }
 
-// TestGetClaimsCustomSid — в JWT-Custom клейм sid кладётся только при непустом SessionId.
+// TestGetClaimsCustomSid — в JWT-Custom клейм sid (хэш id сессии) кладётся только при непустом SessionId.
 func TestGetClaimsCustomSid(t *testing.T) {
 	user := &User{Owner: "clients", Name: "alice", Properties: map[string]string{}}
-	claims := Claims{User: user, TokenType: "access-token", Sid: "sid-1"}
+	sid := getSessionIdClaim("beego-sid-1")
+	claims := Claims{User: user, TokenType: "access-token", Sid: sid}
 	res := getClaimsCustom(claims, []string{"Name"}, nil)
-	if res["sid"] != "sid-1" {
-		t.Fatalf("sid claim = %v, want sid-1", res["sid"])
+	if res["sid"] != sid {
+		t.Fatalf("sid claim = %v, want %s", res["sid"], sid)
+	}
+	if res["sid"] == "beego-sid-1" {
+		t.Fatal("the raw session id (the session cookie) must not reach the token")
 	}
 	claims.Sid = ""
 	res = getClaimsCustom(claims, []string{"Name"}, nil)
 	if _, ok := res["sid"]; ok {
 		t.Fatal("empty sid must not be put into the claims")
+	}
+}
+
+// TestSessionIdClaimIsTheMaskedSessionId — клейм sid совпадает с id, который отдаёт get-sessions.
+func TestSessionIdClaimIsTheMaskedSessionId(t *testing.T) {
+	if getSessionIdClaim("") != "" {
+		t.Fatal("no session, no sid")
+	}
+	session := &Session{SessionId: []string{"beego-raw"}, SessionInfos: []*SessionInfo{{SessionId: "beego-raw"}}}
+	MaskSessionIds(session)
+	if sid := getSessionIdClaim("beego-raw"); sid != session.SessionId[0] || sid != session.SessionInfos[0].SessionId || sid == "beego-raw" {
+		t.Fatalf("sid %q, get-sessions %q", sid, session.SessionId[0])
+	}
+	if resolveSessionId(&Session{SessionId: []string{"beego-raw"}}, getSessionIdClaim("beego-raw")) != "beego-raw" {
+		t.Fatal("delete-session must resolve the sid of a token to its session")
 	}
 }

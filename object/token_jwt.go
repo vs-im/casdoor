@@ -36,7 +36,7 @@ type Claims struct {
 	Provider string `json:"provider,omitempty"`
 
 	SigninMethod string `json:"signinMethod,omitempty"`
-	// Sid is the Beego session id the token was minted under (OIDC "sid"), empty when the grant had no session
+	// Sid is the sha256 hash (GetSessionIdHash) of the Beego session id the token was minted under (OIDC "sid"), empty when the grant had no session
 	Sid string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
@@ -585,6 +585,16 @@ func getTokenAudience(application *Application, user *User, resource string) jwt
 	return jwt.ClaimStrings{application.ClientId}
 }
 
+// getSessionIdClaim is the OIDC "sid" of a token minted under a Beego session: the same
+// sha256 hash get-sessions shows (MaskSessionIds) and delete-session?sessionId= accepts,
+// never the raw id, which is the session cookie itself.
+func getSessionIdClaim(sessionId string) string {
+	if sessionId == "" {
+		return ""
+	}
+	return GetSessionIdHash(sessionId)
+}
+
 func generateJwtToken(application *Application, user *User, provider string, signinMethod string, nonce string, scope string, resource string, host string, sessionId string) (string, string, string, string, error) {
 	nowTime := time.Now()
 	expireTime := nowTime.Add(time.Duration(application.ExpireInHours * float64(time.Hour)))
@@ -628,7 +638,7 @@ func generateJwtToken(application *Application, user *User, provider string, sig
 		Azp:          application.ClientId,
 		Provider:     provider,
 		SigninMethod: signinMethod,
-		Sid:          sessionId,
+		Sid:          getSessionIdClaim(sessionId),
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    originBackend,
 			Subject:   user.Id,

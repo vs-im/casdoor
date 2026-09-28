@@ -52,9 +52,8 @@ func generateLogoutToken(application *Application, user *User, sessionId string,
 		},
 	}
 
-	if sessionId != "" {
-		claims.Sid = sessionId
-	}
+	// fork: the same hashed "sid" as the ID token carries (getSessionIdClaim), not the session cookie
+	claims.Sid = getSessionIdClaim(sessionId)
 
 	cert, err := getCertByApplication(application)
 	if err != nil {
