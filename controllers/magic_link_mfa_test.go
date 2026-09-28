@@ -30,8 +30,8 @@ import (
 	"github.com/casdoor/casdoor/util"
 )
 
-// initMagicLinkMfaTestDb needs a disposable Postgres instance via TEST_POSTGRES_DSN.
-func initMagicLinkMfaTestDb(t *testing.T) {
+// initControllerTestDb needs a disposable Postgres instance via TEST_POSTGRES_DSN.
+func initControllerTestDb(t *testing.T) {
 	t.Helper()
 	dsn := os.Getenv("TEST_POSTGRES_DSN")
 	if dsn == "" {
@@ -79,7 +79,7 @@ func callVerifyMagicLink(t *testing.T, token string) (*Response, *ApiController)
 // TestVerifyMagicLinkAsksForMfa — a magic link proves the email only: a user with MFA gets the
 // NextMfa step, exactly like the built-in magic link sign-in, and is not signed in yet.
 func TestVerifyMagicLinkAsksForMfa(t *testing.T) {
-	initMagicLinkMfaTestDb(t)
+	initControllerTestDb(t)
 	org := "mfatest" + util.GenerateId()[:8]
 
 	if _, err := object.AddOrganization(&object.Organization{Owner: "admin", Name: org, DisplayName: org, PasswordType: "plain"}); err != nil {

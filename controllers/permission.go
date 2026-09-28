@@ -49,6 +49,10 @@ func (c *ApiController) GetPermissions() {
 			return
 		}
 
+		permissions, ok := c.scopePermissionsToRequester(permissions)
+		if !ok {
+			return
+		}
 		c.ResponseOk(permissions)
 		return
 	}
@@ -60,6 +64,10 @@ func (c *ApiController) GetPermissions() {
 			return
 		}
 
+		permissions, ok := c.scopePermissionsToRequester(permissions)
+		if !ok {
+			return
+		}
 		c.ResponseOk(permissions)
 		return
 	}
@@ -89,6 +97,32 @@ func (c *ApiController) GetPermissions() {
 
 		c.ResponseOk(permissions, paginator.Nums())
 	}
+}
+
+// scopePermissionsToRequester keeps the permissions of the requester's own organization: the
+// "userIds" and "group" lookups of GetPermissions() are not bound to the "owner" the authz
+// filter checked, so only a global admin sees the permissions of every organization.
+func (c *ApiController) scopePermissionsToRequester(permissions []*object.Permission) ([]*object.Permission, bool) {
+	isGlobalAdmin, user := c.isGlobalAdmin()
+	if isGlobalAdmin {
+		return permissions, true
+	}
+	if user == nil {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return nil, false
+	}
+
+	return filterPermissionsByOwner(permissions, user.Owner), true
+}
+
+func filterPermissionsByOwner(permissions []*object.Permission, owner string) []*object.Permission {
+	res := []*object.Permission{}
+	for _, permission := range permissions {
+		if permission.Owner == owner {
+			res = append(res, permission)
+		}
+	}
+	return res
 }
 
 // GetPermissionsBySubmitter
