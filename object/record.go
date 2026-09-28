@@ -270,6 +270,36 @@ func addRecord(record *Record) (int64, error) {
 	return affected, err
 }
 
+// retargetAppRecord attributes a successful user/organization management call made with the
+// client credentials of a "built-in" application (the provisioning back office) to the
+// organization of the object it changed, so that the provisioning webhooks of that
+// organization fire. A refused call, or the credentials of an organization's own application,
+// stay attributed where SetUser() put them: otherwise anyone could fire another
+// organization's webhooks with a request that was never carried out.
+func retargetAppRecord(record *Record) bool {
+	if !IsAppUser(record.User) || isErrorRecordResponse(record.Response) {
+		return false
+	}
+
+	appUser, err := GetAppUser(record.User)
+	if err != nil || appUser == nil || appUser.Owner != "built-in" {
+		return false
+	}
+
+	targetOrganization := getRecordTargetOrganization(record)
+	if targetOrganization == "" {
+		return false
+	}
+
+	record.Organization = targetOrganization
+	return true
+}
+
+// isErrorRecordResponse tells a refused call by the response NewRecord() and ApiFilter() write
+func isErrorRecordResponse(response string) bool {
+	return strings.HasPrefix(strings.TrimSpace(response), `{status:"error"`)
+}
+
 func AddRecord(record *Record) bool {
 	if logPostOnly {
 		if record.Method == "GET" && !alwaysLoggedActions[record.Action] {
@@ -277,14 +307,8 @@ func AddRecord(record *Record) bool {
 		}
 	}
 
-	// fork: user/organization management through client credentials (an M2M "app/<name>"
-	// subject) also triggers the provisioning webhooks of the target organization, so the
-	// record is attributed to the organization of the object it changed.
-	if record.Organization == "app" || IsAppUser(record.User) {
-		if targetOrganization := getRecordTargetOrganization(record); targetOrganization != "" {
-			record.Organization = targetOrganization
-		}
-	}
+	// fork: see retargetAppRecord()
+	retargetAppRecord(record)
 
 	// an empty owner matches no audit log query and no retention policy
 	if record.Organization == "" {
