@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/casdoor/casdoor/object"
@@ -181,5 +182,46 @@ func TestMagicLinkListIsScopedToOrganization(t *testing.T) {
 	}
 	if !isMagicLinkListAllowed("", true) || !isMagicLinkListAllowed("org", false) {
 		t.Fatal("the global admin and the organization admin should list the links")
+	}
+}
+
+func TestGetMagicLinkTrustedSend(t *testing.T) {
+	cases := []struct {
+		name             string
+		trusted          bool
+		credentialsValid bool
+		credentialsErr   error
+		wantTrusted      bool
+		wantReject       bool
+	}{
+		{"untrusted without credentials", false, false, nil, false, false},
+		// a sign-in page forwarding its users with the application's credentials stays untrusted
+		{"untrusted with valid credentials", false, true, nil, false, false},
+		{"untrusted with invalid credentials", false, false, errors.New("invalid"), false, false},
+		{"trusted with valid credentials", true, true, nil, true, false},
+		{"trusted without credentials", true, false, nil, false, true},
+		{"trusted with invalid credentials", true, false, errors.New("invalid"), false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			form := &MagicLinkRequestForm{Trusted: tc.trusted}
+			trusted, reject := getMagicLinkTrustedSend(form, tc.credentialsValid, tc.credentialsErr)
+			if trusted != tc.wantTrusted || reject != tc.wantReject {
+				t.Fatalf("got trusted = %v, reject = %v, want %v, %v", trusted, reject, tc.wantTrusted, tc.wantReject)
+			}
+		})
+	}
+}
+
+func TestGetMagicLinkRequester(t *testing.T) {
+	application := &object.Application{Owner: "admin", Name: "app"}
+	if got := getMagicLinkRequester("alice", application, true); got != "alice" {
+		t.Fatalf("a signed-in user stays the requester, got %q", got)
+	}
+	if got := getMagicLinkRequester("", application, false); got != "" {
+		t.Fatalf("an untrusted request has no requester, got %q", got)
+	}
+	if got := getMagicLinkRequester("", application, true); got != "application:admin/app" {
+		t.Fatalf("a trusted request names the application, got %q", got)
 	}
 }

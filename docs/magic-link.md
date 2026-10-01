@@ -94,7 +94,8 @@ Body (`MagicLinkRequestForm`, `controllers/magic_link_api.go`):
   "expireTime": "",
   "captchaType": "",
   "captchaToken": "",
-  "sessionSecret": ""
+  "sessionSecret": "",
+  "trusted": false
 }
 ```
 
@@ -109,6 +110,19 @@ the body, `applicationClientSecret`, or the same names as query parameters) — 
 for a custom TTL or a group/permission without those credentials gets `auth:Unauthorized operation`
 for `group`/`permission`, or silently falls back to the application's configured TTL for
 `expiresInMinutes`/`expireTime`.
+
+**Trusted sender.** A server that sends links on behalf of its users (an invitation or a share
+from a backend) sets `"trusted": true` together with the application's own `clientId` and client
+secret (`applicationClientSecret`, or `clientSecret` when no `captchaToken` is sent). Such a request
+is not asked for a captcha and is not counted per IP; instead it is limited by
+`magicLinkTrustedRateLimitEmail` per address and `magicLinkTrustedRateLimitApplication` per
+application over the same window (§6), so a leaked secret cannot flood a mailbox. The application
+must belong to `organization`. `"trusted": true` with missing or wrong credentials gets
+`auth:Unauthorized operation`. Without `trusted` a request is checked as before even when it carries
+the credentials, so a sign-in page that forwards its visitors with the application's credentials
+keeps the captcha and the per-IP limit. Every trusted request is logged (accepted or rate limited,
+with the application's `clientId`), and its link names `application:<owner>/<name>` as the
+requester when no user is signed in.
 
 Response, always `200` regardless of outcome (so the endpoint never leaks whether an address has an
 account — see §6):
@@ -263,6 +277,8 @@ is still enforced — signup by link does not bypass it.
 | `MagicLinkRateLimitIp` | `magicLinkRateLimitIp` | 10 | links per IP per window |
 | `MagicLinkRateLimitApplication` | `magicLinkRateLimitApplication` | 100 | links per application per window |
 | `MagicLinkCaptchaThreshold` | `magicLinkCaptchaThreshold` | 1 | links (email or IP) in the window before a captcha is required |
+| `MagicLinkTrustedRateLimitEmail` | `magicLinkTrustedRateLimitEmail` | 20 | links per email per window for a trusted request |
+| `MagicLinkTrustedRateLimitApplication` | `magicLinkTrustedRateLimitApplication` | 1000 | links per application per window for a trusted request |
 
 All counts include links of **both** flows (they share the table), so a burst through the API
 throttles the built-in flow's resend for the same address and vice versa.

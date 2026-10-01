@@ -49,6 +49,11 @@ type MagicLinkRequestForm struct {
 	// only accepts the token together with the same secret. Without it the link may be
 	// opened on any device.
 	SessionSecret string `json:"sessionSecret"`
+	// Trusted asks for the path of a server sending on behalf of its users: no captcha and
+	// the application's trusted limits instead of the per-IP ones. It is only honored with
+	// the application's own clientId and client secret, and a request that sets it without
+	// them is refused. Without it the request is checked as before, credentials or not.
+	Trusted bool `json:"trusted"`
 }
 
 // SendMagicLink ...
@@ -58,6 +63,7 @@ type MagicLinkRequestForm struct {
 // @Description optional OAuth query parameters allow redirecting back to external frontend callback after verification
 // @Description group, permission and custom TTL are trusted parameters and require clientId/clientSecret in request body
 // @Description an optional sessionSecret binds the link to the caller, verify-magic-link then requires the same secret
+// @Description trusted=true with clientId/clientSecret skips the captcha and applies the trusted rate limits of the application
 // @Param clientId query string false "OAuth client ID"
 // @Param responseType query string false "OAuth response type"
 // @Param redirectUri query string false "OAuth redirect URI"
@@ -110,9 +116,17 @@ func (c *ApiController) SendMagicLink() {
 	needsClientCredentials := magicLinkRequestNeedsClientCredentials(&requestForm, requestedPermission)
 	hasCustomTTL := magicLinkRequestHasCustomTTL(&requestForm)
 	trustedRequest := false
-	if needsClientCredentials || hasCustomTTL {
+	trustedSend := false
+	if needsClientCredentials || hasCustomTTL || requestForm.Trusted {
 		trustedRequest, err = c.isTrustedMagicLinkRequest(application, &requestForm)
 		if needsClientCredentials && (err != nil || !trustedRequest) {
+			c.ResponseError(c.T("auth:Unauthorized operation"))
+			return
+		}
+		var rejectTrusted bool
+		trustedSend, rejectTrusted = getMagicLinkTrustedSend(&requestForm, trustedRequest, err)
+		if rejectTrusted {
+			util.LogWarning(c.Ctx, "Trusted magic link request refused: invalid client credentials, organization = %s, application = %s, email = %s, remoteAddr = %s", application.Organization, application.Name, requestForm.Email, util.GetClientIpFromRequest(c.Ctx.Request))
 			c.ResponseError(c.T("auth:Unauthorized operation"))
 			return
 		}
@@ -178,18 +192,30 @@ func (c *ApiController) SendMagicLink() {
 		return
 	}
 
-	err = object.IsMagicLinkAllowSend(requestForm.Email, clientIP, application)
-	if err != nil {
-		util.LogWarning(c.Ctx, "Magic link request rate limited, organization = %s, application = %s, email = %s, remoteAddr = %s, error = %s", application.Organization, application.Name, requestForm.Email, clientIP, err.Error())
-		c.ResponseError(err.Error())
-		return
+	captchaRequired := false
+	if trustedSend {
+		// a server that proved the application's credentials: no captcha, the trusted limits
+		err = object.IsMagicLinkAllowSendTrusted(requestForm.Email, clientIP, application)
+		if err != nil {
+			util.LogWarning(c.Ctx, "Trusted magic link request rate limited, organization = %s, application = %s, clientId = %s, email = %s, remoteAddr = %s, error = %s", application.Organization, application.Name, application.ClientId, requestForm.Email, clientIP, err.Error())
+			c.ResponseError(err.Error())
+			return
+		}
+		util.LogInfo(c.Ctx, "Trusted magic link request accepted without captcha, organization = %s, application = %s, clientId = %s, email = %s, remoteAddr = %s", application.Organization, application.Name, application.ClientId, requestForm.Email, clientIP)
+	} else {
+		err = object.IsMagicLinkAllowSend(requestForm.Email, clientIP, application)
+		if err != nil {
+			util.LogWarning(c.Ctx, "Magic link request rate limited, organization = %s, application = %s, email = %s, remoteAddr = %s, error = %s", application.Organization, application.Name, requestForm.Email, clientIP, err.Error())
+			c.ResponseError(err.Error())
+			return
+		}
+		captchaRequired, err = object.IsMagicLinkCaptchaRequired(requestForm.Email, clientIP, application)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
 	}
-	captchaRequired, err := object.IsMagicLinkCaptchaRequired(requestForm.Email, clientIP, application)
-	if err != nil {
-		c.ResponseError(err.Error())
-		return
-	}
-	if captchaRequired || requestForm.CaptchaToken != "" {
+	if !trustedSend && (captchaRequired || requestForm.CaptchaToken != "") {
 		ok, err := c.verifyMagicLinkCaptcha(application, &requestForm, captchaRequired)
 		if err != nil {
 			c.ResponseError(err.Error())
@@ -247,7 +273,7 @@ func (c *ApiController) SendMagicLink() {
 		}
 	}
 
-	token, link, err := object.NewApiMagicLink(application, permission, requestForm.Email, clientIP, c.GetSessionUsername(), oauth, expireAt)
+	token, link, err := object.NewApiMagicLink(application, permission, requestForm.Email, clientIP, getMagicLinkRequester(c.GetSessionUsername(), application, trustedSend), oauth, expireAt)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
@@ -349,6 +375,30 @@ func validateMagicLinkClientCredentials(application *object.Application, clientI
 		return false, fmt.Errorf("invalid magic link client credentials")
 	}
 	return true, nil
+}
+
+// getMagicLinkTrustedSend tells whether a request takes the trusted path (no captcha, the
+// trusted limits) and whether it must be refused: one that asks for the path without the
+// application's valid client credentials. A request that does not ask is never trusted,
+// so a sign-in page that forwards its users with the application's credentials keeps the
+// captcha and the per-IP limits.
+func getMagicLinkTrustedSend(requestForm *MagicLinkRequestForm, credentialsValid bool, credentialsErr error) (bool, bool) {
+	if !requestForm.Trusted {
+		return false, false
+	}
+	if credentialsErr != nil || !credentialsValid {
+		return false, true
+	}
+	return true, false
+}
+
+// getMagicLinkRequester names the requester of a link for the admin list: the signed-in
+// user, or the application itself for a trusted request of a server.
+func getMagicLinkRequester(sessionUsername string, application *object.Application, trustedSend bool) string {
+	if sessionUsername != "" || !trustedSend || application == nil {
+		return sessionUsername
+	}
+	return "application:" + util.GetId(application.Owner, application.Name)
 }
 
 func magicLinkRequestNeedsClientCredentials(requestForm *MagicLinkRequestForm, requestedPermission string) bool {

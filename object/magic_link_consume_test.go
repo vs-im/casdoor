@@ -414,3 +414,88 @@ func TestLegacyMagicLinkTableIsPreparedOnce(t *testing.T) {
 		t.Fatalf("rows: %d, %v", count, err)
 	}
 }
+
+func TestMagicLinkTrustedRateLimit(t *testing.T) {
+	a := newMagicLinkTestOrmer(t)
+	if err := a.syncMagicLink(); err != nil {
+		t.Fatal(err)
+	}
+	application := newMagicLinkTestApplication()
+	application.MagicLinkRateLimitEmail = 1
+	application.MagicLinkRateLimitIP = 1
+	application.MagicLinkRateLimitApplication = 2
+	application.MagicLinkRateLimitWindowMinutes = 5
+	application.MagicLinkTrustedRateLimitEmail = 3
+	application.MagicLinkTrustedRateLimitApplication = 5
+
+	// links from one IP to one address: the untrusted path is over its limits and asks for
+	// a captcha, the trusted path ignores the IP and keeps its own, higher email limit
+	addMagicLinkTestLink(t, application, "a@example.com", time.Time{})
+	addMagicLinkTestLink(t, application, "a@example.com", time.Time{})
+	if err := IsMagicLinkAllowSend("a@example.com", "192.0.2.1", application); err == nil {
+		t.Fatal("the untrusted path should be limited")
+	}
+	required, err := IsMagicLinkCaptchaRequired("b@example.com", "192.0.2.1", application)
+	if err != nil || !required {
+		t.Fatalf("the untrusted path should ask for a captcha, got %v, %v", required, err)
+	}
+	if err = IsMagicLinkAllowSendTrusted("a@example.com", "192.0.2.1", application); err != nil {
+		t.Fatalf("two links are within the trusted email limit: %v", err)
+	}
+	addMagicLinkTestLink(t, application, "a@example.com", time.Time{})
+	err = IsMagicLinkAllowSendTrusted("a@example.com", "192.0.2.1", application)
+	if err == nil || !strings.Contains(err.Error(), "for this email") {
+		t.Fatalf("expected the trusted email limit, got: %v", err)
+	}
+
+	// another address is free until the trusted application limit
+	if err = IsMagicLinkAllowSendTrusted("b@example.com", "192.0.2.1", application); err != nil {
+		t.Fatalf("three links are within the trusted application limit: %v", err)
+	}
+	addMagicLinkTestLink(t, application, "b@example.com", time.Time{})
+	addMagicLinkTestLink(t, application, "c@example.com", time.Time{})
+	err = IsMagicLinkAllowSendTrusted("d@example.com", "192.0.2.1", application)
+	if err == nil || !strings.Contains(err.Error(), "for this application") {
+		t.Fatalf("expected the trusted application limit, got: %v", err)
+	}
+
+	// links outside the window do not count
+	if _, err = ormer.Engine.Where("owner = ?", application.Organization).Cols("time").Update(&MagicLink{Time: time.Now().Add(-6 * time.Minute).Unix()}); err != nil {
+		t.Fatal(err)
+	}
+	if err = IsMagicLinkAllowSendTrusted("a@example.com", "192.0.2.1", application); err != nil {
+		t.Fatalf("links outside the window should not count: %v", err)
+	}
+}
+
+func TestMagicLinkTrustedRateLimitDefaults(t *testing.T) {
+	application := &Application{}
+	if application.GetMagicLinkTrustedRateLimitEmail() != MagicLinkDefaultTrustedRateLimitEmail {
+		t.Fatalf("trusted email limit = %d", application.GetMagicLinkTrustedRateLimitEmail())
+	}
+	if application.GetMagicLinkTrustedRateLimitApplication() != MagicLinkDefaultTrustedRateLimitApplication {
+		t.Fatalf("trusted application limit = %d", application.GetMagicLinkTrustedRateLimitApplication())
+	}
+	if MagicLinkDefaultTrustedRateLimitEmail <= application.GetMagicLinkRateLimitEmail() || MagicLinkDefaultTrustedRateLimitApplication <= application.GetMagicLinkRateLimitApplication() {
+		t.Fatal("the trusted defaults should be above the untrusted ones")
+	}
+	if err := checkMagicLinkTrustedRateLimit(int64(MagicLinkDefaultTrustedRateLimitEmail-1), int64(MagicLinkDefaultTrustedRateLimitApplication-1), application); err != nil {
+		t.Fatalf("below the defaults: %v", err)
+	}
+	if err := checkMagicLinkTrustedRateLimit(int64(MagicLinkDefaultTrustedRateLimitEmail), 0, application); err == nil {
+		t.Fatal("expected the default trusted email limit")
+	}
+	if err := checkMagicLinkTrustedRateLimit(0, int64(MagicLinkDefaultTrustedRateLimitApplication), application); err == nil {
+		t.Fatal("expected the default trusted application limit")
+	}
+
+	application.MagicLinkTrustedRateLimitEmail = -1
+	if err := ValidateMagicLinkConfig(application); err == nil {
+		t.Fatal("a negative trusted email limit should be refused")
+	}
+	application.MagicLinkTrustedRateLimitEmail = 0
+	application.MagicLinkTrustedRateLimitApplication = -1
+	if err := ValidateMagicLinkConfig(application); err == nil {
+		t.Fatal("a negative trusted application limit should be refused")
+	}
+}

@@ -145,6 +145,22 @@ export function ApplicationAuthenticationTab({application, updateField}: Applica
           onChange={(e) => updateField("magicLinkCaptchaThreshold", Setting.myParseInt(e.target.value))}
         />
       </FormRow>
+      <FormRow labelKey="application:Magic link trusted email limit">
+        <Input
+          type="number"
+          min={1}
+          value={application.magicLinkTrustedRateLimitEmail || 20}
+          onChange={(e) => updateField("magicLinkTrustedRateLimitEmail", Setting.myParseInt(e.target.value))}
+        />
+      </FormRow>
+      <FormRow labelKey="application:Magic link trusted application limit">
+        <Input
+          type="number"
+          min={1}
+          value={application.magicLinkTrustedRateLimitApplication || 1000}
+          onChange={(e) => updateField("magicLinkTrustedRateLimitApplication", Setting.myParseInt(e.target.value))}
+        />
+      </FormRow>
       <FormRow labelKey="general:Signup URL">
         <Input value={application.signupUrl ?? ""} onChange={(e) => updateField("signupUrl", e.target.value)} />
       </FormRow>

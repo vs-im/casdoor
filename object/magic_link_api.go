@@ -49,6 +49,11 @@ const (
 	MagicLinkMinExpireMinutes     = 2
 	MagicLinkMaxExpireMinutes     = 43200
 
+	// MagicLinkDefaultTrustedRateLimitEmail and MagicLinkDefaultTrustedRateLimitApplication
+	// are the limits of a trusted request when the application does not set its own.
+	MagicLinkDefaultTrustedRateLimitEmail       = 20
+	MagicLinkDefaultTrustedRateLimitApplication = 1000
+
 	// MagicLinkBindingSession is a link of the built-in sign-in page: it only works in the
 	// browser session that asked for it. It is the zero value, the built-in flow does not
 	// know about the column.
@@ -153,6 +158,20 @@ func (application *Application) GetMagicLinkCaptchaThreshold() int {
 	return application.MagicLinkCaptchaThreshold
 }
 
+func (application *Application) GetMagicLinkTrustedRateLimitEmail() int {
+	if application == nil || application.MagicLinkTrustedRateLimitEmail <= 0 {
+		return MagicLinkDefaultTrustedRateLimitEmail
+	}
+	return application.MagicLinkTrustedRateLimitEmail
+}
+
+func (application *Application) GetMagicLinkTrustedRateLimitApplication() int {
+	if application == nil || application.MagicLinkTrustedRateLimitApplication <= 0 {
+		return MagicLinkDefaultTrustedRateLimitApplication
+	}
+	return application.MagicLinkTrustedRateLimitApplication
+}
+
 // IsMagicLinkApiSignupEnabled tells whether a link of the API may create the account.
 // Besides the built-in rule ("Sign in or sign up" plus the application's own signup) the
 // API keeps its "enableMagicLinkSignup" switch: it lets an application sign users up by
@@ -225,6 +244,12 @@ func ValidateMagicLinkConfig(application *Application) error {
 	if application.MagicLinkCaptchaThreshold < 0 {
 		return fmt.Errorf("magicLinkCaptchaThreshold must be greater than or equal to 0")
 	}
+	if application.MagicLinkTrustedRateLimitEmail < 0 {
+		return fmt.Errorf("magicLinkTrustedRateLimitEmail must be greater than or equal to 0")
+	}
+	if application.MagicLinkTrustedRateLimitApplication < 0 {
+		return fmt.Errorf("magicLinkTrustedRateLimitApplication must be greater than or equal to 0")
+	}
 	return nil
 }
 
@@ -276,6 +301,30 @@ func IsMagicLinkAllowSend(email string, remoteAddr string, application *Applicat
 		return err
 	}
 	return checkMagicLinkRateLimit(emailCount, ipCount, applicationCount, application)
+}
+
+func checkMagicLinkTrustedRateLimit(emailCount int64, applicationCount int64, application *Application) error {
+	if emailCount >= int64(application.GetMagicLinkTrustedRateLimitEmail()) {
+		return fmt.Errorf("too many magic links requested for this email")
+	}
+	if applicationCount >= int64(application.GetMagicLinkTrustedRateLimitApplication()) {
+		return fmt.Errorf("too many magic links requested for this application")
+	}
+	return nil
+}
+
+// IsMagicLinkAllowSendTrusted is the limit of a trusted request: a server that proved the
+// application's own client credentials. It sends on behalf of many people from one
+// address, so the IP is not counted and the captcha is not asked, but the address and the
+// application keep a higher limit of their own, so a leaked secret cannot flood a mailbox
+// or turn the application into a mailer. The window and the counted links are the same as
+// for IsMagicLinkAllowSend.
+func IsMagicLinkAllowSendTrusted(email string, remoteAddr string, application *Application) error {
+	emailCount, _, applicationCount, err := GetMagicLinkRateLimitCounts(email, remoteAddr, application)
+	if err != nil {
+		return err
+	}
+	return checkMagicLinkTrustedRateLimit(emailCount, applicationCount, application)
 }
 
 func ResolveMagicLinkExpireTime(application *Application, expiresInMinutes int, expireTime string, now time.Time) (time.Time, error) {
