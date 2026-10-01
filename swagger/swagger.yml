@@ -5042,6 +5042,12 @@ definitions:
       magicLinkCaptchaThreshold:
         type: integer
         format: int64
+      magicLinkTrustedRateLimitEmail:
+        type: integer
+        format: int64
+      magicLinkTrustedRateLimitApplication:
+        type: integer
+        format: int64
       favicon:
         type: string
       footerHtml:

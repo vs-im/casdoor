@@ -49,6 +49,11 @@ const (
 	MagicLinkMinExpireMinutes     = 2
 	MagicLinkMaxExpireMinutes     = 43200
 
+	// MagicLinkDefaultTrustedRateLimitEmail and MagicLinkDefaultTrustedRateLimitApplication
+	// are the limits of a trusted request when the application does not set its own.
+	MagicLinkDefaultTrustedRateLimitEmail       = 20
+	MagicLinkDefaultTrustedRateLimitApplication = 1000
+
 	// MagicLinkBindingSession is a link of the built-in sign-in page: it only works in the
 	// browser session that asked for it. It is the zero value, the built-in flow does not
 	// know about the column.
@@ -76,6 +81,10 @@ type MagicLinkExtension struct {
 	OpenedTime string `xorm:"varchar(100)" json:"openedTime"`
 	UsedTime   string `xorm:"varchar(100)" json:"usedTime"`
 	LastError  string `xorm:"varchar(500)" json:"lastError"`
+	// Trusted marks a link of a trusted request (a server with the application's client
+	// credentials). Such links only count towards the trusted limits, the others only
+	// towards the limits of the sign-in page.
+	Trusted bool `xorm:"bool notnull default false" json:"trusted"`
 
 	ClientId            string `xorm:"varchar(100)" json:"clientId"`
 	ResponseType        string `xorm:"varchar(100)" json:"responseType"`
@@ -153,6 +162,20 @@ func (application *Application) GetMagicLinkCaptchaThreshold() int {
 	return application.MagicLinkCaptchaThreshold
 }
 
+func (application *Application) GetMagicLinkTrustedRateLimitEmail() int {
+	if application == nil || application.MagicLinkTrustedRateLimitEmail <= 0 {
+		return MagicLinkDefaultTrustedRateLimitEmail
+	}
+	return application.MagicLinkTrustedRateLimitEmail
+}
+
+func (application *Application) GetMagicLinkTrustedRateLimitApplication() int {
+	if application == nil || application.MagicLinkTrustedRateLimitApplication <= 0 {
+		return MagicLinkDefaultTrustedRateLimitApplication
+	}
+	return application.MagicLinkTrustedRateLimitApplication
+}
+
 // IsMagicLinkApiSignupEnabled tells whether a link of the API may create the account.
 // Besides the built-in rule ("Sign in or sign up" plus the application's own signup) the
 // API keeps its "enableMagicLinkSignup" switch: it lets an application sign users up by
@@ -225,27 +248,47 @@ func ValidateMagicLinkConfig(application *Application) error {
 	if application.MagicLinkCaptchaThreshold < 0 {
 		return fmt.Errorf("magicLinkCaptchaThreshold must be greater than or equal to 0")
 	}
+	if application.MagicLinkTrustedRateLimitEmail < 0 {
+		return fmt.Errorf("magicLinkTrustedRateLimitEmail must be greater than or equal to 0")
+	}
+	if application.MagicLinkTrustedRateLimitApplication < 0 {
+		return fmt.Errorf("magicLinkTrustedRateLimitApplication must be greater than or equal to 0")
+	}
 	return nil
 }
 
 // GetMagicLinkRateLimitCounts counts the links issued within the application's window by
-// their issue time, so the links of the built-in sign-in page count as well.
+// their issue time, so the links of the built-in sign-in page count as well. The links of
+// trusted requests are left out, they have limits of their own.
 func GetMagicLinkRateLimitCounts(email string, remoteAddr string, application *Application) (int64, int64, int64, error) {
-	since := time.Now().Add(-time.Duration(application.GetMagicLinkRateLimitWindowMinutes()) * time.Minute).Unix()
-
-	emailCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And("email = ?", email).And("time > ?", since).Count(&MagicLink{})
+	since := getMagicLinkRateLimitSince(application)
+	emailCount, err := countMagicLinks(application, false, since, "email = ?", email)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	ipCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And("remote_addr = ?", remoteAddr).And("time > ?", since).Count(&MagicLink{})
+	ipCount, err := countMagicLinks(application, false, since, "remote_addr = ?", remoteAddr)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	applicationCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And("time > ?", since).Count(&MagicLink{})
+	applicationCount, err := countMagicLinks(application, false, since, "", nil)
 	if err != nil {
 		return 0, 0, 0, err
 	}
 	return emailCount, ipCount, applicationCount, nil
+}
+
+func getMagicLinkRateLimitSince(application *Application) int64 {
+	return time.Now().Add(-time.Duration(application.GetMagicLinkRateLimitWindowMinutes()) * time.Minute).Unix()
+}
+
+// countMagicLinks counts the links of the application issued after since, either those of
+// trusted requests or all the others, optionally narrowed by one more condition.
+func countMagicLinks(application *Application, trusted bool, since int64, cond string, arg interface{}) (int64, error) {
+	session := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And("trusted = ?", trusted).And("time > ?", since)
+	if cond != "" {
+		session = session.And(cond, arg)
+	}
+	return session.Count(&MagicLink{})
 }
 
 func IsMagicLinkCaptchaRequired(email string, remoteAddr string, application *Application) (bool, error) {
@@ -276,6 +319,35 @@ func IsMagicLinkAllowSend(email string, remoteAddr string, application *Applicat
 		return err
 	}
 	return checkMagicLinkRateLimit(emailCount, ipCount, applicationCount, application)
+}
+
+func checkMagicLinkTrustedRateLimit(emailCount int64, applicationCount int64, application *Application) error {
+	if emailCount >= int64(application.GetMagicLinkTrustedRateLimitEmail()) {
+		return fmt.Errorf("too many magic links requested for this email")
+	}
+	if applicationCount >= int64(application.GetMagicLinkTrustedRateLimitApplication()) {
+		return fmt.Errorf("too many magic links requested for this application")
+	}
+	return nil
+}
+
+// IsMagicLinkAllowSendTrusted is the limit of a trusted request: a server that proved the
+// application's own client credentials. It sends on behalf of many people from one
+// address, so the IP is not counted and the captcha is not asked, but the address and the
+// application keep a higher limit of their own, so a leaked secret cannot flood a mailbox
+// or turn the application into a mailer. The window is the one of IsMagicLinkAllowSend,
+// but only the links of trusted requests are counted.
+func IsMagicLinkAllowSendTrusted(email string, remoteAddr string, application *Application) error {
+	since := getMagicLinkRateLimitSince(application)
+	emailCount, err := countMagicLinks(application, true, since, "email = ?", email)
+	if err != nil {
+		return err
+	}
+	applicationCount, err := countMagicLinks(application, true, since, "", nil)
+	if err != nil {
+		return err
+	}
+	return checkMagicLinkTrustedRateLimit(emailCount, applicationCount, application)
 }
 
 func ResolveMagicLinkExpireTime(application *Application, expiresInMinutes int, expireTime string, now time.Time) (time.Time, error) {

@@ -191,6 +191,10 @@ type Application struct {
 	MagicLinkRateLimitIP            int    `json:"magicLinkRateLimitIp"`
 	MagicLinkRateLimitApplication   int    `json:"magicLinkRateLimitApplication"`
 	MagicLinkCaptchaThreshold       int    `json:"magicLinkCaptchaThreshold"`
+	// The limits of a trusted request (see IsMagicLinkAllowSendTrusted): a server that
+	// proves the application's own client credentials and asks for the trusted path.
+	MagicLinkTrustedRateLimitEmail       int `json:"magicLinkTrustedRateLimitEmail"`
+	MagicLinkTrustedRateLimitApplication int `json:"magicLinkTrustedRateLimitApplication"`
 
 	CustomScopes []*ScopeDescription `xorm:"mediumtext" json:"customScopes"`
 
