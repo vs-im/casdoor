@@ -116,7 +116,9 @@ from a backend) sets `"trusted": true` together with the application's own `clie
 secret (`applicationClientSecret`, or `clientSecret` when no `captchaToken` is sent). Such a request
 is not asked for a captcha and is not counted per IP; instead it is limited by
 `magicLinkTrustedRateLimitEmail` per address and `magicLinkTrustedRateLimitApplication` per
-application over the same window (§6), so a leaked secret cannot flood a mailbox. The application
+application over the same window (§6), so a leaked secret cannot flood a mailbox. Its links are
+marked `trusted` and are counted apart: they never use up the limits or trip the captcha of the
+sign-in page for the same address, and the links of the sign-in page never use up the trusted limits. The application
 must belong to `organization`. `"trusted": true` with missing or wrong credentials gets
 `auth:Unauthorized operation`. Without `trusted` a request is checked as before even when it carries
 the credentials, so a sign-in page that forwards its visitors with the application's credentials
@@ -281,7 +283,9 @@ is still enforced — signup by link does not bypass it.
 | `MagicLinkTrustedRateLimitApplication` | `magicLinkTrustedRateLimitApplication` | 1000 | links per application per window for a trusted request |
 
 All counts include links of **both** flows (they share the table), so a burst through the API
-throttles the built-in flow's resend for the same address and vice versa.
+throttles the built-in flow's resend for the same address and vice versa. Links of trusted requests
+(`trusted` column of `magic_link`) are the exception: they only count towards the trusted limits,
+and the trusted limits only count them.
 
 `Provider` (the application's Email provider) carries the mail templates:
 `Content` (shared/legacy, used by the built-in flow and as the API's second fallback),

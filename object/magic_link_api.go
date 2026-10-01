@@ -81,6 +81,10 @@ type MagicLinkExtension struct {
 	OpenedTime string `xorm:"varchar(100)" json:"openedTime"`
 	UsedTime   string `xorm:"varchar(100)" json:"usedTime"`
 	LastError  string `xorm:"varchar(500)" json:"lastError"`
+	// Trusted marks a link of a trusted request (a server with the application's client
+	// credentials). Such links only count towards the trusted limits, the others only
+	// towards the limits of the sign-in page.
+	Trusted bool `xorm:"bool notnull default false" json:"trusted"`
 
 	ClientId            string `xorm:"varchar(100)" json:"clientId"`
 	ResponseType        string `xorm:"varchar(100)" json:"responseType"`
@@ -254,19 +258,30 @@ func ValidateMagicLinkConfig(application *Application) error {
 }
 
 // GetMagicLinkRateLimitCounts counts the links issued within the application's window by
-// their issue time, so the links of the built-in sign-in page count as well.
+// their issue time, so the links of the built-in sign-in page count as well. The links of
+// trusted requests are left out, they have limits of their own.
 func GetMagicLinkRateLimitCounts(email string, remoteAddr string, application *Application) (int64, int64, int64, error) {
-	since := time.Now().Add(-time.Duration(application.GetMagicLinkRateLimitWindowMinutes()) * time.Minute).Unix()
+	return getMagicLinkRateLimitCounts(email, remoteAddr, application, false)
+}
 
-	emailCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And("email = ?", email).And("time > ?", since).Count(&MagicLink{})
+// getMagicLinkRateLimitCounts counts either the links of trusted requests or all the
+// others. A row written before the "trusted" column existed is not trusted.
+func getMagicLinkRateLimitCounts(email string, remoteAddr string, application *Application, trusted bool) (int64, int64, int64, error) {
+	since := time.Now().Add(-time.Duration(application.GetMagicLinkRateLimitWindowMinutes()) * time.Minute).Unix()
+	trustedCond := "(trusted = ? OR trusted IS NULL)"
+	if trusted {
+		trustedCond = "trusted = ?"
+	}
+
+	emailCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And(trustedCond, trusted).And("email = ?", email).And("time > ?", since).Count(&MagicLink{})
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	ipCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And("remote_addr = ?", remoteAddr).And("time > ?", since).Count(&MagicLink{})
+	ipCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And(trustedCond, trusted).And("remote_addr = ?", remoteAddr).And("time > ?", since).Count(&MagicLink{})
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	applicationCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And("time > ?", since).Count(&MagicLink{})
+	applicationCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And(trustedCond, trusted).And("time > ?", since).Count(&MagicLink{})
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -317,10 +332,10 @@ func checkMagicLinkTrustedRateLimit(emailCount int64, applicationCount int64, ap
 // application's own client credentials. It sends on behalf of many people from one
 // address, so the IP is not counted and the captcha is not asked, but the address and the
 // application keep a higher limit of their own, so a leaked secret cannot flood a mailbox
-// or turn the application into a mailer. The window and the counted links are the same as
-// for IsMagicLinkAllowSend.
+// or turn the application into a mailer. The window is the one of IsMagicLinkAllowSend,
+// but only the links of trusted requests are counted.
 func IsMagicLinkAllowSendTrusted(email string, remoteAddr string, application *Application) error {
-	emailCount, _, applicationCount, err := GetMagicLinkRateLimitCounts(email, remoteAddr, application)
+	emailCount, _, applicationCount, err := getMagicLinkRateLimitCounts(email, remoteAddr, application, true)
 	if err != nil {
 		return err
 	}

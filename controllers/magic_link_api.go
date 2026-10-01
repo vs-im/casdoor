@@ -228,14 +228,14 @@ func (c *ApiController) SendMagicLink() {
 
 	provider, err := application.GetEmailProvider("Magic link")
 	if err != nil {
-		c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, err.Error())
+		c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, trustedSend, err.Error())
 		util.LogWarning(c.Ctx, "Magic link email provider lookup failed, organization = %s, application = %s, email = %s, error = %s", application.Organization, application.Name, requestForm.Email, err.Error())
 		c.respondMagicLinkSendAccepted(expireAt)
 		return
 	}
 	if provider == nil {
 		errText := fmt.Sprintf(c.T("verification:please add an Email provider to the \"Providers\" list for the application: %s"), application.Name)
-		c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, errText)
+		c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, trustedSend, errText)
 		util.LogWarning(c.Ctx, "Magic link email provider is not configured, organization = %s, application = %s, email = %s", application.Organization, application.Name, requestForm.Email)
 		c.respondMagicLinkSendAccepted(expireAt)
 		return
@@ -255,7 +255,7 @@ func (c *ApiController) SendMagicLink() {
 			errText = err.Error()
 		}
 		if errText != "" {
-			c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, errText)
+			c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, trustedSend, errText)
 			util.LogInfo(c.Ctx, "Magic link request accepted without sending, organization = %s, application = %s, email = %s, reason = %s", application.Organization, application.Name, requestForm.Email, errText)
 			c.respondMagicLinkSendAccepted(expireAt)
 			return
@@ -266,7 +266,7 @@ func (c *ApiController) SendMagicLink() {
 	if !(user == nil && requestForm.Permission == "") {
 		permission, err = object.ResolveMagicLinkPermission(application, user, requestForm.Permission)
 		if err != nil {
-			c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, err.Error())
+			c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, trustedSend, err.Error())
 			util.LogInfo(c.Ctx, "Magic link request accepted without sending, organization = %s, application = %s, email = %s, reason = %s", application.Organization, application.Name, requestForm.Email, err.Error())
 			c.respondMagicLinkSendAccepted(expireAt)
 			return
@@ -279,6 +279,7 @@ func (c *ApiController) SendMagicLink() {
 		return
 	}
 	link.Group = requestForm.Group
+	link.Trusted = trustedSend
 	link.AuthAction = getMagicLinkAuthAction(user == nil)
 	object.BindMagicLinkToClient(link, requestForm.SessionSecret)
 
@@ -330,9 +331,10 @@ func (c *ApiController) verifyMagicLinkCaptcha(application *object.Application, 
 	return true, nil
 }
 
-func (c *ApiController) saveFailedMagicLink(application *object.Application, requestForm *MagicLinkRequestForm, clientIP string, oauth map[string]string, expireAt time.Time, lastError string) {
-	link := object.NewMagicLink(application, nil, requestForm.Email, clientIP, c.GetSessionUsername(), "", oauth, expireAt)
+func (c *ApiController) saveFailedMagicLink(application *object.Application, requestForm *MagicLinkRequestForm, clientIP string, oauth map[string]string, expireAt time.Time, trustedSend bool, lastError string) {
+	link := object.NewMagicLink(application, nil, requestForm.Email, clientIP, getMagicLinkRequester(c.GetSessionUsername(), application, trustedSend), "", oauth, expireAt)
 	link.Group = requestForm.Group
+	link.Trusted = trustedSend
 	_ = object.AddFailedMagicLink(link, lastError)
 }
 
