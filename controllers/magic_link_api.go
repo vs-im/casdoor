@@ -21,6 +21,7 @@ package controllers
 // token, its mail substitution, its atomic claim and its signup.
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -373,7 +374,7 @@ func validateMagicLinkClientCredentials(application *object.Application, clientI
 	if application == nil || clientID == "" || clientSecret == "" {
 		return false, fmt.Errorf("invalid magic link client credentials")
 	}
-	if application.ClientId != clientID || application.ClientSecret != clientSecret {
+	if application.ClientId != clientID || application.ClientSecret == "" || subtle.ConstantTimeCompare([]byte(application.ClientSecret), []byte(clientSecret)) != 1 {
 		return false, fmt.Errorf("invalid magic link client credentials")
 	}
 	return true, nil

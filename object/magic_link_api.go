@@ -261,31 +261,34 @@ func ValidateMagicLinkConfig(application *Application) error {
 // their issue time, so the links of the built-in sign-in page count as well. The links of
 // trusted requests are left out, they have limits of their own.
 func GetMagicLinkRateLimitCounts(email string, remoteAddr string, application *Application) (int64, int64, int64, error) {
-	return getMagicLinkRateLimitCounts(email, remoteAddr, application, false)
-}
-
-// getMagicLinkRateLimitCounts counts either the links of trusted requests or all the
-// others. A row written before the "trusted" column existed is not trusted.
-func getMagicLinkRateLimitCounts(email string, remoteAddr string, application *Application, trusted bool) (int64, int64, int64, error) {
-	since := time.Now().Add(-time.Duration(application.GetMagicLinkRateLimitWindowMinutes()) * time.Minute).Unix()
-	trustedCond := "(trusted = ? OR trusted IS NULL)"
-	if trusted {
-		trustedCond = "trusted = ?"
-	}
-
-	emailCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And(trustedCond, trusted).And("email = ?", email).And("time > ?", since).Count(&MagicLink{})
+	since := getMagicLinkRateLimitSince(application)
+	emailCount, err := countMagicLinks(application, false, since, "email = ?", email)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	ipCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And(trustedCond, trusted).And("remote_addr = ?", remoteAddr).And("time > ?", since).Count(&MagicLink{})
+	ipCount, err := countMagicLinks(application, false, since, "remote_addr = ?", remoteAddr)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	applicationCount, err := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And(trustedCond, trusted).And("time > ?", since).Count(&MagicLink{})
+	applicationCount, err := countMagicLinks(application, false, since, "", nil)
 	if err != nil {
 		return 0, 0, 0, err
 	}
 	return emailCount, ipCount, applicationCount, nil
+}
+
+func getMagicLinkRateLimitSince(application *Application) int64 {
+	return time.Now().Add(-time.Duration(application.GetMagicLinkRateLimitWindowMinutes()) * time.Minute).Unix()
+}
+
+// countMagicLinks counts the links of the application issued after since, either those of
+// trusted requests or all the others, optionally narrowed by one more condition.
+func countMagicLinks(application *Application, trusted bool, since int64, cond string, arg interface{}) (int64, error) {
+	session := ormer.Engine.Where("owner = ?", application.Organization).And("application = ?", application.Name).And("trusted = ?", trusted).And("time > ?", since)
+	if cond != "" {
+		session = session.And(cond, arg)
+	}
+	return session.Count(&MagicLink{})
 }
 
 func IsMagicLinkCaptchaRequired(email string, remoteAddr string, application *Application) (bool, error) {
@@ -335,7 +338,12 @@ func checkMagicLinkTrustedRateLimit(emailCount int64, applicationCount int64, ap
 // or turn the application into a mailer. The window is the one of IsMagicLinkAllowSend,
 // but only the links of trusted requests are counted.
 func IsMagicLinkAllowSendTrusted(email string, remoteAddr string, application *Application) error {
-	emailCount, _, applicationCount, err := getMagicLinkRateLimitCounts(email, remoteAddr, application, true)
+	since := getMagicLinkRateLimitSince(application)
+	emailCount, err := countMagicLinks(application, true, since, "email = ?", email)
+	if err != nil {
+		return err
+	}
+	applicationCount, err := countMagicLinks(application, true, since, "", nil)
 	if err != nil {
 		return err
 	}
