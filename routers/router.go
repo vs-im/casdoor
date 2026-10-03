@@ -48,6 +48,7 @@ func InitAPI() {
 	web.Router("/api/login", &controllers.ApiController{}, "POST:Login")
 	web.Router("/api/send-magic-link", &controllers.ApiController{}, "POST:SendMagicLink")
 	web.Router("/api/verify-magic-link", &controllers.ApiController{}, "GET:VerifyMagicLink")
+	web.Router("/api/get-captured-magic-link", &controllers.ApiController{}, "POST:GetCapturedMagicLink")
 	web.Router("/api/get-app-login", &controllers.ApiController{}, "GET:GetApplicationLogin")
 	web.Router("/api/get-dashboard", &controllers.ApiController{}, "GET:GetDashboard")
 	web.Router("/api/get-dashboard-providers", &controllers.ApiController{}, "GET:GetDashboardProviderDistribution")

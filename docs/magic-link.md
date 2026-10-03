@@ -391,3 +391,17 @@ re-signature of `generateMagicLinkToken`, `HashMagicLinkSecret`, `getMagicLinkOr
 `addMagicLinkUser`/`getMagicLinkSessionHash` breaks the build in those fork-only files rather than
 producing a merge conflict. `object/ormer.go` keeps a single non-hook edit — `a.syncMagicLink()` in
 place of upstream's `Sync2(new(MagicLink))` — to run the migration of §10 ahead of the sync.
+
+## Dev capture of links for end-to-end tests
+
+With `CASDOOR_DEV_MAGIC_LINK_CAPTURE=true` (off by default; set it only on dev and staging) a link of
+`/api/send-magic-link` addressed to a `.test` mailbox is not mailed. Its open link is kept in memory (the last one per
+application and address, ten minutes, lost on restart) and a test server reads it with the application's credentials:
+
+```
+POST /api/get-captured-magic-link
+{"organization": "...", "application": "...", "clientId": "...", "clientSecret": "...", "email": "x@y.test"}
+-> {"status": "ok", "data": {"link": "https://.../magic-link/callback?token=..."}}
+```
+
+Without the flag the endpoint answers 404; wrong credentials are refused. Addresses outside `.test` are always mailed.

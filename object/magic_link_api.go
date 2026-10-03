@@ -571,12 +571,19 @@ func SendApiMagicLink(organization *Organization, user *User, provider *Provider
 		return err
 	}
 
+	callbackURL := BuildMagicLinkCallbackURL(link, token, origin)
+	if ShouldCaptureMagicLink(link.Email) {
+		// dev capture: nothing is mailed to a ".test" address, the open link is kept for the test
+		captureMagicLink(util.GetId(link.Owner, link.Application), link.Email, callbackURL, time.Now())
+		return UpdateMagicLinkStatus(link, MagicLinkStatusSent, "")
+	}
+
 	title := provider.Title
 	if title == "" {
 		title = "Magic Link"
 	}
 
-	content := getApiMagicLinkEmailContent(provider, BuildMagicLinkCallbackURL(link, token, origin), user, link)
+	content := getApiMagicLinkEmailContent(provider, callbackURL, user, link)
 	err = SendEmail(provider, title, content, []string{link.Email}, organization.DisplayName)
 	if err != nil {
 		// a link nobody received must not stay claimable

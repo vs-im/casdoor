@@ -90,6 +90,7 @@ p, *, *, POST, /api/set-password, *, *
 p, *, *, POST, /api/send-verification-code, *, *
 p, *, *, POST, /api/send-magic-link, *, *
 p, *, *, GET, /api/verify-magic-link, *, *
+p, *, *, POST, /api/get-captured-magic-link, *, *
 p, *, *, GET, /api/get-captcha, *, *
 p, *, *, POST, /api/verify-captcha, *, *
 p, *, *, POST, /api/verify-code, *, *
