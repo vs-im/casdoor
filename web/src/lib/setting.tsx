@@ -2782,7 +2782,9 @@ export function getLoginLink(application) {
   } else if (authConfig.appName === application.name) {
     url = "/login";
   } else if (application.signinUrl === "") {
-    url = trim(application.homepageUrl, "/") + "/login";
+    // the application's own sign-in page is this instance's organization login page, not
+    // homepageUrl + "/login": homepageUrl defaults to the upstream site (casdoor.org)
+    url = getOrganizationLoginPath(application.organization);
   } else {
     url = application.signinUrl;
   }
