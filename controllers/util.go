@@ -170,7 +170,9 @@ func (c *ApiController) RequireSignedInUser() (*object.User, bool) {
 		}
 	}
 
-	user, err := object.GetUser(userId)
+	// an application credential without ?userId= acts as the virtual admin user of its
+	// organization (see object.GetAppUser), like IsOrgAdmin() and the object layer do
+	user, err := object.GetUserOrAppUser(userId)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return nil, false
