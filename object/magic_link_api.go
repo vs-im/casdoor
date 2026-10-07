@@ -199,7 +199,9 @@ func (application *Application) GetMagicLinkSignupApplication() *Application {
 	}
 
 	res := *application
+	// the explicit magic link signup switch wins over the console's "Disable self signup"
 	res.EnableSignUp = true
+	res.DisableSelfSignup = false
 	res.SignupItems = make([]*SignupItem, 0, len(application.SignupItems))
 	for _, signupItem := range application.SignupItems {
 		if signupItem != nil && isMagicLinkSignupItem(signupItem.Name) {

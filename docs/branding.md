@@ -146,6 +146,9 @@ Conflict zones, in the order they usually appear:
 | `web/index.html` | changes the shell | the `<title>`, the description and `/favicon.png` must stay **byte-identical to the strings `applyBrandToIndexHtml` looks for** |
 | `web/src/locales/*/data.json` | new and changed strings | take upstream's text, then replace the product name in the **values** with `{{brand}}` (keys stay upstream) |
 | `web/src/lib/setting.tsx`, `web/src/pages/defaults.ts`, `web/src/lib/tour-config.ts` | new defaults with the upstream product name | route them through `Conf.Brand*` / the `{brand}` placeholder |
+| `object/token_jwt.go`, `object/token_oauth.go`, `object/token_oauth_util.go`, `object/token_standard_jwt.go`, `controllers/token.go` | reshapes token generation (`jwtTokenOptions`, `getUserGrantToken`, new grants) | take upstream's structure and keep: the `Sid` claim in every claims struct, fed by `jwtTokenOptions.SessionId` on every path (password grant through `getUserGrantToken(…, session)`, authorization code, implicit, refresh); `passwordSession` from `controllers/token.go`; `getTokenAudience()` (a shared application's token carries the plain client_id **and** `<client_id>-org-<org>`, where upstream sets only the suffixed one); `updateClaimsWithRoles()` (Hasura role claims) on the JWT-Custom access and refresh tokens |
+| `Dockerfile`, `docker-compose.yml` | upstream's stage names, base images, an ALLINONE stage | the fork's build: lowercase stages, `BRAND_ASSETS_DIR`, no ALLINONE stage, `HEALTHCHECK` on 7777 (the port of the fork's `conf/app.conf`) |
+| `controllers/util.go` | `RequireSignedInUser()` | keep `GetUserOrAppUser()`: an application credential without `?userId=` is the admin of its organization |
 
 After the merge, in this order:
 

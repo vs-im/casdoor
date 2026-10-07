@@ -124,6 +124,16 @@ func TestIsMagicLinkApiSignupEnabled(t *testing.T) {
 		t.Fatalf("unexpected signup check error: %v", err)
 	}
 
+	// a "Disable self signup" left over from the console does not close the explicit switch
+	application.DisableSelfSignup = true
+	if err := CheckMagicLinkSignup(application.GetMagicLinkSignupApplication(), "en"); err != nil {
+		t.Fatalf("disableSelfSignup should not close the magic link signup switch: %v", err)
+	}
+	if !application.DisableSelfSignup {
+		t.Fatal("the signup view must not change the application itself")
+	}
+	application.DisableSelfSignup = false
+
 	// the items of a closed signup page a link cannot answer are left out for the switch, the built-in rule obeys them
 	application.SignupItems = []*SignupItem{{Name: "Phone", Required: true}}
 	if err := CheckMagicLinkSignup(application.GetMagicLinkSignupApplication(), "en"); err != nil {

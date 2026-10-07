@@ -584,6 +584,11 @@ func (c *ApiController) ResetEmailOrPhone() {
 	if !ok {
 		return
 	}
+	// an application credential stands for no real account whose email or phone could change
+	if object.IsAppUser(user.Name) {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return
+	}
 
 	clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
 

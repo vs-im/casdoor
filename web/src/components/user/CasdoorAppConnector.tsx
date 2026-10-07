@@ -4,10 +4,16 @@ import {QRCodeSVG} from "qrcode.react";
 import {Alert, AlertDescription} from "@/components/ui/alert";
 import {Button} from "@/components/ui/button";
 import * as Setting from "@/lib/setting";
+import * as Conf from "@/Conf";
 
 export const CasdoorAuthenticatorUrl = "https://app.casdoor.ai";
 
 export function CasdoorAuthenticatorLink({className}: {className?: string}) {
+  // fork: a branded deployment does not advertise the upstream product's app
+  if (Conf.BrandName !== "Casdoor") {
+    return null;
+  }
+
   return (
     <p className={className ?? "text-sm"}>
       <a href={CasdoorAuthenticatorUrl} target="_blank" rel="noreferrer" className="font-medium text-primary underline underline-offset-4">

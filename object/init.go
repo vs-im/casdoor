@@ -203,7 +203,7 @@ func initBuiltInUser() {
 	}
 
 	if user.Password == "" {
-		fmt.Println("The password of built-in/admin is not set, open Casdoor in the browser to set it, or set initAdminPassword before the first start")
+		fmt.Printf("The password of built-in/admin is not set, open %s in the browser to set it, or set initAdminPassword before the first start\n", conf.GetBrandName())
 	}
 }
 
