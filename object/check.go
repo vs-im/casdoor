@@ -285,6 +285,10 @@ func CheckPassword(user *User, password string, lang string, options ...bool) er
 	if passwordType == "" {
 		passwordType = organization.PasswordType
 	}
+	// an organization without a password type stores the passwords as they are
+	if passwordType == "" {
+		passwordType = "plain"
+	}
 
 	credManager := cred.GetCredManager(passwordType)
 	if credManager == nil {
@@ -301,7 +305,7 @@ func CheckPassword(user *User, password string, lang string, options ...bool) er
 		return recordSigninErrorInfo(user, lang, enableCaptcha)
 	}
 
-	isOutdated := passwordType != organization.PasswordType
+	isOutdated := organization.PasswordType != "" && passwordType != organization.PasswordType
 	if isOutdated {
 		user.Password = password
 		user.UpdateUserPassword(organization)
@@ -639,6 +643,28 @@ func IsUserOfApplication(user *User, application *Application) (bool, error) {
 	return organization != nil && organization.DefaultApplication == application.Name && application.Organization == "built-in", nil
 }
 
+func CheckPasswordOnlySignin(user *User, clientIp string, lang string) error {
+	organization, err := GetOrganizationByUser(user)
+	if err != nil {
+		return err
+	}
+	if organization != nil && organization.DisableSignin {
+		return fmt.Errorf(i18n.Translate(lang, "auth:The organization: %s has disabled users to signin"), organization.Name)
+	}
+
+	if clientIp != "" {
+		err = CheckEntryIp(clientIp, user, nil, organization, lang)
+		if err != nil {
+			return err
+		}
+	}
+
+	if user.NeedUpdatePassword || IsNeedPromptMfa(organization, user) {
+		return fmt.Errorf("the user: %s must update the password or set up MFA on the login page first", user.GetId())
+	}
+	return nil
+}
+
 func CheckApplicationSignin(application *Application, user *User, clientIp string, lang string) error {
 	if user.IsForbidden {
 		return errors.New(i18n.Translate(lang, "check:The user is forbidden to sign in, please contact the administrator"))
@@ -961,42 +987,44 @@ func getOrganizationGroups(owner string, groups []string) []string {
 	return res
 }
 
+// GetCaptchaProviderItem returns the captcha provider the login page shows: the first one with the rule
+// "Always", then "Dynamic", then "Internet-Only"
+func GetCaptchaProviderItem(application *Application) *ProviderItem {
+	for _, rule := range []string{"Always", "Dynamic", "Internet-Only"} {
+		for _, providerItem := range application.Providers {
+			if providerItem.Provider != nil && providerItem.Provider.Category == "Captcha" && providerItem.Rule == rule {
+				return providerItem
+			}
+		}
+	}
+	return nil
+}
+
 func CheckToEnableCaptcha(application *Application, organization, username string, clientIp string) (bool, error) {
-	if len(application.Providers) == 0 {
+	providerItem := GetCaptchaProviderItem(application)
+	if providerItem == nil {
 		return false, nil
 	}
 
-	for _, providerItem := range application.Providers {
-		if providerItem.Provider == nil || providerItem.Provider.Category != "Captcha" {
-			continue
-		}
-
-		if providerItem.Rule == "Internet-Only" {
-			if util.IsInternetIp(clientIp) {
-				return true, nil
-			}
-		}
-
-		if providerItem.Rule == "Dynamic" {
-			user, err := GetUserByFields(organization, username)
-			if err != nil {
-				return false, err
-			}
-
-			if user != nil {
-				failedSigninLimit, _, err := GetFailedSigninConfigByUser(user)
-				if err != nil {
-					return false, err
-				}
-
-				return user.SigninWrongTimes >= failedSigninLimit, nil
-			}
-
-			return false, nil
-		}
-
-		return providerItem.Rule == "Always", nil
+	switch providerItem.Rule {
+	case "Always":
+		return true, nil
+	case "Internet-Only":
+		return util.IsInternetIp(clientIp), nil
 	}
 
-	return false, nil
+	user, err := GetUserByFields(organization, username)
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, nil
+	}
+
+	failedSigninLimit, _, err := GetFailedSigninConfigByUser(user)
+	if err != nil {
+		return false, err
+	}
+
+	return user.SigninWrongTimes >= failedSigninLimit, nil
 }

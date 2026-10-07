@@ -10,6 +10,7 @@
     "Failed to create user, user information is invalid: %s": "Failed to create user, user information is invalid: %s",
     "Failed to login in: %s": "Failed to login in: %s",
     "Invalid token": "Invalid token",
+    "Please sign in again": "Please sign in again",
     "Requested scope exceeds original device authorization scope": "Requested scope exceeds original device authorization scope",
     "State expected: %s, but got: %s": "State expected: %s, but got: %s",
     "The account for provider: %s and username: %s (%s) does not exist and is not allowed to sign up as new account via %s, please use another way to sign up": "The account for provider: %s and username: %s (%s) does not exist and is not allowed to sign up as new account via %s, please use another way to sign up",
@@ -21,6 +22,7 @@
     "The group: %s does not exist": "The group: %s does not exist",
     "The login method: login with LDAP is not enabled for the application": "The login method: login with LDAP is not enabled for the application",
     "The login method: login with SMS is not enabled for the application": "The login method: login with SMS is not enabled for the application",
+    "The login method: login with WebAuthn is not enabled for the application": "The login method: login with WebAuthn is not enabled for the application",
     "The login method: login with email is not enabled for the application": "The login method: login with email is not enabled for the application",
     "The login method: login with face is not enabled for the application": "The login method: login with face is not enabled for the application",
     "The login method: login with magic link is not enabled for the application": "The login method: login with magic link is not enabled for the application",
@@ -31,6 +33,7 @@
     "The plan: %s does not exist": "The plan: %s does not exist",
     "The pricing: %s does not exist": "The pricing: %s does not exist",
     "The pricing: %s does not have plan: %s": "The pricing: %s does not have plan: %s",
+    "The pricing: %s is invite-only, only invited users can use it": "The pricing: %s is invite-only, only invited users can use it",
     "The provider: %s does not exist": "The provider: %s does not exist",
     "The provider: %s is not enabled for the application": "The provider: %s is not enabled for the application",
     "Unauthorized operation": "Unauthorized operation",
@@ -44,6 +47,9 @@
   },
   "cas": {
     "Service %s and %s do not match": "Service %s and %s do not match"
+  },
+  "cert": {
+    "The cert name: %s is already used by another organization": "The cert name: %s is already used by another organization"
   },
   "check": {
     "%s does not meet the CIDR format requirements: %s": "%s does not meet the CIDR format requirements: %s",
@@ -64,6 +70,7 @@
     "Guest users must upgrade their account by setting a username and password before they can sign in directly": "Guest users must upgrade their account by setting a username and password before they can sign in directly",
     "Invitation code cannot be blank": "Invitation code cannot be blank",
     "Invitation code exhausted": "Invitation code exhausted",
+    "Invitation code expired": "Invitation code expired",
     "Invitation code is invalid": "Invitation code is invalid",
     "Invitation code suspended": "Invitation code suspended",
     "LastName cannot be blank": "LastName cannot be blank",
@@ -209,6 +216,7 @@
     "Invalid application or wrong clientSecret": "Invalid application or wrong clientSecret",
     "Invalid scope": "Invalid scope",
     "Redirect URI: %s doesn't exist in the allowed Redirect URI list": "Redirect URI: %s doesn't exist in the allowed Redirect URI list",
+    "The nonce parameter is required for this response type": "The nonce parameter is required for this response type",
     "Token not found, invalid accessToken": "Token not found, invalid accessToken"
   },
   "user": {
@@ -219,7 +227,9 @@
     "MFA phone is enabled but phone number is empty": "MFA phone is enabled but phone number is empty",
     "New password cannot contain blank space.": "New password cannot contain blank space.",
     "No application found for user": "No application found for user",
+    "Please use the set-password API to change the password": "Please use the set-password API to change the password",
     "The new password must be different from your current password": "The new password must be different from your current password",
+    "The new password must be different from your last %d passwords": "The new password must be different from your last %d passwords",
     "User is already verified": "User is already verified",
     "the user's owner and name should not be empty": "the user's owner and name should not be empty"
   },
@@ -243,6 +253,7 @@
     "Unable to get the email modify rule.": "Unable to get the email modify rule.",
     "Unable to get the phone modify rule.": "Unable to get the phone modify rule.",
     "Unknown type": "Unknown type",
+    "Wrong parameter": "Wrong parameter",
     "Wrong verification code!": "Wrong verification code!",
     "You should verify your code in %d min!": "You should verify your code in %d min!",
     "please add a SMS provider to the \"Providers\" list for the application: %s": "please add a SMS provider to the \"Providers\" list for the application: %s",

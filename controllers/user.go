@@ -380,6 +380,57 @@ func (c *ApiController) UpdateUser() {
 		}
 	}
 
+	// a password_type column means the caller writes an already hashed password as it is
+	if user.Password != "" && user.Password != "***" && user.Password != oldUser.Password && !util.InSlice(columns, "password_type") {
+		if (!isAdmin && oldUser.Tag != "guest-user") || oldUser.Ldap != "" {
+			c.ResponseError(c.T("user:Please use the set-password API to change the password"))
+			return
+		}
+
+		if strings.Contains(user.Password, " ") {
+			c.ResponseError(c.T("user:New password cannot contain blank space."))
+			return
+		}
+
+		organization, err := object.GetOrganizationByUser(oldUser)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		if organization == nil {
+			c.ResponseError(fmt.Sprintf(c.T("auth:the organization: %s is not found"), oldUser.Owner))
+			return
+		}
+
+		if msg := object.CheckPasswordComplexityByOrg(organization, user.Password, c.GetAcceptLanguage()); msg != "" {
+			c.ResponseError(msg)
+			return
+		}
+
+		msg, err := object.CheckPasswordReuse(oldUser, user.Password, organization, c.GetAcceptLanguage())
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		if msg != "" {
+			c.ResponseError(msg)
+			return
+		}
+
+		err = oldUser.AddPasswordHistory(organization)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+
+		user.UpdateUserPassword(organization)
+		user.LastChangePasswordTime = util.GetCurrentTime()
+		if len(columns) == 0 {
+			columns = object.GetDefaultUserUpdateColumns(isAdmin)
+		}
+		columns = append(columns, "password", "password_salt", "password_type", "last_change_password_time")
+	}
+
 	affected, err := object.UpdateUser(id, &user, columns, isAdmin)
 	if err != nil {
 		c.ResponseError(err.Error())
@@ -725,6 +776,57 @@ func (c *ApiController) SetPassword() {
 	c.ResponseOk()
 }
 
+// GetInitAdminStatus
+// @Title GetInitAdminStatus
+// @Tag Account API
+// @Description whether built-in/admin is waiting for its first password on the welcome page
+// @Success 200 {object} controllers.Response The Response object
+// @router /get-init-admin-status [get]
+func (c *ApiController) GetInitAdminStatus() {
+	isPending, err := object.IsInitAdminPending()
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	c.ResponseOk(isPending)
+}
+
+// InitAdminPassword
+// @Title InitAdminPassword
+// @Tag Account API
+// @Description set the first password of built-in/admin on the welcome page
+// @Param   password     formData    string  true        "The password"
+// @Success 200 {object} controllers.Response The Response object
+// @router /init-admin-password [post]
+func (c *ApiController) InitAdminPassword() {
+	password := c.Ctx.Request.Form.Get("password")
+
+	organization, err := object.GetOrganization(util.GetId("admin", "built-in"))
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	if organization != nil && organization.PasswordObfuscatorType != "" && organization.PasswordObfuscatorType != "Plain" {
+		deobfuscatedPassword, deobfuscateErr := util.GetUnobfuscatedPassword(organization.PasswordObfuscatorType, organization.PasswordObfuscatorKey, password)
+		if deobfuscateErr == nil {
+			password = deobfuscatedPassword
+		}
+	}
+
+	isSet, err := object.SetInitAdminPassword(password, c.GetAcceptLanguage())
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	if !isSet {
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return
+	}
+
+	c.ResponseOk()
+}
+
 // CheckUserPassword
 // @Title CheckUserPassword
 // @Description Check if user password is correct
@@ -809,6 +911,11 @@ func (c *ApiController) RemoveUserFromGroup() {
 
 	organization, err := object.GetOrganization(util.GetId("admin", owner))
 	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	if organization == nil {
+		c.ResponseError(fmt.Sprintf(c.T("auth:The organization: %s does not exist"), owner))
 		return
 	}
 	item := object.GetAccountItemForUpdate("Groups", organization)

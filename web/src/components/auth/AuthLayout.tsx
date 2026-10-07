@@ -7,6 +7,7 @@ import {Button} from "@/components/ui/button";
 import {LanguageSelect} from "@/components/common/LanguageSelect";
 import {ThemeToggle} from "@/components/common/ThemeToggle";
 import {CustomHtml, CustomStyle} from "@/components/common/CustomHtml";
+import {getSafeHtml, isTrustedApplication} from "@/lib/custom-html";
 import {
   getOrganizationCookieChrome,
   useApplicationHelmet,
@@ -181,8 +182,9 @@ export function AuthLayout({
   const isPhone = useIsPhone();
   useApplicationHelmet(preview ? null : application);
   // headerHtml is the organization/application chrome, pageHtml is the per-page one
-  useCustomHead(preview ? undefined : application?.headerHtml, "header");
-  useCustomHead(preview ? undefined : application?.pageHtml, "page");
+  const trusted = isTrustedApplication(application);
+  useCustomHead(preview ? undefined : application?.headerHtml, "header", trusted);
+  useCustomHead(preview ? undefined : application?.pageHtml, "page", trusted);
 
   // the backend hands us the organization's branding in cookies so the first
   // paint is already branded, before /api/get-application has come back
@@ -223,7 +225,11 @@ export function AuthLayout({
     application?.logoDark || cookieChrome.logoDark,
     [isDark && !panelIsLight ? "dark" : "light"],
   );
-  const footerHtml = application?.footerHtml || cookieChrome.footerHtml;
+  const footerHtml = application?.footerHtml;
+  const footerClassName = cn(
+    "shrink-0 text-center text-xs text-muted-foreground",
+    backgroundUrl ? "mx-auto mb-4 w-fit max-w-full rounded-full bg-background/80 px-4 py-1.5 backdrop-blur" : "py-6",
+  );
 
   return (
     <div
@@ -280,7 +286,7 @@ export function AuthLayout({
             )}
           >
             {sidePanel ? (
-              <CustomHtml html={application.formSideHtml} className="side-image hidden w-[420px] shrink-0 self-stretch lg:block" />
+              <CustomHtml html={application.formSideHtml} trusted={trusted} className="side-image hidden w-[420px] shrink-0 self-stretch lg:block" />
             ) : null}
             <div
               className={cn(
@@ -323,15 +329,16 @@ export function AuthLayout({
       </div>
 
       {/* below the centred card and at the bottom of the viewport, as antd's
-          Layout.Footer is a sibling of the Content it follows */}
+          Layout.Footer is a sibling of the Content it follows; over a background
+          image it brings its own surface, as that footer did */}
       {footerHtml ? (
         <footer
           id="footer"
-          className="shrink-0 py-6 text-center text-xs text-muted-foreground"
-          dangerouslySetInnerHTML={{__html: footerHtml}}
+          className={footerClassName}
+          dangerouslySetInnerHTML={{__html: getSafeHtml(footerHtml, trusted)}}
         />
       ) : (
-        <footer id="footer" className="shrink-0 py-6 text-center text-xs text-muted-foreground">
+        <footer id="footer" className={footerClassName}>
           <PoweredBy />
         </footer>
       )}

@@ -168,7 +168,7 @@ func (c *ApiController) SendMagicLink() {
 	}
 	clientIP := util.GetClientIpFromRequest(c.Ctx.Request)
 	if oauth["responseType"] != "" && oauth["responseType"] != "login" {
-		msg, oauthApplication, err := object.CheckOAuthLogin(oauth["clientId"], oauth["responseType"], oauth["redirectUri"], oauth["scope"], oauth["state"], c.GetAcceptLanguage())
+		msg, oauthApplication, err := object.CheckOAuthLogin(oauth["clientId"], oauth["responseType"], oauth["redirectUri"], oauth["scope"], oauth["state"], oauth["nonce"], c.GetAcceptLanguage())
 		if err != nil {
 			c.ResponseError(err.Error())
 			return

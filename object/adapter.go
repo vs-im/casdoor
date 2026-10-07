@@ -258,6 +258,10 @@ func CheckSameDbAdapterTable(adapter *Adapter) error {
 	}
 
 	table := getSameDbAdapterTable(adapter)
+	if !util.FilterSQLIdentifier(table) {
+		return fmt.Errorf("the table: %s is not a valid table name", table)
+	}
+
 	existed, err := ormer.Engine.IsTableExist(table)
 	if err != nil {
 		return err
@@ -281,6 +285,9 @@ func CheckSameDbAdapterTable(adapter *Adapter) error {
 
 func CheckAdapterHost(adapter *Adapter) error {
 	if adapter.UseSameDb || adapter.DatabaseType == "sqlite3" || adapter.DatabaseType == "sqlite" {
+		return nil
+	}
+	if isTrustedDbHost(adapter.Owner, adapter.Host, adapter.Port) {
 		return nil
 	}
 	return util.CheckInternetHost(adapter.Host)

@@ -83,6 +83,7 @@ type Organization struct {
 	DefaultPassword        string     `xorm:"varchar(200)" json:"defaultPassword"`
 	MasterVerificationCode string     `xorm:"varchar(100)" json:"masterVerificationCode"`
 	IpWhitelist            string     `xorm:"varchar(200)" json:"ipWhitelist"`
+	TrustedDbHosts         string     `xorm:"varchar(500)" json:"trustedDbHosts"`
 	InitScore              int        `json:"initScore"`
 	EnableSoftDeletion     bool       `json:"enableSoftDeletion"`
 	IsProfilePublic        bool       `json:"isProfilePublic"`
@@ -104,7 +105,9 @@ type Organization struct {
 
 	DcrPolicy string `xorm:"varchar(100)" json:"dcrPolicy"`
 
-	LdapAttributes []string `xorm:"mediumtext" json:"ldapAttributes"`
+	LdapAttributes     []string `xorm:"mediumtext" json:"ldapAttributes"`
+	EnableLdapPassword bool     `xorm:"bool" json:"enableLdapPassword"`
+	EnableRadius       bool     `xorm:"bool" json:"enableRadius"`
 
 	KerberosRealm       string `xorm:"varchar(200)" json:"kerberosRealm"`
 	KerberosKdcHost     string `xorm:"varchar(200)" json:"kerberosKdcHost"`
@@ -275,8 +278,18 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 		organization.Name = name
 	}
 
+	organization.Owner = org.Owner
+	if organization.PasswordType == "" {
+		organization.PasswordType = org.PasswordType
+	}
+
 	if name != organization.Name {
-		err := organizationChangeTrigger(name, organization.Name)
+		err = checkReservedOrganizationName(organization.Name)
+		if err != nil {
+			return false, err
+		}
+
+		err = organizationChangeTrigger(name, organization.Name)
 		if err != nil {
 			return false, err
 		}
@@ -285,6 +298,7 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 	organization.hashMasterPassword()
 
 	if !isGlobalAdmin {
+		organization.TrustedDbHosts = org.TrustedDbHosts
 		organization.NavItems = org.NavItems
 		organization.UserNavItems = org.UserNavItems
 		organization.WidgetItems = org.WidgetItems
@@ -292,6 +306,9 @@ func UpdateOrganization(id string, organization *Organization, isGlobalAdmin boo
 		organization.UserBalance = org.UserBalance
 		organization.BalanceCredit = org.BalanceCredit
 		organization.BalanceCurrency = org.BalanceCurrency
+		organization.EnableLdapPassword = org.EnableLdapPassword
+		organization.EnableRadius = org.EnableRadius
+		organization.DcrPolicy = org.DcrPolicy
 	}
 
 	session := ormer.Engine.ID(core.PK{owner, name}).AllCols()
@@ -333,7 +350,21 @@ func checkDefaultApplication(organizationName string, applicationName string, la
 	return nil
 }
 
+var reservedOrganizationNames = []string{"admin", "app"}
+
+func checkReservedOrganizationName(name string) error {
+	if util.InSlice(reservedOrganizationNames, name) {
+		return fmt.Errorf("the organization name: %s is reserved", name)
+	}
+	return nil
+}
+
 func AddOrganization(organization *Organization) (bool, error) {
+	err := checkReservedOrganizationName(organization.Name)
+	if err != nil {
+		return false, err
+	}
+
 	// there is no previous record for a new organization, so the masked values mean "empty"
 	if organization.MasterPassword == "***" {
 		organization.MasterPassword = ""
@@ -346,6 +377,11 @@ func AddOrganization(organization *Organization) (bool, error) {
 	}
 	if organization.KerberosKeytab == "***" {
 		organization.KerberosKeytab = ""
+	}
+
+	organization.Owner = "admin"
+	if organization.PasswordType == "" {
+		organization.PasswordType = "bcrypt"
 	}
 
 	organization.hashMasterPassword()

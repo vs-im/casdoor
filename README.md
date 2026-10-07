@@ -31,6 +31,9 @@
     <a href="https://github.com/casdoor/casdoor/actions/workflows/golangci-lint.yml">
       <img src="https://img.shields.io/github/actions/workflow/status/casdoor/casdoor/golangci-lint.yml?style=flat-square&label=golangci-lint&logo=go&logoColor=white" alt="golangci-lint">
     </a>
+    <a href="https://www.bestpractices.dev/projects/15254">
+      <img src="https://img.shields.io/cii/level/15254?style=flat-square&label=OpenSSF%20Best%20Practices" alt="OpenSSF Best Practices">
+    </a>
     <a href="https://discord.gg/5rPsrAzK7S">
       <img src="https://img.shields.io/discord/1022748306096537660?style=flat-square&logo=discord&label=Discord&color=5865F2" alt="Discord">
     </a>
@@ -110,7 +113,7 @@ Casdoor is a **complete identity provider**, not an authentication proxy and not
 
 - **One server, many protocols.** The same user directory is reachable over OAuth 2.0, OIDC, SAML 2.0, CAS, LDAP and SCIM, so a modern SPA and a legacy CAS-only app can share one set of accounts.
 - **Everything is editable in the UI.** Organizations, applications, providers, sign-in methods, email and SMS templates, and login-page branding are configured in the web console instead of in files you have to redeploy.
-- **Policy-based authorization built in.** Access rules are expressed with [Casbin](https://casbin.org/) — ACL, RBAC, ABAC and custom models — rather than a fixed permission scheme.
+- **Policy-based authorization built in.** Access rules are expressed with [Casbin](https://casbin.apache.org/) — ACL, RBAC, ABAC and custom models — rather than a fixed permission scheme.
 - **Straightforward to self-host.** A single Go binary plus a database. No JVM, no operator, no cluster required.
 
 If all you need is a login screen in front of an existing reverse proxy, a smaller tool may suit you better. Casdoor is for when you want to own the user directory itself.
@@ -161,7 +164,7 @@ Guide: [Try with Docker](https://casdoor.ai/docs/basic/try-with-docker)
 Requires Helm v3 and a running cluster:
 
 ```bash
-helm install casdoor oci://registry-1.docker.io/casbin/casdoor-helm-charts
+helm install casdoor oci://ghcr.io/casdoor/helm-charts/casdoor
 ```
 
 The chart does not expose Casdoor outside the cluster by default. To reach it, find the service and forward a port:
@@ -176,7 +179,14 @@ kubectl port-forward svc/<service-name-from-above> 8000:8000
 
 For a real deployment, configure an Ingress and an external database through the chart's values. [`k8s.yaml`](k8s.yaml) in this repo is a minimal plain-manifest example if you would rather not use Helm.
 
-Guide: [Try with Helm](https://casdoor.ai/docs/basic/try-with-helm)
+Guide: [Try with Helm](https://casdoor.ai/docs/basic/try-with-helm) &middot; Chart on [Artifact Hub](https://artifacthub.io/packages/helm/casdoor/casdoor)
+
+### Configuration as code
+
+Organizations, applications, users, providers, roles and permissions can be kept in Git instead of being clicked together in the UI:
+
+- **Init data file**: Casdoor applies a JSON or YAML file at startup, and with `initDataMerge = true` and `initDataWatchInterval = 30` it applies every change to the file again without a restart, only touching the fields the file sets. The Helm chart exposes it as `initData` in its values ([chart README](manifests/casdoor/README.md#declarative-configuration-init-data)). Guide: [Data initialization](https://casdoor.ai/docs/deployment/data-initialization)
+- **Terraform**: the official [Terraform provider](https://registry.terraform.io/providers/casdoor/casdoor) manages the same objects through the API, with plan, import and drift detection.
 
 ### From source — for development
 
@@ -216,6 +226,7 @@ At this point you have a running identity provider with nothing connected to it 
 - **LDAP** — sync from a directory, or serve as one
 - **WebAuthn / passkeys** — passwordless sign-in
 - **TOTP / MFA** — multi-factor authentication, including email and SMS codes
+- **[Casdoor Authenticator](https://app.casdoor.ai)** — open-source TOTP app for Android and iOS that syncs your MFA accounts with Casdoor ([source](https://github.com/casdoor/casdoor-authenticator))
 - **Face ID** — biometric sign-in
 
 **🏢 Organizations and access control**
@@ -260,6 +271,7 @@ The full documentation lives at **[casdoor.ai/docs](https://casdoor.ai/docs/over
 | Use the API | [Public API](https://casdoor.ai/docs/basic/public-api) &middot; [Swagger UI](https://door.casdoor.net/swagger) |
 | Choose an SDK | [Integrations](https://casdoor.ai/docs/category/integrations) |
 | Deploy to production | [Deployment](https://casdoor.ai/docs/category/deployment) |
+| Upgrade from v3 to v4 | [Upgrading from v3 to v4](https://casdoor.ai/docs/deployment/upgrade-v3-to-v4) |
 
 ## 🔌 SDKs and integrations
 

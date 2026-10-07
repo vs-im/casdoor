@@ -25,6 +25,7 @@ import (
 	"github.com/beego/beego/v2/core/logs"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/controllers"
+	"github.com/casdoor/casdoor/mcpself"
 	"github.com/casdoor/casdoor/object"
 
 	"github.com/beego/beego/v2/server/web/context"
@@ -205,6 +206,14 @@ func getSubject(ctx *context.Context) (string, string) {
 	return owner, name
 }
 
+func getRunSyncerObject(ctx *context.Context) (string, string, error) {
+	_, name, err := util.GetOwnerAndNameFromIdWithError(ctx.Input.Query("id"))
+	if err != nil {
+		return "", "", err
+	}
+	return ctx.Input.Query("organization"), name, nil
+}
+
 func getObject(ctx *context.Context) (string, string, error) {
 	method := ctx.Request.Method
 	path := ctx.Request.URL.Path
@@ -279,6 +288,10 @@ func getObject(ctx *context.Context) (string, string, error) {
 
 		return "", "", nil
 	} else {
+		if path == "/api/run-syncer" {
+			return getRunSyncerObject(ctx)
+		}
+
 		if path == "/api/add-policy" || path == "/api/remove-policy" || path == "/api/update-policy" || path == "/api/send-invitation" {
 			id := ctx.Input.Query("id")
 			if id != "" {
@@ -420,7 +433,7 @@ func appendObject(objects []Object, owner string, name string) []Object {
 }
 
 func willLog(subOwner string, subName string, method string, urlPath string, objOwner string, objName string) bool {
-	if subOwner == "anonymous" && subName == "anonymous" && method == "GET" && (urlPath == "/api/get-account" || urlPath == "/api/get-app-login") && objOwner == "" && objName == "" {
+	if subOwner == "anonymous" && subName == "anonymous" && method == "GET" && (urlPath == "/api/get-account" || urlPath == "/api/get-app-login" || urlPath == "/api/get-init-admin-status") && objOwner == "" && objName == "" {
 		return false
 	}
 	return true
@@ -463,18 +476,13 @@ func getUrlPath(ctx *context.Context) string {
 func getExtraInfo(ctx *context.Context, urlPath string) map[string]interface{} {
 	var extra map[string]interface{}
 	if urlPath == "/api/mcp" {
-		var m map[string]interface{}
-		if err := json.Unmarshal(ctx.Input.RequestBody, &m); err != nil {
-			return nil
-		}
-
-		method, ok := m["method"].(string)
-		if !ok {
+		var req mcpself.McpRequest
+		if err := json.Unmarshal(ctx.Input.RequestBody, &req); err != nil || req.Method == "" {
 			return nil
 		}
 
 		return map[string]interface{}{
-			"detailPathUrl": method,
+			"detailPathUrl": req.Method,
 		}
 	}
 	return extra
@@ -510,6 +518,12 @@ func getImpersonateUser(ctx *context.Context, subOwner, subName, username string
 }
 
 func ApiFilter(ctx *context.Context) {
+	urlPath := getUrlPath(ctx)
+	// before the subject is read: it may sign out a session left by another application's token
+	if !checkDynamicClientSession(ctx, urlPath) {
+		return
+	}
+
 	subOwner, subName := getSubject(ctx)
 	// stash current user info into request context for controllers
 	username := ""
@@ -532,10 +546,6 @@ func ApiFilter(ctx *context.Context) {
 	}
 
 	method := ctx.Request.Method
-	urlPath := getUrlPath(ctx)
-	if !checkDynamicClientSession(ctx, urlPath) {
-		return
-	}
 	extraInfo := getExtraInfo(ctx, urlPath)
 
 	objects := []Object{{}}
@@ -649,8 +659,33 @@ func checkDynamicClientSession(ctx *context.Context, urlPath string) bool {
 		return true
 	}
 
-	denyRequest(ctx)
-	return false
+	// a request that carries the access token itself is the client using it: keep it within the token's limits
+	if credentialUser, _ := ctx.Input.GetData(requestCredentialUserKey).(string); credentialUser != "" {
+		denyRequest(ctx)
+		return false
+	}
+
+	// otherwise it is the browser, sending only the cookie that the token-authenticated response left behind:
+	// sign that session out and go on as anonymous, so the login page and the rest of Casdoor keep working there
+	err = clearSessionOfToken(ctx)
+	if err != nil {
+		responseError(ctx, err.Error())
+		return false
+	}
+	return true
+}
+
+func isRestrictedClientSession(ctx *context.Context) (bool, error) {
+	aud, ok := ctx.Input.Session("aud").(string)
+	if !ok || aud == "" {
+		return false, nil
+	}
+
+	application, err := object.GetApplicationByClientId(aud)
+	if err != nil || application == nil {
+		return false, err
+	}
+	return !isClientSessionApiAllowed(application, getSessionUser(ctx), "/login/oauth/authorize"), nil
 }
 
 func isClientSessionApiAllowed(application *object.Application, userId string, urlPath string) bool {

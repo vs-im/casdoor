@@ -17,6 +17,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/casdoor/casdoor/object"
 )
@@ -133,6 +134,13 @@ func (c *ApiController) GrantConsent() {
 		return
 	}
 
+	// consent is asked by the authorization code and hybrid flows, both return a code
+	responseType, ok := object.ParseResponseType(request.ResponseType)
+	if !ok || !responseType.Code {
+		c.ResponseError(fmt.Sprintf(c.T("token:Grant_type: %s is not supported in this application"), request.ResponseType))
+		return
+	}
+
 	// Validate application by clientId
 	application, err := object.GetApplicationByClientId(request.ClientId)
 	if err != nil {
@@ -140,7 +148,7 @@ func (c *ApiController) GrantConsent() {
 		return
 	}
 	if application == nil {
-		c.ResponseError(c.T("general:Invalid client_id"))
+		c.ResponseError(c.T("token:Invalid client_id"))
 		return
 	}
 
@@ -220,6 +228,7 @@ func (c *ApiController) GrantConsent() {
 		request.Challenge,
 		request.Resource,
 		c.Ctx.Input.CruSession.SessionID(context.Background()),
+		c.getSessionAuthTime(),
 		c.Ctx.Request.Host,
 		c.GetAcceptLanguage(),
 	)
@@ -228,5 +237,6 @@ func (c *ApiController) GrantConsent() {
 		return
 	}
 
-	c.ResponseOk(code.Code)
+	c.Data["json"] = codeToResponseWithTokens(code, responseType)
+	c.ServeJSON()
 }

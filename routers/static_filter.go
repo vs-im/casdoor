@@ -17,7 +17,6 @@ package routers
 import (
 	"compress/gzip"
 	stdcontext "context"
-	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -69,6 +68,27 @@ func getWebBuildFolder() string {
 	return path
 }
 
+// GetSwaggerFolder finds the swagger folder like getWebBuildFolder(), so an instance whose folder only has its own
+// conf, logs and files can serve the swagger of the shared Casdoor code on the same machine
+func GetSwaggerFolder() string {
+	path := "swagger"
+	if util.FileExist(filepath.Join(path, "swagger.json")) || frontendBaseDir == "" {
+		return path
+	}
+
+	candidates := []string{
+		filepath.Join(frontendBaseDir, "swagger"),
+		filepath.Join(filepath.Dir(frontendBaseDir), "casdoor", "swagger"),
+	}
+	for _, candidate := range candidates {
+		if util.FileExist(filepath.Join(candidate, "swagger.json")) {
+			return candidate
+		}
+	}
+
+	return path
+}
+
 func fastAutoSignin(ctx *context.Context) (string, error) {
 	userId := getSessionUser(ctx)
 	if userId == "" || isSessionExpired(ctx) {
@@ -83,7 +103,14 @@ func fastAutoSignin(ctx *context.Context) (string, error) {
 	nonce := ctx.Input.Query("nonce")
 	codeChallenge := ctx.Input.Query("code_challenge")
 	resource := ctx.Input.Query("resource")
-	if clientId == "" || responseType != "code" || redirectUri == "" {
+	responseMode := ctx.Input.Query("response_mode")
+	if clientId == "" || responseType != "code" || redirectUri == "" || (responseMode != "" && responseMode != "query") {
+		return "", nil
+	}
+
+	// prompt=login and an expired max_age need the user to enter credentials on the sign-in page
+	authTime, _ := ctx.Input.Session("authTime").(int64)
+	if !object.IsSessionAuthFresh(ctx.Input.Query("prompt"), ctx.Input.Query("max_age"), authTime) {
 		return "", nil
 	}
 
@@ -124,18 +151,20 @@ func fastAutoSignin(ctx *context.Context) (string, error) {
 		return "", nil
 	}
 
-	code, err := object.GetOAuthCode(userId, clientId, "", "autoSignin", responseType, redirectUri, scope, state, nonce, codeChallenge, resource, ctx.Input.CruSession.SessionID(stdcontext.Background()), ctx.Request.Host, getAcceptLanguage(ctx))
+	code, err := object.GetOAuthCode(userId, clientId, "", "autoSignin", responseType, redirectUri, scope, state, nonce, codeChallenge, resource, ctx.Input.CruSession.SessionID(stdcontext.Background()), authTime, ctx.Request.Host, getAcceptLanguage(ctx))
 	if err != nil {
 		return "", err
 	} else if code.Message != "" {
-		return "", errors.New(code.Message)
+		// the sign-in page reports why no code can be issued, and lets the user sign in with another account
+		return "", nil
 	}
 
 	sep := "?"
 	if strings.Contains(redirectUri, "?") {
 		sep = "&"
 	}
-	res := fmt.Sprintf("%s%scode=%s&state=%s", redirectUri, sep, url.QueryEscape(code.Code), url.QueryEscape(state))
+	issuer := object.GetOidcDiscovery(ctx.Request.Host, "").Issuer
+	res := fmt.Sprintf("%s%scode=%s&state=%s&iss=%s", redirectUri, sep, url.QueryEscape(code.Code), url.QueryEscape(state), url.QueryEscape(issuer))
 	return res, nil
 }
 
@@ -144,7 +173,18 @@ func isFastAutoSigninAllowed(ctx *context.Context, user *object.User, applicatio
 		return false, nil
 	}
 
-	err := object.CheckApplicationSignin(application, user, util.GetClientIpFromRequest(ctx.Request), getAcceptLanguage(ctx))
+	isRestricted, err := isRestrictedClientSession(ctx)
+	if err != nil || isRestricted {
+		return false, err
+	}
+
+	// signed in to Casdoor with an account of another organization: show the sign-in page of this application
+	isUserOfApplication, err := object.IsUserOfApplication(user, application)
+	if err != nil || !isUserOfApplication {
+		return false, err
+	}
+
+	err = object.CheckApplicationSignin(application, user, util.GetClientIpFromRequest(ctx.Request), getAcceptLanguage(ctx))
 	if err != nil {
 		return false, nil
 	}
@@ -319,6 +359,7 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, o
 		panic(err)
 	}
 
+	modTime := d.ModTime()
 	oldContent := util.ReadStringFromPath(name)
 	newContent := oldContent
 	if organizationThemeCookie != nil {
@@ -336,11 +377,18 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, o
 	if strings.HasSuffix(name, "index.html") {
 		lang := getIndexHtmlLanguage(r)
 		newContent = strings.ReplaceAll(newContent, `<html lang="en">`, fmt.Sprintf(`<html lang="%s">`, lang))
+		var cdnEnabled bool
+		newContent, cdnEnabled = useFrontendCdn(newContent, name, r)
+		if cdnEnabled {
+			// the same file is served with or without the CDN (cookie), so a 304 by modification time could bring back
+			// the cached CDN version after the page turned the CDN off
+			modTime = time.Time{}
+		}
 	}
 
 	newContent = strings.ReplaceAll(newContent, oldStaticBaseUrl, newStaticBaseUrl)
 
-	http.ServeContent(w, r, d.Name(), d.ModTime(), strings.NewReader(newContent))
+	http.ServeContent(w, r, d.Name(), modTime, strings.NewReader(newContent))
 }
 
 type gzipResponseWriter struct {

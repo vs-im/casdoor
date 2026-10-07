@@ -557,6 +557,13 @@ export default function OrganizationEditPage() {
               onChange={(e) => update("ipWhitelist", e.target.value)}
             />
           </FormRow>
+          <FormRow labelKey="organization:Trusted database hosts">
+            <Input
+              value={organization.trustedDbHosts ?? ""}
+              disabled={!Setting.isAdminUser(account)}
+              onChange={(e) => update("trustedDbHosts", e.target.value)}
+            />
+          </FormRow>
           <FormRow labelKey="organization:Init score">
             <Input
               type="number"
@@ -619,6 +626,39 @@ export default function OrganizationEditPage() {
               value={organization.ldapAttributes ?? []}
               onChange={(value) => update("ldapAttributes", value)}
               options={Setting.getUserCommonFields().map((item: string) => ({value: item, label: item}))}
+            />
+          </FormRow>
+          <FormRow labelKey="organization:Enable LDAP password">
+            {organization.enableLdapPassword || !Setting.isAdminUser(account) ? (
+              <Switch
+                checked={!!organization.enableLdapPassword}
+                disabled={!Setting.isAdminUser(account)}
+                onCheckedChange={(v) => update("enableLdapPassword", v)}
+              />
+            ) : (
+              <ConfirmButton
+                variant="ghost"
+                size="iconSm"
+                destructive={false}
+                title={i18next.t("organization:Enable LDAP password warning")}
+                onConfirm={() => update("enableLdapPassword", true)}
+              >
+                <Switch checked={false} className="pointer-events-none" />
+              </ConfirmButton>
+            )}
+          </FormRow>
+          <FormRow labelKey="organization:Enable RADIUS">
+            <Switch
+              checked={!!organization.enableRadius}
+              disabled={!Setting.isAdminUser(account)}
+              onCheckedChange={(v) => update("enableRadius", v)}
+            />
+          </FormRow>
+          <FormRow labelKey="organization:Enable dynamic client registration">
+            <Switch
+              checked={!!organization.dcrPolicy && organization.dcrPolicy !== "disabled"}
+              disabled={!Setting.isAdminUser(account)}
+              onCheckedChange={(v) => update("dcrPolicy", v ? "open" : "disabled")}
             />
           </FormRow>
           <FormRow labelKey="organization:Admin navbar items" block>

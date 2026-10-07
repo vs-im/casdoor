@@ -51,4 +51,8 @@ COPY --from=back --chown=$USER:$USER /go/src/casdoor/swagger ./swagger
 COPY --from=back --chown=$USER:$USER /go/src/casdoor/conf/app.conf ./conf/app.conf
 COPY --from=front --chown=$USER:$USER /web/build ./web/build
 
+# conf/app.conf of this fork listens on 7777, not upstream's 8000
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -fsS "http://127.0.0.1:${httpport:-7777}/api/health" > /dev/null || exit 1
+
 ENTRYPOINT ["/server"]

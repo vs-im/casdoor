@@ -312,6 +312,10 @@ func UpdateProvider(id string, provider *Provider) (bool, error) {
 		return false, err
 	}
 
+	if err := validateAuditProvider(provider); err != nil {
+		return false, err
+	}
+
 	if name != provider.Name {
 		err := providerChangeTrigger(owner, name, provider.Name)
 		if err != nil {
@@ -345,6 +349,7 @@ func UpdateProvider(id string, provider *Provider) (bool, error) {
 
 	if affected != 0 {
 		refreshLogProviderRuntime(util.GetId(owner, name), provider)
+		stopAuditProvider(util.GetId(owner, name))
 	}
 
 	return affected != 0, nil
@@ -375,6 +380,10 @@ func AddProvider(provider *Provider) (bool, error) {
 		return false, err
 	}
 
+	if err := validateAuditProvider(provider); err != nil {
+		return false, err
+	}
+
 	affected, err := ormer.Engine.Insert(provider)
 	if err != nil {
 		return false, err
@@ -395,6 +404,7 @@ func DeleteProvider(provider *Provider) (bool, error) {
 
 	if affected != 0 {
 		stopLogProviderRuntime(provider.GetId())
+		stopAuditProvider(provider.GetId())
 	}
 
 	return affected != 0, nil
@@ -539,21 +549,12 @@ func GetCaptchaProviderByApplication(applicationId, isCurrentProvider, lang stri
 	if application == nil || len(application.Providers) == 0 {
 		return nil, errors.New(i18n.Translate(lang, "provider:Invalid application id"))
 	}
-	for _, provider := range application.Providers {
-		if provider.Provider == nil {
-			continue
-		}
-		if provider.Provider.Category == "Captcha" {
-			// For CAPTCHA providers, "None" means disabled (don't show CAPTCHA at all)
-			// This is different from SMS/Email providers where "None" is treated as "All"
-			// CAPTCHA Rule options are: "None" (disabled), "Dynamic", "Always", "Internet-Only"
-			if provider.Rule == "None" || provider.Rule == "" {
-				return nil, nil
-			}
-			return GetCaptchaProviderByOwnerName(util.GetId(provider.Provider.Owner, provider.Provider.Name), lang)
-		}
+
+	providerItem := GetCaptchaProviderItem(application)
+	if providerItem == nil {
+		return nil, nil
 	}
-	return nil, nil
+	return GetCaptchaProviderByOwnerName(util.GetId(providerItem.Provider.Owner, providerItem.Provider.Name), lang)
 }
 
 func GetFaceIdProviderByOwnerName(applicationId, lang string) (*Provider, error) {

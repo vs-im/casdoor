@@ -59,6 +59,49 @@ jobs:
           name: frontend-build-${{ github.run_id }}
           path: ./web/build
 
+  # every master commit's frontend build is published as casdoor-web@0.0.0-c<commit>, servers running that commit
+  # install it instead of building it and let browsers load it from a public npm CDN (frontendCdnUrl in app.conf)
+  frontend-npm:
+    name: Front-end npm package
+    runs-on: ubuntu-latest
+    needs: [frontend]
+    if: github.repository == 'casdoor/casdoor' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download frontend build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build-${{ github.run_id }}
+          path: ./build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+      - run: npm install -g npm@latest
+      - name: Publish
+        working-directory: ./build
+        run: |
+          cat > package.json <<EOF
+          {
+            "name": "casdoor-web",
+            "version": "0.0.0-c${GITHUB_SHA}",
+            "description": "The built frontend of Casdoor commit ${GITHUB_SHA}, for serving it from a CDN",
+            "license": "Apache-2.0",
+            "homepage": "https://casdoor.org",
+            "repository": {
+              "type": "git",
+              "url": "git+https://github.com/casdoor/casdoor.git"
+            }
+          }
+          EOF
+          if npm view "casdoor-web@0.0.0-c${GITHUB_SHA}" version >/dev/null 2>&1; then
+            echo "casdoor-web@0.0.0-c${GITHUB_SHA} is already published, skipping"
+          else
+            npm publish --tag master --access public
+          fi
+
   backend:
     name: Back-end
     runs-on: ubuntu-latest
@@ -134,6 +177,9 @@ jobs:
       - name: start backend
         run: nohup go run ./main.go > /tmp/backend.log 2>&1 &
         working-directory: ./
+        # the cypress tests sign in as built-in/admin with this password
+        env:
+          initAdminPassword: "123"
       - uses: actions/setup-node@v3
         with:
           node-version: 20
@@ -236,6 +282,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
     if: github.repository == 'casdoor/casdoor' && startsWith(github.ref, 'refs/tags/v')
     needs: [frontend, backend, linter, e2e]
     steps:
@@ -297,11 +344,35 @@ jobs:
             casbin/casdoor-all-in-one:${{ steps.version.outputs.version }}
             ${{ steps.version.outputs.prerelease == 'false' && 'casbin/casdoor-all-in-one:latest' || '' }}
 
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The chart is published as `casdoor` on GHCR, which is what Artifact Hub
+      # lists. `casbin/casdoor` on Docker Hub is the image and uses the same tags,
+      # so Docker Hub keeps the old `casdoor-helm-charts` name for existing installs.
       - name: Package and push Helm chart
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          REGISTRY=oci://registry-1.docker.io/casbin
-
           helm package manifests/casdoor --version "$VERSION" --app-version "$VERSION"
-          helm push casdoor-helm-charts-$VERSION.tgz $REGISTRY
+          helm push casdoor-$VERSION.tgz oci://ghcr.io/casdoor/helm-charts
+
+          sed -i 's/^name: casdoor$/name: casdoor-helm-charts/' manifests/casdoor/Chart.yaml
+          helm package manifests/casdoor --version "$VERSION" --app-version "$VERSION"
+          helm push casdoor-helm-charts-$VERSION.tgz oci://registry-1.docker.io/casbin
+
+      - name: Set up ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Push Artifact Hub metadata
+        working-directory: manifests
+        run: |
+          for ref in ghcr.io/casdoor/helm-charts/casdoor registry-1.docker.io/casbin/casdoor-helm-charts; do
+            oras push "$ref:artifacthub.io" \
+              --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
+              artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
+          done

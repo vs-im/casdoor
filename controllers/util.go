@@ -15,6 +15,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -46,6 +47,11 @@ func (c *ApiController) ResponseOk(data ...interface{}) {
 
 // ResponseError ...
 func (c *ApiController) ResponseError(error string, data ...interface{}) {
+	c.ResponseErrorWithCode("", error, data...)
+}
+
+// ResponseErrorWithCode ...
+func (c *ApiController) ResponseErrorWithCode(code string, error string, data ...interface{}) {
 	enableErrorMask2 := conf.GetConfigBool("enableErrorMask2")
 	if enableErrorMask2 {
 		error = c.T("subscription:Error")
@@ -55,8 +61,48 @@ func (c *ApiController) ResponseError(error string, data ...interface{}) {
 		return
 	}
 
-	resp := &Response{Status: "error", Msg: error}
+	resp := &Response{Status: "error", Code: code, Msg: error}
 	c.ResponseJsonData(resp, data...)
+}
+
+func (c *ApiController) responseSigninError(err error, fallbackReason string) {
+	reason := fallbackReason
+	var signinErr *object.SigninError
+	if errors.As(err, &signinErr) {
+		reason = signinErr.Reason
+	}
+	if reason != "" {
+		c.Ctx.Input.SetParam("recordDetail", reason)
+	}
+	c.ResponseErrorWithCode(reason, err.Error())
+}
+
+// mergeColumns overwrites only the listed fields of obj with the ones in the request body,
+// columns may be written as JSON names (displayName) or column names (display_name)
+func mergeColumns(obj interface{}, body []byte, columnsStr string) error {
+	fields := map[string]json.RawMessage{}
+	err := json.Unmarshal(body, &fields)
+	if err != nil {
+		return err
+	}
+
+	keyMap := map[string]string{}
+	for key := range fields {
+		keyMap[util.CamelToSnakeCase(key)] = key
+	}
+
+	selected := map[string]json.RawMessage{}
+	for _, column := range strings.Split(columnsStr, ",") {
+		if key, ok := keyMap[util.CamelToSnakeCase(strings.TrimSpace(column))]; ok {
+			selected[key] = fields[key]
+		}
+	}
+
+	data, err := json.Marshal(selected)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, obj)
 }
 
 func (c *ApiController) T(error string) string {
@@ -220,7 +266,7 @@ func (c *ApiController) IsMaskedEnabled() (bool, bool) {
 	if withSecret == "1" {
 		isMaskEnabled = false
 
-		if conf.IsDemoMode() {
+		if conf.IsDemoMode() || conf.IsDemoDatabase() {
 			c.ResponseError(c.T("general:this operation is not allowed in demo mode"))
 			return false, isMaskEnabled
 		}

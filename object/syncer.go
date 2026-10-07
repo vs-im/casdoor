@@ -17,6 +17,7 @@ package object
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/util"
@@ -52,6 +53,7 @@ type Syncer struct {
 	SshPort          int            `json:"sshPort"`
 	SshUser          string         `xorm:"varchar(100)" json:"sshUser"`
 	SshPassword      string         `xorm:"varchar(150)" json:"sshPassword"`
+	SshHostKey       string         `xorm:"varchar(1000)" json:"sshHostKey"`
 	Cert             string         `xorm:"varchar(100)" json:"cert"`
 	Database         string         `xorm:"varchar(100)" json:"database"`
 	Table            string         `xorm:"varchar(100)" json:"table"`
@@ -194,6 +196,9 @@ func UpdateSyncer(id string, syncer *Syncer, isGlobalAdmin bool, lang string) (b
 	if syncer.Password == "***" {
 		syncer.Password = s.Password
 	}
+	if (syncer.SshHost != s.SshHost || syncer.SshPort != s.SshPort) && syncer.SshHostKey == s.SshHostKey {
+		syncer.SshHostKey = ""
+	}
 	affected, err := session.Update(syncer)
 	if err != nil {
 		return false, err
@@ -207,6 +212,11 @@ func UpdateSyncer(id string, syncer *Syncer, isGlobalAdmin bool, lang string) (b
 	}
 
 	return affected != 0, nil
+}
+
+func updateSyncerSshHostKey(syncer *Syncer) error {
+	_, err := ormer.Engine.ID(core.PK{syncer.Owner, syncer.Name}).Cols("ssh_host_key").Update(syncer)
+	return err
 }
 
 func updateSyncerErrorText(syncer *Syncer, line string) (bool, error) {
@@ -323,9 +333,21 @@ func (syncer *Syncer) getTargetTablePrimaryKey() string {
 	return column.Name
 }
 
+var errSyncerRunning = errors.New("the syncer is already running")
+
+var syncerLocks sync.Map
+
 func RunSyncer(syncer *Syncer) error {
+	value, _ := syncerLocks.LoadOrStore(syncer.GetId(), &sync.Mutex{})
+	lock := value.(*sync.Mutex)
+	if !lock.TryLock() {
+		return errSyncerRunning
+	}
+	defer lock.Unlock()
+
 	err := syncer.initAdapter()
 	if err != nil {
+		_ = syncer.Close()
 		return err
 	}
 
@@ -333,6 +355,7 @@ func RunSyncer(syncer *Syncer) error {
 	err = syncer.syncGroups()
 	if err != nil {
 		// Log error but don't fail the entire sync
+		recordSyncerError(syncer, err)
 		fmt.Printf("Warning: syncGroups() error: %s\n", err.Error())
 	}
 

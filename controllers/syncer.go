@@ -175,7 +175,7 @@ func (c *ApiController) DeleteSyncer() {
 // @Param   id           query  string  true        "The id (owner/name) of the syncer"
 // @Param   organization query  string  false       "The organization of the syncer"
 // @Success 200 {object} controllers.Response The Response object
-// @router /run-syncer [get]
+// @router /run-syncer [post]
 func (c *ApiController) RunSyncer() {
 	id := c.Ctx.Input.Query("id")
 	organization := c.Ctx.Input.Query("organization")
@@ -229,6 +229,12 @@ func (c *ApiController) TestSyncerDb() {
 }
 
 func (c *ApiController) checkSyncerDatabase(syncer *object.Syncer) bool {
+	err := object.CheckSyncerDatabaseTarget(syncer)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return false
+	}
+
 	if c.IsGlobalAdmin() {
 		return true
 	}
@@ -238,7 +244,7 @@ func (c *ApiController) checkSyncerDatabase(syncer *object.Syncer) bool {
 		return false
 	}
 
-	err := object.CheckSyncerDatabaseHost(syncer)
+	err = object.CheckSyncerDatabaseHost(syncer)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return false

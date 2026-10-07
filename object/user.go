@@ -255,21 +255,22 @@ type User struct {
 }
 
 type Userinfo struct {
-	Sub           string   `json:"sub"`
-	Iss           string   `json:"iss"`
-	Aud           string   `json:"aud"`
-	Name          string   `json:"preferred_username,omitempty"`
-	DisplayName   string   `json:"name,omitempty"`
-	Email         string   `json:"email,omitempty"`
-	EmailVerified bool     `json:"email_verified,omitempty"`
-	Avatar        string   `json:"picture,omitempty"`
-	Address       string   `json:"address,omitempty"`
-	Phone         string   `json:"phone,omitempty"`
-	RealName      string   `json:"real_name,omitempty"`
-	IsVerified    bool     `json:"is_verified,omitempty"`
-	Groups        []string `json:"groups,omitempty"`
-	Roles         []string `json:"roles,omitempty"`
-	Permissions   []string `json:"permissions,omitempty"`
+	Sub           string       `json:"sub"`
+	Iss           string       `json:"iss"`
+	Aud           string       `json:"aud"`
+	Name          string       `json:"preferred_username,omitempty"`
+	DisplayName   string       `json:"name,omitempty"`
+	Email         string       `json:"email,omitempty"`
+	EmailVerified bool         `json:"email_verified,omitempty"`
+	Avatar        string       `json:"picture,omitempty"`
+	Address       *OIDCAddress `json:"address,omitempty"`
+	Phone         string       `json:"phone,omitempty"`
+	PhoneNumber   string       `json:"phone_number,omitempty"`
+	RealName      string       `json:"real_name,omitempty"`
+	IsVerified    bool         `json:"is_verified,omitempty"`
+	Groups        []string     `json:"groups,omitempty"`
+	Roles         []string     `json:"roles,omitempty"`
+	Permissions   []string     `json:"permissions,omitempty"`
 }
 
 type ManagedAccount struct {
@@ -703,6 +704,8 @@ func GetMaskedUser(user *User, isAdminOrSelf bool, errs ...error) (*User, error)
 				}
 			}
 		}
+		user.PasswordSalt = ""
+		user.PasswordType = ""
 	}
 
 	if user.ManagedAccounts != nil {
@@ -834,6 +837,16 @@ var userProviderColumns = []string{
 	"yammer", "yandex", "zoom", "oidc", "custom",
 }
 
+func GetDefaultUserUpdateColumns(isAdmin bool) []string {
+	columns := append([]string{}, userSelfColumns...)
+	if isAdmin {
+		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "balance_credit", "balance_currency", "mfa_items", "register_type", "register_source",
+			"is_admin", "is_forbidden", "is_deleted", "uid_number", "email_verified")
+		columns = append(columns, userProviderColumns...)
+	}
+	return columns
+}
+
 func FilterUserSelfColumns(columns []string) []string {
 	res := []string{}
 	for _, column := range columns {
@@ -899,13 +912,7 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 	}
 
 	if len(columns) == 0 {
-		columns = append([]string{}, userSelfColumns...)
-
-		if isAdmin {
-			columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "balance_credit", "balance_currency", "mfa_items", "register_type", "register_source",
-				"is_admin", "is_forbidden", "is_deleted", "uid_number", "email_verified")
-			columns = append(columns, userProviderColumns...)
-		}
+		columns = GetDefaultUserUpdateColumns(isAdmin)
 	}
 
 	columns = append(columns, "updated_time")
@@ -1054,7 +1061,7 @@ func AddUser(user *User, lang string) (bool, error) {
 			return false, err
 		}
 		if applicationCount == 0 {
-			return false, fmt.Errorf(i18n.Translate(lang, "general:The organization: %s should have one application at least"), organization.Owner)
+			return false, fmt.Errorf(i18n.Translate(lang, "general:The organization: %s should have one application at least"), organization.Name)
 		}
 	}
 
@@ -1323,12 +1330,20 @@ func DeleteUser(user *User) (bool, error) {
 		return false, err
 	}
 	if organization != nil && organization.EnableSoftDeletion {
-		user.IsDeleted = true
-		user.DeletedTime = util.GetCurrentTime()
-		return UpdateUser(user.GetId(), user, []string{"is_deleted", "deleted_time"}, false)
-	} else {
-		return deleteUser(user)
+		oldUser, err := getUser(user.Owner, user.Name)
+		if err != nil {
+			return false, err
+		}
+
+		// Deleting a user that is already soft-deleted removes it permanently
+		if oldUser != nil && !oldUser.IsDeleted {
+			user.IsDeleted = true
+			user.DeletedTime = util.GetCurrentTime()
+			return UpdateUser(user.GetId(), user, []string{"is_deleted", "deleted_time"}, false)
+		}
 	}
+
+	return deleteUser(user)
 }
 
 func GetUserInfo(user *User, scope string, aud string, host string) (*Userinfo, error) {
@@ -1371,7 +1386,11 @@ func GetUserInfo(user *User, scope string, aud string, host string) (*Userinfo, 
 			resp.Avatar = user.Avatar
 		}
 		if allowed("Groups") {
-			resp.Groups = user.Groups
+			groups, err := user.GetGroupsForToken(application)
+			if err != nil {
+				return nil, err
+			}
+			resp.Groups = groups
 		}
 
 		if allowed("Roles") || allowed("Permissions") {
@@ -1402,11 +1421,14 @@ func GetUserInfo(user *User, scope string, aud string, host string) (*Userinfo, 
 	}
 
 	if strings.Contains(scope, "address") && allowed("Location") {
-		resp.Address = user.Location
+		resp.Address = getOIDCAddress(user)
 	}
 
 	if strings.Contains(scope, "phone") && allowed("Phone") {
 		resp.Phone = user.Phone
+		if phoneNumber, ok := util.GetE164Number(user.Phone, user.CountryCode); ok {
+			resp.PhoneNumber = phoneNumber
+		}
 	}
 
 	if strings.Contains(scope, "profile") {
@@ -1497,6 +1519,9 @@ func DeleteGroupForUser(user string, group string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if userObj == nil {
+		return false, fmt.Errorf(i18n.Translate("en", "general:The user: %s doesn't exist"), user)
+	}
 
 	userObj.Groups = util.DeleteVal(userObj.Groups, group)
 	_, err = updateUser(user, userObj, []string{"groups"})
@@ -1576,6 +1601,11 @@ func userChangeTrigger(owner string, oldName string, newName string) error {
 	}
 
 	_, err = session.Where(fmt.Sprintf("owner = ? AND %s = ?", quoteColumn("user")), owner, oldName).Cols("user").Update(&Resource{User: newName})
+	if err != nil {
+		return err
+	}
+
+	_, err = session.Where(fmt.Sprintf("organization = ? AND %s = ?", quoteColumn("user")), owner, oldName).Cols("user").Update(&Token{User: newName})
 	if err != nil {
 		return err
 	}
@@ -1717,21 +1747,15 @@ func (user *User) GetUserFullGroupPath() ([]string, error) {
 		}
 
 		groupPath := groupName
-
-		curGroup, ok := groupMap[group.ParentId]
-		if !ok {
-			return []string{}, fmt.Errorf(i18n.Translate("en", "auth:The group: %s does not exist"), group.ParentId)
-		}
-		for {
-			groupPath = util.GetId(curGroup.Name, groupPath)
-			if curGroup.IsTopGroup {
-				break
-			}
-
-			curGroup, ok = groupMap[curGroup.ParentId]
+		curGroup := group
+		for !curGroup.IsTopGroup {
+			parentGroup, ok := groupMap[curGroup.ParentId]
 			if !ok {
 				return []string{}, fmt.Errorf(i18n.Translate("en", "auth:The group: %s does not exist"), curGroup.ParentId)
 			}
+
+			groupPath = util.GetId(parentGroup.Name, groupPath)
+			curGroup = parentGroup
 		}
 
 		groupPath = util.GetId(curGroup.Owner, groupPath)
@@ -1739,6 +1763,31 @@ func (user *User) GetUserFullGroupPath() ([]string, error) {
 	}
 
 	return groupFullPath, nil
+}
+
+func (user *User) GetUserGroupNames() []string {
+	groupNames := []string{}
+	for _, groupId := range user.Groups {
+		_, groupName := util.GetOwnerAndNameFromIdNoCheck(groupId)
+		groupNames = append(groupNames, groupName)
+	}
+	return groupNames
+}
+
+func (user *User) GetGroupsForToken(application *Application) ([]string, error) {
+	tokenGroupFormat := ""
+	if application != nil {
+		tokenGroupFormat = application.TokenGroupFormat
+	}
+
+	switch tokenGroupFormat {
+	case "Path":
+		return user.GetUserFullGroupPath()
+	case "Name":
+		return user.GetUserGroupNames(), nil
+	default:
+		return user.Groups, nil
+	}
 }
 
 func GenerateIdForNewUser(application *Application) (string, error) {

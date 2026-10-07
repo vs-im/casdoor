@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/beego/beego/v2/core/logs"
 	"github.com/casdoor/casdoor/form"
@@ -40,6 +41,7 @@ const (
 
 type Response struct {
 	Status     string      `json:"status"`
+	Code       string      `json:"code,omitempty"`
 	Msg        string      `json:"msg"`
 	Sub        string      `json:"sub"`
 	Name       string      `json:"name"`
@@ -102,6 +104,13 @@ func (c *ApiController) Signup() {
 	}
 
 	if !application.EnableSignUp || !application.IsSignupAllowedFor(authForm.Organization) {
+		c.ResponseError(c.T("account:The application does not allow to sign up new account"))
+		return
+	}
+
+	// without self signup, the signup page only takes the invitation codes an admin hands out,
+	// an invalid code is refused by CheckInvitationCode below
+	if !application.IsSelfSignupEnabled() && authForm.InvitationCode == "" {
 		c.ResponseError(c.T("account:The application does not allow to sign up new account"))
 		return
 	}
@@ -348,7 +357,7 @@ func (c *ApiController) Signup() {
 			return
 		}
 
-		code, err := object.GetOAuthCode(userId, clientId, "", "password", responseType, redirectUri, scope, state, nonce, codeChallenge, "", c.Ctx.Input.CruSession.SessionID(context.Background()), c.Ctx.Request.Host, c.GetAcceptLanguage())
+		code, err := object.GetOAuthCode(userId, clientId, "", "password", responseType, redirectUri, scope, state, nonce, codeChallenge, "", c.Ctx.Input.CruSession.SessionID(context.Background()), time.Now().Unix(), c.Ctx.Request.Host, c.GetAcceptLanguage())
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
 			return
@@ -752,7 +761,7 @@ func (c *ApiController) GetAccount() {
 // @Tag Account API
 // @Description return user information according to OIDC standards
 // @Success 200 {object} object.Userinfo The Response object
-// @router /userinfo [get]
+// @router /userinfo [get,post]
 func (c *ApiController) GetUserinfo() {
 	user, ok := c.RequireSignedInUser()
 	if !ok {
@@ -826,28 +835,11 @@ func (c *ApiController) GetCaptcha() {
 			return
 		}
 
-		// Check the CAPTCHA rule to determine if CAPTCHA should be shown
-		clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
-
 		// For Internet-Only rule, we can determine on the backend if CAPTCHA should be shown
 		// For other rules (Dynamic, Always), we need to return the CAPTCHA config
-		for _, providerItem := range application.Providers {
-			if providerItem.Provider == nil || providerItem.Provider.Category != "Captcha" {
-				continue
-			}
-
-			// For "None" rule, skip CAPTCHA
-			if providerItem.Rule == "None" || providerItem.Rule == "" {
-				shouldSkipCaptcha = true
-			} else if providerItem.Rule == "Internet-Only" {
-				// For Internet-Only rule, check if the client is from intranet
-				if !util.IsInternetIp(clientIp) {
-					// Client is from intranet, skip CAPTCHA
-					shouldSkipCaptcha = true
-				}
-			}
-
-			break // Only check the first CAPTCHA provider
+		providerItem := object.GetCaptchaProviderItem(application)
+		if providerItem != nil && providerItem.Rule == "Internet-Only" && !util.IsInternetIp(util.GetClientIpFromRequest(c.Ctx.Request)) {
+			shouldSkipCaptcha = true
 		}
 
 		if shouldSkipCaptcha {

@@ -95,6 +95,14 @@ export function isSelfRedirectUri(redirectUri) {
   }
 }
 
+export function getOAuthIssuer() {
+  return getFullServerUrl();
+}
+
+export function getOAuthIssuerParam() {
+  return `&iss=${encodeURIComponent(getOAuthIssuer())}`;
+}
+
 export function isMobile() {
   if (typeof window === "undefined") {
     return false;
@@ -641,6 +649,12 @@ export const OtherProviderInfo = {
     "Alibaba Cloud": {
       logo: `${StaticBaseUrl}/img/social_aliyun.png`,
       url: "https://www.aliyun.com/product/idverification",
+    },
+  },
+  Audit: {
+    "Syslog": {
+      logo: `${StaticBaseUrl}/img/social_default.png`,
+      url: "https://datatracker.ietf.org/doc/html/rfc5424",
     },
   },
   Log: {
@@ -1607,6 +1621,10 @@ export function getProviderTypeOptions(category) {
       {id: "Jumio", name: "Jumio"},
       {id: "Alibaba Cloud", name: "Alibaba Cloud"},
     ]);
+  } else if (category === "Audit") {
+    return ([
+      {id: "Syslog", name: "Syslog"},
+    ]);
   } else if (category === "Log") {
     return ([
       {id: "Casdoor Permission Log", name: "Casdoor Permission Log"},
@@ -1800,6 +1818,18 @@ export function getApplicationDisplayName(application) {
 
 export function getRandomName() {
   return Math.random().toString(36).slice(-6);
+}
+
+/**
+ * Remembers where to land after sign-in. Only same-site paths are kept, so a
+ * crafted ?from= link cannot bounce the user to another site.
+ */
+export function setFromLink(from) {
+  if (typeof from === "string" && from.startsWith("/") && !from.startsWith("//") && !from.startsWith("/\\") && !from.startsWith("/login")) {
+    sessionStorage.setItem("from", from);
+  } else {
+    sessionStorage.removeItem("from");
+  }
 }
 
 export function getFromLink() {
@@ -2642,9 +2672,6 @@ export function getApiPaths() {
 
   // SAML APIs
   res.push("acs", "saml/metadata");
-
-  // Casbin engine APIs
-  res.push("run-casbin-command", "refresh-engines");
 
   // Monitoring and health APIs
   res.push("health", "metrics");

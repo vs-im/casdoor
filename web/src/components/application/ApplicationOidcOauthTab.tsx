@@ -1,6 +1,7 @@
 
 import i18next from "i18next";
 import {Input} from "@/components/ui/input";
+import {Switch} from "@/components/ui/switch";
 import {MultiSelect} from "@/components/common/MultiSelect";
 import {SelectField} from "@/components/common/SelectField";
 import {TagsInput} from "@/components/common/TagsInput";
@@ -21,9 +22,15 @@ const GRANT_TYPES = [
   {value: "urn:ietf:params:oauth:grant-type:device_code", label: "Device Code"},
   {value: "urn:ietf:params:oauth:grant-type:jwt-bearer", label: "JWT Bearer"},
   {value: "urn:ietf:params:oauth:grant-type:token-exchange", label: "Token Exchange"},
+  {value: "urn:casdoor:params:oauth:grant-type:verification-code", label: "Verification Code"},
 ];
 const TOKEN_FORMATS = ["JWT", "JWT-Empty", "JWT-Custom", "JWT-Standard"];
 const TOKEN_SIGNING_METHODS = ["RS256", "RS512", "ES256", "ES512", "ES384"];
+const TOKEN_GROUP_FORMATS = [
+  {id: "ID", name: "ID (org/group)"},
+  {id: "Path", name: "Path (org/parent/group)"},
+  {id: "Name", name: "Name (group)"},
+];
 /** the backend only tells "String" (first value) from everything else (the whole list) */
 const TOKEN_ATTRIBUTE_TYPES: EnumMap = {
   "Array": {i18nKey: "application:Array"},
@@ -137,6 +144,71 @@ export function ApplicationOidcOauthTab({application, updateField}: ApplicationT
           ]}
         />
       </FormRow>
+      <FormRow labelKey="application:Federated credentials" block>
+        <EditableTable
+          rows={application.federatedCredentials ?? []}
+          onChange={(rows) => updateField("federatedCredentials", rows)}
+          newRow={() => ({issuer: "", jwksUri: "", subject: "", audience: "", user: ""})}
+          columns={[
+            {
+              key: "issuer",
+              title: i18next.t("application:Issuer"),
+              width: "24%",
+              render: (row: any, _i, patch) => (
+                <Input
+                  value={row.issuer ?? ""}
+                  placeholder="https://token.actions.githubusercontent.com"
+                  onChange={(e) => patch({issuer: e.target.value})}
+                />
+              ),
+            },
+            {
+              key: "jwksUri",
+              title: i18next.t("application:JWKS URL"),
+              width: "22%",
+              render: (row: any, _i, patch) => (
+                <Input
+                  value={row.jwksUri ?? ""}
+                  placeholder={i18next.t("application:Discovered from the issuer if empty")}
+                  onChange={(e) => patch({jwksUri: e.target.value})}
+                />
+              ),
+            },
+            {
+              key: "subject",
+              title: i18next.t("provider:Subject"),
+              width: "22%",
+              render: (row: any, _i, patch) => (
+                <Input
+                  value={row.subject ?? ""}
+                  placeholder="repo:my-org/my-repo:*"
+                  aria-invalid={!(row.subject ?? "").trim()}
+                  onChange={(e) => patch({subject: e.target.value})}
+                />
+              ),
+            },
+            {
+              key: "audience",
+              title: i18next.t("application:Audience"),
+              width: "16%",
+              render: (row: any, _i, patch) => (
+                <Input value={row.audience ?? ""} onChange={(e) => patch({audience: e.target.value})} />
+              ),
+            },
+            {
+              key: "user",
+              title: i18next.t("general:User"),
+              render: (row: any, _i, patch) => (
+                <Input
+                  value={row.user ?? ""}
+                  placeholder={i18next.t("application:The application itself if empty")}
+                  onChange={(e) => patch({user: e.target.value})}
+                />
+              ),
+            },
+          ]}
+        />
+      </FormRow>
       <FormRow labelKey="general:Custom scopes" block>
         <EditableTable
           rows={application.customScopes ?? []}
@@ -201,6 +273,13 @@ export function ApplicationOidcOauthTab({application, updateField}: ApplicationT
           value={application.tokenSigningMethod || "RS256"}
           onChange={(v) => updateField("tokenSigningMethod", v)}
           options={TOKEN_SIGNING_METHODS.map((item) => ({id: item, name: item}))}
+        />
+      </FormRow>
+      <FormRow block labelKey="application:Token group format">
+        <SelectField
+          value={application.tokenGroupFormat || "ID"}
+          onChange={(v) => updateField("tokenGroupFormat", v)}
+          options={TOKEN_GROUP_FORMATS}
         />
       </FormRow>
       <FormRow block labelKey="application:Token fields">
@@ -285,6 +364,12 @@ export function ApplicationOidcOauthTab({application, updateField}: ApplicationT
           type="number"
           value={application.refreshExpireInHours ?? 168}
           onChange={(e) => updateField("refreshExpireInHours", Setting.myParseInt(e.target.value))}
+        />
+      </FormRow>
+      <FormRow labelKey="application:Disable refresh token rotation">
+        <Switch
+          checked={!!application.disableRefreshRotation}
+          onCheckedChange={(v) => updateField("disableRefreshRotation", v)}
         />
       </FormRow>
     </>
