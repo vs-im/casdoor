@@ -325,6 +325,13 @@ func StaticFilter(ctx *context.Context) {
 // organization theme and the deployment branding are substituted into it.
 const indexHtmlFaviconPlaceholder = "/favicon.png"
 
+// replaceIndexHtmlFavicon substitutes the whole href attribute, not the bare path: the
+// organization's favicon is often the branded one (/brand/favicon.png), which contains
+// the placeholder and would otherwise be rewritten a second time by applyBrandToIndexHtml.
+func replaceIndexHtmlFavicon(content string, favicon string) string {
+	return strings.ReplaceAll(content, fmt.Sprintf(`href="%s"`, indexHtmlFaviconPlaceholder), fmt.Sprintf(`href="%s"`, favicon))
+}
+
 // applyBrandToIndexHtml replaces the upstream product strings of the static shell
 // with the deployment's branding, so that the first paint is already branded and
 // the frontend bundle needs no rebuild per brand. The defaults of every
@@ -341,7 +348,7 @@ func applyBrandToIndexHtml(content string) string {
 	}
 
 	if favicon := conf.GetBrandFaviconUrl(); favicon != "" && favicon != indexHtmlFaviconPlaceholder {
-		content = strings.ReplaceAll(content, indexHtmlFaviconPlaceholder, favicon)
+		content = replaceIndexHtmlFavicon(content, favicon)
 	}
 
 	return content
@@ -363,7 +370,7 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, o
 	oldContent := util.ReadStringFromPath(name)
 	newContent := oldContent
 	if organizationThemeCookie != nil {
-		newContent = strings.ReplaceAll(newContent, indexHtmlFaviconPlaceholder, html.EscapeString(organizationThemeCookie.Favicon))
+		newContent = replaceIndexHtmlFavicon(newContent, html.EscapeString(organizationThemeCookie.Favicon))
 		newContent = strings.ReplaceAll(newContent, fmt.Sprintf("<title>%s</title>", conf.DefaultBrandName), fmt.Sprintf("<title>%s</title>", html.EscapeString(organizationThemeCookie.DisplayName)))
 	}
 

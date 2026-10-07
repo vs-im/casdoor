@@ -66,3 +66,20 @@ func TestApplyBrandToIndexHtml(t *testing.T) {
 		t.Error("the branded shell still carries the upstream title or favicon")
 	}
 }
+
+// TestOrganizationFaviconIsNotBrandedTwice — an organization whose favicon is the branded
+// /brand/favicon.png keeps it as is, the deployment branding does not rewrite the
+// "/favicon.png" inside it again (it used to end up as /brand/brand/favicon.png).
+func TestOrganizationFaviconIsNotBrandedTwice(t *testing.T) {
+	shell, err := os.ReadFile(indexHtmlPath)
+	if err != nil {
+		t.Skipf("no frontend shell to check: %v", err)
+	}
+
+	t.Setenv(conf.BrandFaviconUrlEnv, "/brand/favicon.png")
+
+	got := applyBrandToIndexHtml(replaceIndexHtmlFavicon(string(shell), "/brand/favicon.png"))
+	if !strings.Contains(got, `href="/brand/favicon.png"`) || strings.Contains(got, "/brand/brand/") {
+		t.Error("the organization favicon was rewritten by the deployment branding")
+	}
+}
