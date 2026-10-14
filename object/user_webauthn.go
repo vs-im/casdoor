@@ -26,26 +26,71 @@ import (
 )
 
 func GetWebAuthnObject(host string) (*webauthn.WebAuthn, error) {
-	var err error
-
 	_, originBackend := getOriginFromHost(host)
 
-	localUrl, err := url.Parse(originBackend)
+	rpId, rpOrigins, err := getWebAuthnRelyingParty(originBackend, conf.GetConfigString("webauthnRpId"), conf.GetConfigString("webauthnOrigins"))
 	if err != nil {
-		return nil, fmt.Errorf("error when parsing origin: %w", err)
+		return nil, err
 	}
 
 	webAuthn, err := webauthn.New(&webauthn.Config{
-		RPDisplayName: conf.GetConfigString("appname"),      // Display Name for your site
-		RPID:          strings.Split(localUrl.Host, ":")[0], // Generally the domain name for your site, it's ok because splits cannot return empty array
-		RPOrigin:      originBackend,                        // The origin URL for WebAuthn requests
-		// RPIcon:     "https://duo.com/logo.png",           // Optional icon URL for your site
+		RPDisplayName: conf.GetConfigString("appname"), // Display Name for your site
+		RPID:          rpId,                            // Generally the domain name for your site
+		RPOrigins:     rpOrigins,                       // The origin URLs allowed for WebAuthn requests
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return webAuthn, nil
+}
+
+// The backend origin is always allowed so that the built-in login page keeps working;
+// webauthnOrigins adds origins of other apps sharing the RP ID (e.g. a parent domain).
+func getWebAuthnRelyingParty(originBackend string, rpIdConf string, originsConf string) (string, []string, error) {
+	localUrl, err := url.Parse(originBackend)
+	if err != nil {
+		return "", nil, fmt.Errorf("error when parsing origin: %w", err)
+	}
+
+	rpId := strings.TrimSpace(rpIdConf)
+	if rpId == "" {
+		rpId = localUrl.Hostname()
+	}
+	rpId = strings.ToLower(rpId)
+
+	origins := []string{strings.TrimRight(originBackend, "/")}
+	for _, origin := range strings.Split(originsConf, ",") {
+		origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+		if origin == "" {
+			continue
+		}
+
+		duplicate := false
+		for _, existing := range origins {
+			if existing == origin {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			origins = append(origins, origin)
+		}
+	}
+
+	for _, origin := range origins {
+		originUrl, err := url.Parse(origin)
+		if err != nil || originUrl.Scheme == "" || originUrl.Host == "" {
+			return "", nil, fmt.Errorf("invalid WebAuthn origin: %s", origin)
+		}
+
+		hostname := strings.ToLower(originUrl.Hostname())
+		if hostname != rpId && !strings.HasSuffix(hostname, "."+rpId) {
+			return "", nil, fmt.Errorf("WebAuthn RP ID %s is not a registrable suffix of origin %s", rpId, origin)
+		}
+	}
+
+	return rpId, origins, nil
 }
 
 // WebAuthnID
