@@ -597,6 +597,30 @@ func SendApiMagicLink(organization *Organization, user *User, provider *Provider
 	return UpdateMagicLinkStatus(link, MagicLinkStatusSent, "")
 }
 
+// IssueApiMagicLink stores a link of the API and returns its callback URL instead of mailing it
+// (the trusted "returnLink" request: the caller's server sends its own mail). The origin is the one
+// getMagicLinkOrigin() vouches for. The URL carries the one-time token: the caller keeps it out of logs.
+func IssueApiMagicLink(link *MagicLink, token string, host string, lang string) (string, error) {
+	origin, err := getMagicLinkOrigin(host, lang)
+	if err != nil {
+		return "", err
+	}
+	return issueApiMagicLinkAt(link, token, origin)
+}
+
+func issueApiMagicLinkAt(link *MagicLink, token string, origin string) (string, error) {
+	err := AddMagicLink(link)
+	if err != nil {
+		return "", err
+	}
+	callbackURL := BuildMagicLinkCallbackURL(link, token, origin)
+	err = UpdateMagicLinkStatus(link, MagicLinkStatusSent, "")
+	if err != nil {
+		return "", err
+	}
+	return callbackURL, nil
+}
+
 // GetMagicLinkByToken looks a link up without claiming it.
 func GetMagicLinkByToken(token string) (*MagicLink, error) {
 	if token == "" {
