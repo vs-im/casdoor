@@ -55,6 +55,9 @@ type MagicLinkRequestForm struct {
 	// the application's own clientId and client secret, and a request that sets it without
 	// them is refused. Without it the request is checked as before, credentials or not.
 	Trusted bool `json:"trusted"`
+	// ReturnLink makes the response carry the link and sends no mail: the caller mails it itself.
+	// Only the trusted path of a server may ask for it.
+	ReturnLink bool `json:"returnLink"`
 }
 
 // SendMagicLink ...
@@ -135,6 +138,11 @@ func (c *ApiController) SendMagicLink() {
 			requestForm.ExpiresInMinutes = 0
 			requestForm.ExpireTime = ""
 		}
+	}
+	if !returnLinkAllowed(&requestForm, trustedSend) {
+		util.LogWarning(c.Ctx, "Magic link returnLink refused: the request is not trusted, organization = %s, application = %s, remoteAddr = %s", application.Organization, application.Name, util.GetClientIpFromRequest(c.Ctx.Request))
+		c.ResponseError(c.T("auth:Unauthorized operation"))
+		return
 	}
 	if requestForm.Permission == "" {
 		requestForm.Permission = application.MagicLinkPermission
@@ -227,14 +235,17 @@ func (c *ApiController) SendMagicLink() {
 		}
 	}
 
-	provider, err := application.GetEmailProvider("Magic link")
+	var provider *object.Provider
+	if !requestForm.ReturnLink {
+		provider, err = application.GetEmailProvider("Magic link")
+	}
 	if err != nil {
 		c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, trustedSend, err.Error())
 		util.LogWarning(c.Ctx, "Magic link email provider lookup failed, organization = %s, application = %s, email = %s, error = %s", application.Organization, application.Name, requestForm.Email, err.Error())
 		c.respondMagicLinkSendAccepted(expireAt)
 		return
 	}
-	if provider == nil {
+	if provider == nil && !requestForm.ReturnLink {
 		errText := fmt.Sprintf(c.T("verification:please add an Email provider to the \"Providers\" list for the application: %s"), application.Name)
 		c.saveFailedMagicLink(application, &requestForm, clientIP, oauth, expireAt, trustedSend, errText)
 		util.LogWarning(c.Ctx, "Magic link email provider is not configured, organization = %s, application = %s, email = %s", application.Organization, application.Name, requestForm.Email)
@@ -283,6 +294,17 @@ func (c *ApiController) SendMagicLink() {
 	link.Trusted = trustedSend
 	link.AuthAction = getMagicLinkAuthAction(user == nil)
 	object.BindMagicLinkToClient(link, requestForm.SessionSecret)
+
+	if requestForm.ReturnLink {
+		callbackURL, err := object.IssueApiMagicLink(link, token, c.Ctx.Request.Host, c.GetAcceptLanguage())
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		c.logMagicLinkStatus("send", link, application, requestForm.Email, "")
+		c.ResponseOk(map[string]string{"expireTime": util.Time2String(expireAt), "link": callbackURL})
+		return
+	}
 
 	err = object.SendApiMagicLink(organization, user, provider, link, token, c.Ctx.Request.Host, c.GetAcceptLanguage())
 	if err != nil {
@@ -337,6 +359,12 @@ func (c *ApiController) saveFailedMagicLink(application *object.Application, req
 	link.Group = requestForm.Group
 	link.Trusted = trustedSend
 	_ = object.AddFailedMagicLink(link, lastError)
+}
+
+// returnLinkAllowed refuses a returnLink request that did not take the trusted path: the link is a
+// bearer token and goes only to a server that proved the application's credentials.
+func returnLinkAllowed(requestForm *MagicLinkRequestForm, trustedSend bool) bool {
+	return !requestForm.ReturnLink || trustedSend
 }
 
 func (c *ApiController) respondMagicLinkSendAccepted(expireAt time.Time) {
