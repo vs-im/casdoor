@@ -1262,10 +1262,9 @@ func (c *ApiController) Login() {
 						return
 					}
 
-					userId := userInfo.Id
-					if userId == "" {
-						userId = util.GenerateId()
-					}
+					// The user id is always a generated UUID: services store user ids in uuid columns, and the
+					// provider's own id (e.g. the Google sub) is kept by linkUserByProvider for later sign-ins.
+					userId := util.GenerateId()
 
 					user = &object.User{
 						Owner:             application.Organization,
