@@ -120,8 +120,12 @@ func NewGothIdProvider(providerType string, clientId string, clientSecret string
 			return nil, err
 		}
 
+		provider := apple.New(clientId, *secret, redirectUrl, nil)
+		if err = forceAppleBodyCredentials(provider); err != nil {
+			return nil, err
+		}
 		idp = GothIdProvider{
-			Provider: apple.New(clientId, *secret, redirectUrl, nil),
+			Provider: provider,
 			Session:  &apple.Session{},
 		}
 	case "AzureAD":
