@@ -235,12 +235,9 @@ func (l *License) isExpired() bool {
 	return err != nil || time.Now().After(expireTime)
 }
 
+// Форк vs-im: код Apache-2.0, ограничения редакций сняты — все функции доступны без лицензии.
 func Get() string {
-	license, _, _ := getState()
-	if license == nil {
-		return Community
-	}
-	return license.Edition
+	return Enterprise
 }
 
 // GetLicenseText returns the configured license when it is valid and not expired, for the Marketplace to send
