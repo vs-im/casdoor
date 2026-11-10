@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React, {Suspense, lazy} from "react";
-import {Button, Checkbox, Col, Form, Input, Result, Tabs} from "antd";
+import {Button, Checkbox, Col, Form, Input, Result, Tabs, message} from "antd";
 import Loading from "../common/Loading";
 import {ArrowLeftOutlined, LockOutlined, UserOutlined} from "@ant-design/icons";
 import {withRouter} from "react-router-dom";
@@ -44,57 +44,13 @@ import DeviceLoginPanel from "./DeviceLoginPanel";
 import {CountryCodeSelect} from "../common/select/CountryCodeSelect";
 const FaceRecognitionCommonModal = lazy(() => import("../common/modal/FaceRecognitionCommonModal"));
 const FaceRecognitionModal = lazy(() => import("../common/modal/FaceRecognitionModal"));
-import "./AuthButtons.css";
-/* eslint-disable */
-import {ApplicationConfig} from "../types";
-
-/**
- * @typedef {Object} LoginPageProps
- * @property {ApplicationConfig} application - The application configuration.
- * @property {string} type - The type of login (e.g., "signin", "signup").
- * @property {string} applicationName - The name of the application.
- * @property {string} owner - The owner of the application.
- * @property {string} mode - The mode of the login page, either "signin" or "signup".
- * @property {Object} match - React Router match object containing route parameters.
- * @property {Object} location - React Router location object.
- * @property {Object} history - React Router history object.
- */
-
-/**
- * @typedef {Object} LoginPageState
- * @property {boolean} loading - Indicates if the page is loading.
- * @property {Object} classes - Contains the props passed to the component.
- * @property {string} type - The type of login.
- * @property {string|null} applicationName - The name of the application.
- * @property {string|null} owner - The owner of the application.
- * @property {string|null} mode - The mode of the login page ("signup" or "signin").
- * @property {string|null} msg - Message to display on the login page.
- * @property {string|null} username - The username or email entered by the user.
- * @property {boolean} validEmailOrPhone - Indicates if the email or phone is valid.
- * @property {boolean} validEmail - Indicates if the email is valid.
- * @property {boolean} openCaptchaModal - Indicates if the captcha modal is open.
- * @property {boolean} openFaceRecognitionModal - Indicates if the face recognition modal is open.
- * @property {string|undefined} verifyCaptcha - Captcha verification status.
- * @property {string} samlResponse - SAML response for authentication.
- * @property {string} relayState - Relay state for SAML.
- * @property {string} redirectUrl - URL to redirect after login.
- * @property {boolean} isTermsOfUseVisible - Indicates if the terms of use are visible.
- * @property {string} termsOfUseContent - Content of the terms of use.
- * @property {string|null} orgChoiceMode - Organization choice mode from URL query params.
- */
-
 
 class LoginPage extends React.Component {
-    /**
-   * @param {LoginPageProps} props
-   */
   constructor(props) {
     super(props);
     this.captchaRef = React.createRef();
     const urlParams = new URLSearchParams(this.props.location?.search);
     this.state = {
-      loading: false,
-      redirected: false,
       classes: props,
       type: props.type,
       applicationName: props.applicationName ?? (props.match?.params?.applicationName ?? null),
@@ -118,7 +74,6 @@ class LoginPage extends React.Component {
       userCode: props.userCode ?? (props.match?.params?.userCode ?? null),
       userCodeStatus: "",
       prefilledUsername: urlParams.get("username") || urlParams.get("login_hint"),
-      magicLinkSent: false,
     };
 
     if (this.state.type === "cas" && props.match?.params.casApplicationName !== undefined) {
@@ -149,8 +104,8 @@ class LoginPage extends React.Component {
   }
 
   componentDidUpdate(prevProps, prevState, snapshot) {
-    const application = this.getApplicationObj();
     if (prevState.loginMethod === undefined && this.state.loginMethod === undefined) {
+      const application = this.getApplicationObj();
       this.setState({loginMethod: this.getDefaultLoginMethod(application)});
     }
     if (prevProps.application !== this.props.application) {
@@ -286,11 +241,6 @@ class LoginPage extends React.Component {
       case "WebAuthn": return "webAuthn";
       case "LDAP": return "ldap";
       case "Face ID": return "faceId";
-      case "Magic link":
-        if (Setting.isMagicLinkEnabled(application)) {
-          return "magicLink";
-        }
-        break;
       case "Device login":
         if (application?.signinMethods[0]?.rule === "Tab") {
           return "device";
@@ -313,8 +263,6 @@ class LoginPage extends React.Component {
       return "LDAP";
     } else if (this.state.loginMethod === "faceId") {
       return "Face ID";
-    } else if (this.state.loginMethod === "magicLink") {
-      return "Magic link";
     } else if (this.state.loginMethod === "device") {
       return "Device login";
     } else {
@@ -330,7 +278,6 @@ class LoginPage extends React.Component {
     case "verificationCode": return i18next.t("login:Email or phone");
     case "verificationCodeEmail": return i18next.t("general:Email");
     case "verificationCodePhone": return i18next.t("general:Phone");
-    case "magicLink": return i18next.t("general:Email");
     case "ldap": return i18next.t("login:LDAP username, Email or phone");
     default: return i18next.t("login:username, Email or phone");
     }
@@ -342,36 +289,14 @@ class LoginPage extends React.Component {
 
   onUpdateApplication(application) {
     this.props.onUpdateApplication(application);
-    if (!!application && Array.isArray(application.providers)) {
-      for (const idx in application.providers) {
-        const provider = application.providers[idx];
-        if (provider.provider?.category === "Face ID") {
-          this.setState({haveFaceIdProvider: true});
-          break;
-        }
-      }
+    if (application === null) {
+      return;
     }
-    if (!this.redirected && !!application?.providers) {
-      const loginParams = (this.state.type === "cas") ? Util.getCasLoginParameters("admin", this.state.applicationName) : Util.getOAuthGetParameters();
-      if (!loginParams?.action) return;
-      if (!application || !application.providers || !Array.isArray(application.providers)) return
-      const provider = application.providers.find((p) => p.name === loginParams.action)
-      if (!provider?.provider) return;
-      const {onClick, href} = ProviderButton.renderProviderLogoProps(
-        provider.provider,
-        application,
-        30,
-        5,
-        "medium",
-        this.props.location
-      )
-      this.setState({
-        redirected: true,
-      })
-      if (onClick) {
-        onClick()
-      } else if (href) {
-        window.location.href = href;
+    for (const idx in application.providers) {
+      const provider = application.providers[idx];
+      if (provider.provider?.category === "Face ID") {
+        this.setState({haveFaceIdProvider: true});
+        break;
       }
     }
   }
@@ -516,11 +441,7 @@ class LoginPage extends React.Component {
   }
 
   onFinish(values) {
-    this.setState({loginLoading: true, loading: true});
-    if (this.state.loginMethod === "magicLink") {
-      this.requestMagicLink(values);
-      return;
-    }
+    this.setState({loginLoading: true});
     if (this.state.loginMethod === "webAuthn") {
       let username = this.state.username;
       if (username === null || username === "") {
@@ -547,7 +468,6 @@ class LoginPage extends React.Component {
           if (res.status === "error") {
             this.setState({
               loginLoading: false,
-              loading: false
             });
             Setting.showMessage("error", res.msg);
             return;
@@ -599,52 +519,6 @@ class LoginPage extends React.Component {
     this.login(values);
   }
 
-  requestMagicLink(values) {
-    const oAuthParams = Util.getOAuthGetParameters();
-    const expiresInMinutes = values["expiresInMinutes"];
-    const requestApplication = values["magicLinkApplication"] || this.getApplicationObj()?.name;
-    values["email"] = values["username"];
-    values["application"] = requestApplication;
-    values["organization"] = this.getApplicationObj()?.organization;
-    if (expiresInMinutes !== undefined && expiresInMinutes !== null && expiresInMinutes !== "") {
-      values["expiresInMinutes"] = Number(expiresInMinutes);
-    } else {
-      delete values["expiresInMinutes"];
-    }
-    if (!values["group"]) {
-      delete values["group"];
-    }
-    if (!values["permission"]) {
-      delete values["permission"];
-    }
-    if (!values["magicLinkApplication"]) {
-      delete values["magicLinkApplication"];
-    }
-    AuthBackend.sendMagicLink(values, oAuthParams)
-      .then((res) => {
-        if (res.status === "ok") {
-          this.setState({magicLinkSent: true});
-        } else if (res.data === "captchaRequired") {
-          this.setState({
-            openCaptchaModal: true,
-            forceCaptchaModal: true,
-            values: values,
-          });
-        } else {
-          Setting.showMessage("error", `${i18next.t("application:Failed to sign in")}: ${res.msg}`);
-        }
-      })
-      .catch((error) => {
-        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}${error}`);
-      })
-      .finally(() => {
-        this.setState({
-          loginLoading: false,
-          loading: false
-        });
-      });
-  }
-
   login(values) {
     // here we are supposed to determine whether Casdoor is working as an OAuth server or CAS server
     values["language"] = this.state.userLang ?? "";
@@ -656,9 +530,6 @@ class LoginPage extends React.Component {
       const casParams = Util.getCasParameters();
       values["signinMethod"] = this.getCurrentLoginMethod();
       values["type"] = this.state.type;
-      this.setState({
-        loading: true,
-      });
       AuthBackend.loginCas(values, casParams).then((res) => {
         const loginHandler = (res) => {
           let msg = "Logged in successfully. ";
@@ -685,18 +556,12 @@ class LoginPage extends React.Component {
           }
         }
       }).finally(() => {
-        this.setState({
-          loginLoading: false,
-          loading: false
-        });
+        this.setState({loginLoading: false});
       });
     } else {
       // OAuth
       const oAuthParams = Util.getOAuthGetParameters();
       this.populateOauthValues(values);
-      this.setState({
-        loading: true,
-      });
       AuthBackend.login(values, oAuthParams)
         .then((res) => {
           const loginHandler = (res) => {
@@ -756,7 +621,7 @@ class LoginPage extends React.Component {
           }
         }).finally(() => {
           localStorage.setItem("lastLoginOrg", values?.organization || "");
-          this.setState({loginLoading: false, loading: false});
+          this.setState({loginLoading: false});
         });
     }
   }
@@ -774,7 +639,6 @@ class LoginPage extends React.Component {
       return null;
     }
 
-    if (!Array.isArray(application.providers)) return null
     for (const providerConf of application.providers) {
       if (providerConf.provider?.type === "Google" && providerConf.rule === "OneTap" && this.props.preview !== "auto") {
         return (
@@ -933,7 +797,7 @@ class LoginPage extends React.Component {
       }
 
       return (
-        <div key={resultItemKey} style={{margin: "0px"}}>
+        <div key={resultItemKey}>
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <Form.Item
             name="username"
@@ -972,7 +836,7 @@ class LoginPage extends React.Component {
                     } else {
                       this.setState({validEmail: false});
                     }
-                  } else if (this.state.loginMethod === "verificationCodeEmail" || this.state.loginMethod === "magicLink") {
+                  } else if (this.state.loginMethod === "verificationCodeEmail") {
                     if (!Setting.isValidEmail(value)) {
                       this.setState({validEmail: false});
                       this.setState({validEmailOrPhone: false});
@@ -1010,7 +874,7 @@ class LoginPage extends React.Component {
       );
     } else if (signinItem.name === "Password") {
       return (
-        <div key={resultItemKey} style={{marginTop: "17px"}}>
+        <div key={resultItemKey}>
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           {this.renderPasswordOrCodeInput(signinItem)}
         </div>
@@ -1048,7 +912,7 @@ class LoginPage extends React.Component {
         <Form.Item key={resultItemKey} className="login-button-box">
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <Button
-            loading={this.state.loginLoading || this.state.loading}
+            loading={this.state.loginLoading}
             type="primary"
             htmlType="submit"
             className="login-button"
@@ -1056,7 +920,6 @@ class LoginPage extends React.Component {
             {
               this.state.loginMethod === "webAuthn" ? i18next.t("login:Sign in with WebAuthn") :
                 this.state.loginMethod === "faceId" ? i18next.t("login:Sign in with Face ID") :
-                  this.state.loginMethod === "magicLink" ? i18next.t("login:Send Magic Link") :
                   this.state.type === "device" ? i18next.t("login:Approve and sign in") :
                     signinItem.label ? signinItem.label : i18next.t("login:Sign In")
             }
@@ -1116,16 +979,10 @@ class LoginPage extends React.Component {
         </Form.Item>
       );
     } else if (signinItem.name === "Providers") {
-      const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application) || Setting.isMagicLinkEnabled(application);
+      const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application);
       if (signinItem.rule === "None" || signinItem.rule === "") {
         signinItem.rule = showForm ? "small" : "big";
       }
-      const availableProviders = application.providers?.filter(providerItem => this.isProviderVisible(providerItem));
-      const showProviders = availableProviders.length > 0;
-      const otherProviderForm = this.renderOtherFormProvider(application)
-      
-      if (!otherProviderForm && !showProviders) return null;
-
       const searchParams = new URLSearchParams(window.location.search);
       const providerHint = searchParams.get("provider_hint");
 
@@ -1133,33 +990,31 @@ class LoginPage extends React.Component {
         <div key={resultItemKey}>
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
           <Form.Item>
-            {otherProviderForm}
-            {showProviders && (
-              <React.Fragment>
-                <div className="social-auth-label">
-                  <p className="social-auth">{i18next.t("account:or") || "or"}</p>
-                </div>
-                <div
-                  style={{display: "flex", flexDirection: "column", gap: "4px"}}
-                >
-                  {availableProviders.map((providerItem) => {
-                    if (providerHint === providerItem.provider.name) {
-                      goToLink(Provider.getAuthUrl(application, providerItem.provider, this.state.mode ?? "signup"));
-                      return;
+            {
+              application.providers.filter(providerItem => this.isProviderVisible(providerItem)).map((providerItem, id) => {
+                if (providerHint === providerItem.provider.name) {
+                  goToLink(Provider.getAuthUrl(application, providerItem.provider, this.state.mode ?? "signup"));
+                  return;
+                }
+                return (
+                  <span key={id} onClick={(e) => {
+                    const agreementChecked = this.form.current.getFieldValue("agreement");
+
+                    if (agreementChecked !== undefined && typeof agreementChecked === "boolean" && !agreementChecked) {
+                      e.preventDefault();
+                      message.error(i18next.t("signup:Please accept the agreement!"));
                     }
-                    return ProviderButton.renderProviderLogo(
-                      providerItem.provider,
-                      application,
-                      30,
-                      5,
-                      "medium",
-                      this.props.location,
-                      this.state.mode ?? "signup"
-                    );
-                  })}
-                </div>
-              </React.Fragment>
-            )}
+                  }}>
+                    {
+                      ProviderButton.renderProviderLogo(providerItem.provider, application, null, null, signinItem.rule, this.props.location, this.state.mode ?? "signup")
+                    }
+                  </span>
+                );
+              })
+            }
+            {
+              this.renderOtherFormProvider(application)
+            }
           </Form.Item>
         </div>
       );
@@ -1170,12 +1025,10 @@ class LoginPage extends React.Component {
         <div key={resultItemKey} dangerouslySetInnerHTML={{__html: signinItem.customCss}} />
       );
     } else if (signinItem.name === "Signup link") {
-      const footer = this.renderFooter(application, signinItem);
-      if (!footer) return null;
       return (
-        <div key={resultItemKey} style={{width: "100%", marginBottom: "10px"}} className="login-signup-link">
+        <div key={resultItemKey} style={{width: "100%"}} className="login-signup-link">
           <div dangerouslySetInnerHTML={{__html: ("<style>" + signinItem.customCss?.replaceAll("<style>", "").replaceAll("</style>", "") + "</style>")}} />
-          {footer}
+          {this.renderFooter(application, signinItem)}
         </div>
       );
     } else if (signinItem.name === "Select organization") {
@@ -1236,17 +1089,7 @@ class LoginPage extends React.Component {
       );
     }
 
-    if (this.state.magicLinkSent) {
-      return (
-        <Result
-          status="success"
-          title={i18next.t("login:Check your email")}
-          subTitle={i18next.t("login:We sent you a magic link to sign in")}
-        />
-      );
-    }
-
-    const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application) || Setting.isFaceIdEnabled(application) || Setting.isMagicLinkEnabled(application);
+    const showForm = Setting.isPasswordEnabled(application) || Setting.isCodeSigninEnabled(application) || Setting.isWebAuthnEnabled(application) || Setting.isLdapEnabled(application) || Setting.isFaceIdEnabled(application);
     if (showForm) {
       let loginWidth = 320;
       if (Setting.getLanguage() === "fr") {
@@ -1325,7 +1168,7 @@ class LoginPage extends React.Component {
   }
 
   renderCaptchaModal(application, noModal) {
-    if (!this.state.forceCaptchaModal && Setting.getCaptchaRule(this.getApplicationObj()) === Setting.CaptchaRule.Never) {
+    if (Setting.getCaptchaRule(this.getApplicationObj()) === Setting.CaptchaRule.Never) {
       return null;
     }
     const captchaProviderItems = Setting.getCaptchaProviderItems(application);
@@ -1337,9 +1180,7 @@ class LoginPage extends React.Component {
     const captchaRule = Setting.getCaptchaRule(this.getApplicationObj());
     let provider = null;
 
-    if (this.state.forceCaptchaModal && captchaProviderItems.length > 0) {
-      provider = captchaProviderItems[0].provider;
-    } else if (captchaRule === Setting.CaptchaRule.Always && alwaysProviderItems.length > 0) {
+    if (captchaRule === Setting.CaptchaRule.Always && alwaysProviderItems.length > 0) {
       provider = alwaysProviderItems[0].provider;
     } else if (captchaRule === Setting.CaptchaRule.Dynamic && dynamicProviderItems.length > 0) {
       provider = dynamicProviderItems[0].provider;
@@ -1369,22 +1210,16 @@ class LoginPage extends React.Component {
         values["captchaToken"] = captchaToken;
         values["clientSecret"] = clientSecret;
 
-        if (this.state.loginMethod === "magicLink") {
-          this.setState({loginLoading: true, loading: true});
-          this.requestMagicLink(values);
-        } else {
-          this.login(values);
-        }
-        this.setState({openCaptchaModal: false, forceCaptchaModal: false});
+        this.login(values);
+        this.setState({openCaptchaModal: false});
       }}
-      onCancel={() => this.setState({openCaptchaModal: false, forceCaptchaModal: false, loginLoading: false})}
+      onCancel={() => this.setState({openCaptchaModal: false, loginLoading: false})}
       isCurrentProvider={true}
       innerRef={this.captchaRef}
     />;
   }
 
   renderFooter(application, signinItem) {
-    if (!application.enableSignUp) return null;
     return (
       <div>
         {
@@ -1499,7 +1334,7 @@ class LoginPage extends React.Component {
           <strong>{application.displayName}</strong>
         </div>
         <div style={{color: "#8c8c8c"}}>
-          {i18next.t("code:Confirmation code")}: {this.state.userCode}
+          {i18next.t("login:Confirmation code")}: {this.state.userCode}
         </div>
       </div>
     );
@@ -1531,7 +1366,6 @@ class LoginPage extends React.Component {
         if ("status" in credentialRequestOptions) {
           return Promise.reject(new Error(credentialRequestOptions.msg));
         }
-
         credentialRequestOptions.publicKey.challenge = UserWebauthnBackend.webAuthnBufferDecode(credentialRequestOptions.publicKey.challenge);
 
         if (username) {
@@ -1598,7 +1432,7 @@ class LoginPage extends React.Component {
         Setting.showMessage("error", `${error.message}`);
       }).finally(() => {
         this.setState({
-          loginLoading: false, loading: false
+          loginLoading: false,
         });
       });
   }
@@ -1627,7 +1461,6 @@ class LoginPage extends React.Component {
                 className="login-password-input"
                 prefix={<LockOutlined className="site-form-item-icon" />}
                 type="password"
-                autoComplete="current-password"
                 placeholder={signinItem.placeholder ? signinItem.placeholder : i18next.t("general:Password")}
                 disabled={this.state.loginMethod === "password" ? !Setting.isPasswordEnabled(application) : !Setting.isLdapEnabled(application)}
               />
@@ -1708,7 +1541,6 @@ class LoginPage extends React.Component {
       [generateItemKey("WebAuthn", "None"), {label: i18next.t("login:WebAuthn"), key: "webAuthn"}],
       [generateItemKey("LDAP", "None"), {label: i18next.t("login:LDAP"), key: "ldap"}],
       [generateItemKey("Face ID", "None"), {label: i18next.t("login:Face ID"), key: "faceId"}],
-      [generateItemKey("Magic link", "None"), {label: i18next.t("login:Magic link"), key: "magicLink"}],
       [generateItemKey("Device login", "Tab"), {label: i18next.t("login:Device login"), key: "device"}],
       [generateItemKey("WeChat", "Tab"), {label: i18next.t("login:WeChat"), key: "wechat"}],
       [generateItemKey("WeChat", "None"), {label: i18next.t("login:WeChat"), key: "wechat"}],
@@ -1716,10 +1548,6 @@ class LoginPage extends React.Component {
 
     application?.signinMethods?.forEach((signinMethod) => {
       if (Setting.isSigninMethodHidden(signinMethod)) {
-        return;
-      }
-
-      if (signinMethod.name === "Magic link" && !Setting.isMagicLinkEnabled(application)) {
         return;
       }
 

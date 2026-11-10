@@ -1,21 +1,20 @@
 import * as React from "react";
 import i18next from "i18next";
-import {Link, useNavigate, useParams, useSearchParams} from "react-router-dom";
+import {Link, useLocation, useNavigate, useParams, useSearchParams} from "react-router-dom";
 import {Alert, AlertDescription, AlertTitle} from "@/components/ui/alert";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {CountryCodeSelect} from "@/components/common/CountryCodeSelect";
-import {Loading} from "@/components/common/Loading";
 import {MultiSelect} from "@/components/common/MultiSelect";
 import {PasswordInput} from "@/components/common/PasswordInput";
 import {SearchableSelect} from "@/components/common/SearchableSelect";
 import {RegionSelect} from "@/components/common/RegionSelect";
 import {CustomHtml, CustomStyle} from "@/components/common/CustomHtml";
 import {isTrustedApplication} from "@/lib/custom-html";
-import {AuthDivider, AuthLayout} from "@/components/auth/AuthLayout";
-import {AgreementCheckbox} from "@/components/auth/AgreementModal";
+import {AuthDivider, AuthLayout, AuthLoading} from "@/components/auth/AuthLayout";
+import {AgreementCheckbox, hasAgreementDoc} from "@/components/auth/AgreementModal";
 import {ProviderButtons, getVisibleProviders} from "@/components/auth/ProviderButtons";
 import {SendCodeInput} from "@/components/auth/SendCodeInput";
 import {CaptchaModal} from "@/components/common/CaptchaModal";
@@ -62,8 +61,12 @@ function fieldClass(field: string): string {
 export default function SignupPage({application: applicationProp}: {application?: any} = {}) {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const {reload} = useAccount();
+  // the email or phone a verification-code sign-in already proved, with that code
+  const verifiedAddress = (location.state as any)?.verifiedAddress as
+    {type: "email" | "phone"; dest: string; countryCode: string; code: string} | undefined;
 
   const [application, setApplication] = React.useState<any>(undefined);
   const [msg, setMsg] = React.useState<string | null>(null);
@@ -73,7 +76,9 @@ export default function SignupPage({application: applicationProp}: {application?
   const [loading, setLoading] = React.useState(false);
   const [captchaVisible, setCaptchaVisible] = React.useState(false);
   const [pendingValues, setPendingValues] = React.useState<any>(null);
-  const [emailOrPhoneMode, setEmailOrPhoneMode] = React.useState("");
+  const [emailOrPhoneMode, setEmailOrPhoneMode] = React.useState(
+    verifiedAddress ? (verifiedAddress.type === "email" ? "Email" : "Phone") : "",
+  );
   const [invitation, setInvitation] = React.useState<any>(undefined);
   const [passwordFocused, setPasswordFocused] = React.useState(false);
   const [userLang, setUserLang] = React.useState("");
@@ -85,6 +90,8 @@ export default function SignupPage({application: applicationProp}: {application?
   const [captchaAction, setCaptchaAction] = React.useState<"signup" | "magicLink">("signup");
 
   const applicationName = params.applicationName ?? authConfig.appName;
+
+  React.useEffect(() => Setting.onPageRestored(() => setLoading(false)), []);
 
   React.useEffect(() => {
     if (applicationProp) {
@@ -102,7 +109,7 @@ export default function SignupPage({application: applicationProp}: {application?
     const oAuthParams = Util.getOAuthGetParameters();
     if (oAuthParams) {
       // the OAuth params live on the signin path, remember it to get back there after the signup
-      const signinUrl = window.location.pathname.replace("/signup/oauth/authorize", "/login/oauth/authorize");
+      const signinUrl = Setting.getRoutePath().replace("/signup/oauth/authorize", "/login/oauth/authorize");
       sessionStorage.setItem("signinUrl", signinUrl + window.location.search);
     }
     const load = oAuthParams
@@ -153,18 +160,42 @@ export default function SignupPage({application: applicationProp}: {application?
 
   const signupItems = (application?.signupItems ?? []) as any[];
   const languagesItem = signupItems.find((item: any) => item.name === "Languages");
+  // an application that lists no Logo item keeps the logo
+  const hideLogo = signupItems.find((item: any) => item.name === "Logo")?.visible === false;
   const languages = application?.organizationObj?.languages as string[] | undefined;
   // an organization that offers a single language forces it rather than offering a choice
   const forcedLanguage =
-    (!languagesItem || languagesItem.visible) && languages && languages.length <= 1
-      ? (languages.length === 1 ? languages[0] : "en")
-      : "";
+    (!languagesItem || languagesItem.visible) && languages?.length === 1 ? languages[0] : "";
 
   React.useEffect(() => {
     if (forcedLanguage !== "" && Setting.getLanguage() !== forcedLanguage) {
       Setting.setLanguage(forcedLanguage);
     }
   }, [forcedLanguage]);
+
+  React.useEffect(() => {
+    if (!application || !verifiedAddress) {
+      return;
+    }
+    setValues((prev) => ({
+      ...prev,
+      ...(verifiedAddress.type === "email"
+        ? {email: verifiedAddress.dest, emailCode: verifiedAddress.code}
+        : {phone: verifiedAddress.dest, countryCode: verifiedAddress.countryCode, phoneCode: verifiedAddress.code}),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [application]);
+
+  /** The email or phone the sign-in proved, shown instead of its field and code. */
+  const renderVerifiedAddress = (item: any, field: "email" | "phone", defaultLabel: string) => (
+    <div key={`${item.name}-${field}`} className={`signup-${field} signup-verified-address space-y-2`}>
+      {renderLabel(item.label || defaultLabel, item.required)}
+      <div className="flex h-9 items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 text-sm">
+        <span className="truncate">{values[field] ?? verifiedAddress?.dest}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{i18next.t("user:Verified")}</span>
+      </div>
+    </div>
+  );
 
   const set = (key: string, value: any) => {
     setValues((prev) => ({...prev, [key]: value}));
@@ -184,7 +215,7 @@ export default function SignupPage({application: applicationProp}: {application?
   );
 
   if (application === undefined) {
-    return <Loading className="min-h-screen" />;
+    return <AuthLoading preview={!!applicationProp} />;
   }
 
   if (application === null) {
@@ -200,9 +231,9 @@ export default function SignupPage({application: applicationProp}: {application?
   const signinLink = Setting.getStoredSigninUrl() || Setting.getLoginLink(application) || "/login";
 
   // without self signup, only an invitation link opens the signup form
-  if (!application.enableSignUp || (application.disableSelfSignup && !values.invitationCode)) {
+  if (!Setting.isSignupAllowed(application) || (application.disableSelfSignup && !values.invitationCode)) {
     return (
-      <AuthLayout preview={!!applicationProp} application={application}>
+      <AuthLayout preview={!!applicationProp} application={application} hideLogo={hideLogo}>
         <div className="space-y-4">
           <Alert variant="warning">
             <AlertDescription>{i18next.t("application:The application does not allow to sign up new account")}</AlertDescription>
@@ -217,6 +248,11 @@ export default function SignupPage({application: applicationProp}: {application?
 
   const captchaProvider = getCaptchaProvider(application);
   const items = signupItems.filter((item: any) => item.visible);
+  // the address a verification-code sign-in proved leads the form, the other items keep their order
+  const isVerifiedItem = (item: any) => !!verifiedAddress && (
+    item.name === (verifiedAddress.type === "email" ? "Email" : "Phone") || item.name === "Email or Phone" || item.name === "Phone or Email"
+  );
+  const shownItems = verifiedAddress ? [...items.filter(isVerifiedItem), ...items.filter((item: any) => !isVerifiedItem(item))] : items;
   // "First, last" splits the display name into two fields, which then replace the
   // separate First name / Last name items; Chinese names are not split
   const splitDisplayName =
@@ -388,10 +424,15 @@ export default function SignupPage({application: applicationProp}: {application?
         }
         navigate(path, {state: {username}});
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        // the spinner stays on while the browser leaves for the application
+        if (!Setting.isLeavingPage()) {
+          setLoading(false);
+        }
+      });
   };
 
-  const renderEmail = (item: any) => (
+  const renderEmail = (item: any) => verifiedAddress?.type === "email" ? renderVerifiedAddress(item, "email", i18next.t("general:Email")) : (
     <React.Fragment key={`${item.name}-email`}>
       <div className="signup-email space-y-2">
         {renderLabel(item.label || i18next.t("general:Email"), item.required, "email")}
@@ -428,7 +469,7 @@ export default function SignupPage({application: applicationProp}: {application?
     </React.Fragment>
   );
 
-  const renderPhone = (item: any) => (
+  const renderPhone = (item: any) => verifiedAddress?.type === "phone" ? renderVerifiedAddress(item, "phone", i18next.t("general:Phone")) : (
     <React.Fragment key={`${item.name}-phone`}>
       <div className="signup-phone space-y-2">
         {renderLabel(item.label || i18next.t("general:Phone"), item.required, "phone")}
@@ -564,6 +605,10 @@ export default function SignupPage({application: applicationProp}: {application?
     case "Phone or Email": {
       const mode = emailOrPhoneMode || (item.name === "Email or Phone" ? "Email" : "Phone");
       const choices = item.name === "Email or Phone" ? ["Email", "Phone"] : ["Phone", "Email"];
+      // the address the sign-in proved decides the choice
+      if (verifiedAddress) {
+        return mode === "Email" ? renderEmail(item) : renderPhone(item);
+      }
       return (
         <React.Fragment key={item.name}>
           <div className="signup-email-or-phone grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
@@ -621,8 +666,8 @@ export default function SignupPage({application: applicationProp}: {application?
         disabled: invitation !== undefined,
       });
     case "Agreement":
-      // the application's own terms document opens in a dialog, as in the antd page
-      if (application.termsOfUse) {
+      // the application's own terms and privacy documents open in a dialog, as in the antd page
+      if (hasAgreementDoc(application)) {
         return (
           <div key={item.name} className="login-agreement">
             <AgreementCheckbox application={application} checked={agreed} onChange={setAgreed} />
@@ -699,6 +744,7 @@ export default function SignupPage({application: applicationProp}: {application?
         </div>
       );
     case "ID":
+    case "Logo":
     case "Languages":
       return null;
     default: {
@@ -764,6 +810,7 @@ export default function SignupPage({application: applicationProp}: {application?
       preview={!!applicationProp}
       application={application}
       wide
+      hideLogo={hideLogo}
       hideLanguages={(languagesItem && !languagesItem.visible) || forcedLanguage !== ""}
       onLanguageChange={(key) => {
         setUserLang(key);
@@ -789,7 +836,7 @@ export default function SignupPage({application: applicationProp}: {application?
         {signupItems.map((item: any) => (
           <CustomStyle key={`css-${item.name}`} css={item.customCss} />
         ))}
-        {items.map(renderItem)}
+        {shownItems.map(renderItem)}
         {hasSignupButtonItem ? null : (
           <Button type="submit" className="signup-button w-full" loading={loading}>
             {i18next.t("account:Sign Up")}

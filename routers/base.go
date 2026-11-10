@@ -44,6 +44,20 @@ func isMcpRequest(urlPath string) bool {
 	return urlPath == "/api/mcp" || strings.HasPrefix(urlPath, "/api/server/")
 }
 
+// responseInvalidToken answers 401 with a challenge on the userinfo endpoint (RFC 6750 section 3.1,
+// RFC 9449 section 7.1), other APIs keep answering 200 with the error in the body
+func responseInvalidToken(ctx *context.Context, token *object.Token, errorCode string, error string) {
+	if ctx.Request.URL.Path == "/api/userinfo" {
+		challenge := fmt.Sprintf("Bearer error=\"%s\", error_description=%q", errorCode, error)
+		if (token != nil && token.TokenType == "DPoP") || strings.HasPrefix(ctx.Request.Header.Get("Authorization"), "DPoP ") {
+			challenge = fmt.Sprintf("DPoP error=\"%s\", error_description=%q, algs=\"%s\"", errorCode, error, strings.Join(object.DPoPSigningAlgs, " "))
+		}
+		ctx.Output.Header("WWW-Authenticate", challenge)
+		ctx.Output.SetStatus(http.StatusUnauthorized)
+	}
+	responseError(ctx, error)
+}
+
 func responseError(ctx *context.Context, error string, data ...interface{}) {
 	// ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
 	urlPath := ctx.Request.URL.Path
@@ -89,7 +103,10 @@ func denyMcpRequest(ctx *context.Context, message string) {
 		// localhost:8000 or computer-name:80
 		scheme = "http"
 	}
-	resourceMetadataUrl := fmt.Sprintf("%s://%s/.well-known/oauth-protected-resource", scheme, host)
+	resourceMetadataUrl := fmt.Sprintf("%s://%s%s/.well-known/oauth-protected-resource", scheme, host, basePath)
+	if strings.HasPrefix(ctx.Request.URL.Path, "/api/server/") {
+		resourceMetadataUrl += ctx.Request.URL.EscapedPath()
+	}
 	ctx.Output.Header("WWW-Authenticate", fmt.Sprintf("Bearer realm=\"casdoor\", resource_metadata=\"%s\"", resourceMetadataUrl))
 
 	req := mcpself.McpRequest{}
@@ -156,7 +173,16 @@ func getUsernameByClientIdSecret(ctx *context.Context) (string, error) {
 func getUsernameByAccessKey(ctx *context.Context) (string, error) {
 	accessKey := ctx.Input.Query("accessKey")
 	accessSecret := ctx.Input.Query("accessSecret")
+	// the agent platforms that only send fixed headers to an MCP server, e.g. Alibaba Cloud Bailian, Baidu Qianfan and Coze
+	if accessKey == "" && accessSecret == "" && strings.HasPrefix(ctx.Request.URL.Path, "/api/server/") {
+		accessKey = ctx.Request.Header.Get("X-Casdoor-Access-Key")
+		accessSecret = ctx.Request.Header.Get("X-Casdoor-Access-Secret")
+	}
+	return getUsernameByKeyPair(accessKey, accessSecret)
+}
 
+// getUsernameByKeyPair authenticates an access key of the "Keys" page, which belongs to a user or an application
+func getUsernameByKeyPair(accessKey string, accessSecret string) (string, error) {
 	if accessKey == "" || accessSecret == "" {
 		return "", nil
 	}
@@ -249,7 +275,10 @@ func clearSessionOfRevokedToken(ctx *context.Context) error {
 		return err
 	}
 	if token != nil && token.ExpiresIn > 0 {
-		return nil
+		isExpired, _ := util.IsTokenExpired(token.CreatedTime, token.ExpiresIn)
+		if !isExpired {
+			return nil
+		}
 	}
 
 	return clearSessionOfToken(ctx)

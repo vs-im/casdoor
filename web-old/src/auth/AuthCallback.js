@@ -89,7 +89,6 @@ class AuthCallback extends React.Component {
     const concatChar = oAuthParams?.redirectUri?.includes("?") ? "&" : "?";
     const responseMode = oAuthParams?.responseMode || "query";
     const responseTypes = responseType.split(" ");
-    const isPopup = innerParams.get("popup");
 
     const handleLogin = (res) => {
       // Check if consent is required
@@ -118,10 +117,6 @@ class AuthCallback extends React.Component {
             state: oAuthParams?.state,
           };
           createFormAndSubmit(oAuthParams?.redirectUri, params);
-        } else if (isPopup === "true") {
-          const code = res.data;
-          window.opener.postMessage({type: "loginSuccess", data: {code: code, state: oAuthParams.state}}, window.location.origin);
-          window.close();
         } else {
           const code = res.data;
           Setting.goToLink(`${oAuthParams.redirectUri}${concatChar}code=${encodeURIComponent(code)}&state=${encodeURIComponent(oAuthParams.state)}`);

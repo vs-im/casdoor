@@ -24,13 +24,16 @@ class SelfLoginButton extends React.Component {
       if (!avatarUrl) {
         return Setting.getAvatarPlaceholder(account.name, 36);
       }
-      return <img style={{borderRadius: "50%"}} width={36} height={36} src={avatarUrl} alt={account.name} />;
+      return <img width={36} height={36} src={avatarUrl} alt={account.name} />;
     };
   }
 
   getAccountShowName() {
-    const name = this.props.account.email || this.props.account.displayName || this.props.account.name;
-    return name.length > 20 ? name.substring(0, 20) + "..." : name;
+    let {name, displayName} = this.props.account;
+    if (displayName !== "") {
+      name += " (" + displayName + ")";
+    }
+    return name;
   }
 
   render() {
@@ -42,13 +45,7 @@ class SelfLoginButton extends React.Component {
     };
 
     const SelfLoginButton = createButton(config);
-    return <SelfLoginButton style={{
-      margin: "0",
-      borderRadius: "12px",
-      width: "100%",
-      transition: "background 0.2s ease, color 0.2s ease",
-      boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.1)",
-    }} text={this.getAccountShowName()} onClick={this.props.onClick} align={"center"} />;
+    return <SelfLoginButton text={this.getAccountShowName()} onClick={this.props.onClick} align={"center"} />;
   }
 }
 

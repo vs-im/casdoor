@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/casdoor/casdoor/object"
+	"github.com/casdoor/casdoor/util"
 )
 
 // RevokeConsent revokes a consent record
@@ -92,6 +93,11 @@ func (c *ApiController) RevokeConsent() {
 	}
 	userObj.ApplicationScopes = newScopes
 	success, err := object.UpdateUser(userObj.GetId(), userObj, nil, false)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	err = object.AddConsentLog(userObj, consent.Application, "revoke", consent.GrantedScopes, nil, util.GetClientIpFromRequest(c.Ctx.Request), c.Ctx.Request.UserAgent())
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
@@ -173,45 +179,30 @@ func (c *ApiController) GrantConsent() {
 		return
 	}
 
-	appId := application.GetId()
-	found := false
-	// Insert new scope into existing applicationScopes
-	for i, record := range userObj.ApplicationScopes {
-		if record.Application == appId {
-			existing := make(map[string]bool)
-			for _, s := range userObj.ApplicationScopes[i].GrantedScopes {
-				existing[s] = true
-			}
-			for _, s := range request.Scopes {
-				if !existing[s] {
-					userObj.ApplicationScopes[i].GrantedScopes = append(userObj.ApplicationScopes[i].GrantedScopes, s)
-					existing[s] = true
-				}
-			}
-			found = true
-			break
-		}
+	grantedScopes, ok := object.GetConsentGrantedScopes(request.Scope, request.Scopes)
+	if !ok {
+		c.ResponseError(c.T("token:Invalid scope"))
+		return
 	}
-	// create a new applicationScopes if not found
-	if !found {
-		uniqueScopes := []string{}
-		existing := make(map[string]bool)
-		for _, s := range request.Scopes {
-			if !existing[s] {
-				uniqueScopes = append(uniqueScopes, s)
-				existing[s] = true
-			}
-		}
-		userObj.ApplicationScopes = append(userObj.ApplicationScopes, object.ConsentRecord{
-			Application:   appId,
-			GrantedScopes: uniqueScopes,
-		})
+	if len(grantedScopes) == 0 {
+		c.ResponseError(c.T("general:Granted scopes cannot be empty"))
+		return
 	}
+
+	object.UpdateConsentRecord(userObj, application, request.Scope, grantedScopes)
 
 	_, err = object.UpdateUser(userObj.GetId(), userObj, []string{"application_scopes"}, false)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
+	}
+
+	if record := object.GetConsentRecordOfUser(userObj, application); record != nil {
+		err = object.AddConsentLog(userObj, application.GetId(), "grant", record.GrantedScopes, record.DeniedScopes, util.GetClientIpFromRequest(c.Ctx.Request), c.Ctx.Request.UserAgent())
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
 	}
 
 	// Now get the OAuth code

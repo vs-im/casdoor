@@ -37,16 +37,35 @@ import viCountries from "i18n-iso-countries/langs/vi.json";
 import zhCountries from "i18n-iso-countries/langs/zh.json";
 import * as Conf from "@/Conf";
 import {authConfig} from "@/auth/Auth";
+import {BasePath, getRoutePath, withBasePath} from "@/lib/base-path";
 import "@/i18n";
 
-export const ServerUrl = "";
+export {BasePath, getOriginUrl, getRoutePath, withBasePath} from "@/lib/base-path";
+
+export const ServerUrl = BasePath;
 
 export const StaticBaseUrl = Conf.StaticBaseUrl;
 
 export const MAX_PAGE_SIZE = 25;
 export const SEARCH_DEBOUNCE_MS = 300;
 
+export const PricingUrl = "https://casdoor.cn/pricing";
+
+// the backend ends the message of a feature that needs a higher edition with " (<pricing page>)"
+const editionRequiredSuffix = ` (${PricingUrl})`;
+
 export function showMessage(type: "success" | "error" | "info" | "warning", text: string) {
+  if (type === "error" && typeof text === "string" && text.includes(editionRequiredSuffix)) {
+    toast.error(text.replace(editionRequiredSuffix, ""), {
+      duration: 15000,
+      action: {
+        label: i18next.t("general:View editions and pricing"),
+        onClick: () => window.open(PricingUrl, "_blank", "noopener,noreferrer"),
+      },
+    });
+    return;
+  }
+
   if (type === "success") {
     toast.success(text);
   } else if (type === "error") {
@@ -77,26 +96,30 @@ export function getFullServerUrl() {
   if (fullServerUrl === "http://localhost:7002" || fullServerUrl === "http://localhost:7001") {
     fullServerUrl = "http://localhost:8000";
   }
-  return fullServerUrl;
+  return `${fullServerUrl}${BasePath}`;
 }
 
-// An OAuth redirect URI on Casdoor's own origin belongs to Casdoor itself: the whole
-// origin serves the frontend, so no client application can live there. Such a request
-// is signed in directly instead of being answered with a code nobody can collect.
+// An OAuth redirect URI on Casdoor's own origin (under its base path) belongs to Casdoor
+// itself: that whole path serves the frontend, so no client application can live there.
+// Such a request is signed in directly instead of being answered with a code nobody can collect.
 export function isSelfRedirectUri(redirectUri) {
   if (!redirectUri) {
     return false;
   }
 
   try {
-    return new URL(redirectUri).origin === getFullServerUrl();
+    const url = new URL(redirectUri);
+    if (url.origin !== new URL(getFullServerUrl()).origin) {
+      return false;
+    }
+    return BasePath === "" || url.pathname === BasePath || url.pathname.startsWith(`${BasePath}/`);
   } catch {
     return false;
   }
 }
 
 export function getOAuthIssuer() {
-  return getFullServerUrl();
+  return document.querySelector("meta[name=\"casdoor-issuer\"]")?.getAttribute("content") || getFullServerUrl();
 }
 
 export function getOAuthIssuerParam() {
@@ -192,14 +215,14 @@ export function copyToClipboard(text: string) {
   showMessage("success", i18next.t("general:Copied to clipboard successfully"));
 }
 
-export function getClickable(text) {
+export function getClickable(text, label: React.ReactNode = text) {
   return (
     <button
       type="button"
       className="text-left underline-offset-4 hover:underline"
       onClick={() => copyToClipboard(text)}
     >
-      {text}
+      {label}
     </button>
   );
 }
@@ -221,7 +244,7 @@ export function getThemeData(organization, application) {
   } else if (organization?.themeData?.isEnabled) {
     return organization.themeData;
   } else {
-    return Conf.ThemeDefault;
+    return Conf.getThemeDefault();
   }
 }
 
@@ -329,6 +352,14 @@ export const OtherProviderInfo = {
     "Twilio SMS": {
       logo: `${StaticBaseUrl}/img/social_twilio.svg`,
       url: "https://www.twilio.com/messaging",
+    },
+    "Twilio Verify": {
+      logo: `${StaticBaseUrl}/img/social_twilio.svg`,
+      url: "https://www.twilio.com/docs/verify",
+    },
+    "Plugin": {
+      logo: `${StaticBaseUrl}/img/social_custom.png`,
+      url: "",
     },
     "SmsBao SMS": {
       logo: `${StaticBaseUrl}/img/social_smsbao.png`,
@@ -502,6 +533,10 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/payment_adyen.svg`,
       url: "https://www.adyen.com/",
     },
+    "Plugin": {
+      logo: `${StaticBaseUrl}/img/social_custom.png`,
+      url: "",
+    },
   },
   Captcha: {
     "Default": {
@@ -544,6 +579,10 @@ export const OtherProviderInfo = {
     },
   },
   Notification: {
+    "Plugin": {
+      logo: `${StaticBaseUrl}/img/social_custom.png`,
+      url: "",
+    },
     "Telegram": {
       logo: `${StaticBaseUrl}/img/social_telegram.png`,
       url: "https://telegram.org/",
@@ -649,6 +688,10 @@ export const OtherProviderInfo = {
     "Alibaba Cloud": {
       logo: `${StaticBaseUrl}/img/social_aliyun.png`,
       url: "https://www.aliyun.com/product/idverification",
+    },
+    "Plugin": {
+      logo: `${StaticBaseUrl}/img/social_custom.png`,
+      url: "",
     },
   },
   Audit: {
@@ -779,6 +822,9 @@ export const GetTranslatedUserItems = () => {
     {name: "Multi-factor authentication", label: i18next.t("mfa:Multi-factor authentication")},
     {name: "WebAuthn credentials", label: i18next.t("user:WebAuthn credentials")},
     {name: "Last change password time", label: i18next.t("user:Last change password time")},
+    {name: "Deleted time", label: i18next.t("user:Deleted time")},
+    {name: "Last signin time", label: i18next.t("user:Last signin time")},
+    {name: "Last signin IP", label: i18next.t("user:Last signin IP")},
     {name: "Managed accounts", label: i18next.t("user:Managed accounts")},
     {name: "Face ID", label: i18next.t("login:Face ID")},
     {name: "MFA accounts", label: i18next.t("user:MFA accounts")},
@@ -879,12 +925,13 @@ export function getCountryCode(country) {
   return "";
 }
 
-export function getCountryCodeData(countryCodes: any = phoneNumber.getCountries()): any[] {
-  if (countryCodes?.includes("All")) {
+export function getCountryCodeData(countryCodes: any = undefined): any[] {
+  // organizations created from init.json come back with null countryCodes
+  if (!countryCodes || countryCodes.includes("All")) {
     countryCodes = phoneNumber.getCountries();
   }
   const countries = initCountries() as any;
-  return countryCodes?.map((countryCode) => {
+  return countryCodes.map((countryCode) => {
     if (phoneNumber.isSupportedCountry(countryCode)) {
       // fall back to English so an unregistered locale never empties the list
       const name = countries.getName(countryCode, getLanguage()) || countries.getName(countryCode, "en");
@@ -930,6 +977,11 @@ export function isProviderVisible(providerItem) {
     return false;
   }
 
+  // inside WeChat only the Official Account (clientId2) can sign in, the QR code needs another device
+  if (providerItem.provider.type === "WeChat" && !providerItem.provider.clientId2 && navigator.userAgent.includes("MicroMessenger")) {
+    return false;
+  }
+
   return true;
 }
 
@@ -963,6 +1015,14 @@ export function isProviderPrompted(providerItem) {
 export function isSignupItemPrompted(signupItem) {
   return signupItem.visible && signupItem.prompted;
 }
+
+// the signup items the prompt page can ask for, and the user field each one fills
+export const PromptedSignupItemFields: Record<string, string> = {
+  "Display name": "displayName",
+  "Email": "email",
+  "Phone": "phone",
+  "Country/Region": "region",
+};
 
 export function getAllPromptedProviderItems(application) {
   return application.providers?.filter(providerItem => isProviderPrompted(providerItem));
@@ -999,6 +1059,10 @@ export function isValidEmail(email) {
   // https://github.com/yiminghe/async-validator/blob/057b0b047f88fac65457bae691d6cb7c6fe48ce1/src/rule/type.ts#L9
   const emailRegex = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   return emailRegex.test(email);
+}
+
+export function isValidRealName(name) {
+  return /^[一-龥]{2,6}(?:·[一-龥]{1,10})*$/.test(name ?? "");
 }
 
 export function isValidPhone(phone, countryCode = "") {
@@ -1054,7 +1118,7 @@ export function hasPromptPage(application) {
   }
 
   const signupItems = getAllPromptedSignupItems(application);
-  if (signupItems?.filter(item => item.name === "Country/Region").length > 0) {
+  if (signupItems?.filter(item => PromptedSignupItemFields[item.name] !== undefined).length > 0) {
     return true;
   }
 
@@ -1087,12 +1151,17 @@ function isSignupItemAnswered(user, signupItem) {
     return false;
   }
 
-  if (signupItem.name !== "Country/Region") {
+  const field = PromptedSignupItemFields[signupItem.name];
+  if (field === undefined) {
     return true;
   }
 
-  const value = user["region"];
-  return value !== undefined && value !== "";
+  const value = user[field];
+  if (signupItem.name === "Display name" && signupItem.rule === "Real name") {
+    // a third-party nickname fills the display name but is not a real name
+    return isValidRealName(value);
+  }
+  return value !== undefined && value !== null && value !== "";
 }
 
 export function isPromptAnswered(user, application) {
@@ -1136,6 +1205,15 @@ export function isRequiredEnableMfa(user, organization) {
     return false;
   }
   return getMfaItemsByRules(user, organization, [MfaRuleRequired]).length > 0;
+}
+
+/** The MFA types the user may set up: the user's own MFA items, else the organization's. An empty list allows all types. */
+export function getAllowedMfaTypes(user, organization): string[] {
+  let mfaItems = organization?.mfaItems ?? [];
+  if (user?.mfaItems && user.mfaItems.length !== 0) {
+    mfaItems = user.mfaItems;
+  }
+  return (mfaItems ?? []).map((mfaItem) => mfaItem.name);
 }
 
 export function getMfaItemsByRules(user, organization, mfaRules = []) {
@@ -1192,7 +1270,7 @@ export function openLink(link) {
   }
   // this.props.history.push(link);
   const w = window.open("about:blank");
-  w.location.href = link;
+  w.location.href = withBasePath(link);
 }
 
 export function openLinkSafe(link) {
@@ -1202,16 +1280,50 @@ export function openLinkSafe(link) {
   // Javascript window.open issue in safari
   // https://stackoverflow.com/questions/45569893/javascript-window-open-issue-in-safari
   const a = document.createElement("a");
-  a.href = link;
+  a.href = withBasePath(link);
   a.setAttribute("target", "_blank");
   a.click();
+}
+
+let leavingPage = false;
+
+// a custom scheme hands the link to a native app and a fragment of this page stays on it
+function unloadsPage(link) {
+  try {
+    const url = new URL(link, window.location.href);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return false;
+    }
+    return !(url.hash !== "" && url.href.split("#")[0] === window.location.href.split("#")[0]);
+  } catch {
+    return false;
+  }
+}
+
+/** Whether goToLink() or createFormAndSubmit() has sent the browser to another page that is still loading. */
+export function isLeavingPage() {
+  return leavingPage;
+}
+
+/** Calls onRestored when the browser shows this page again from its back-forward cache. */
+export function onPageRestored(onRestored) {
+  const onPageShow = (event) => {
+    if (event.persisted) {
+      leavingPage = false;
+      onRestored();
+    }
+  };
+  window.addEventListener("pageshow", onPageShow);
+  return () => window.removeEventListener("pageshow", onPageShow);
 }
 
 export function goToLink(link) {
   if (isScriptUrl(link)) {
     return;
   }
-  window.location.href = link;
+  const href = withBasePath(link);
+  leavingPage = unloadsPage(href);
+  window.location.href = href;
 }
 
 
@@ -1390,14 +1502,14 @@ export function isCustomOAuthType(type) {
 }
 
 export function getProviderLogoURL(provider) {
-  if (isCustomOAuthType(provider.type) && provider.customLogo) {
+  if ((isCustomOAuthType(provider.type) || provider.type === "Plugin") && provider.customLogo) {
     return provider.customLogo;
   }
   if (provider.category === "OAuth") {
-    const type = isCustomOAuthType(provider.type) ? "Custom" : provider.type;
+    const type = isCustomOAuthType(provider.type) || provider.type === "Plugin" ? "Custom" : provider.type;
     return `${StaticBaseUrl}/img/social_${type.toLowerCase()}.png`;
   } else {
-    const info = OtherProviderInfo[provider.category][provider.type];
+    const info = OtherProviderInfo[provider.category]?.[provider.type];
     // avoid crash when provider is not found
     if (info) {
       return info.logo;
@@ -1499,6 +1611,7 @@ export function getProviderTypeOptions(category) {
         {id: "Custom9", name: "Custom9"},
         {id: "Custom10", name: "Custom10"},
         {id: "Custom Flexible", name: "Custom Flexible"},
+        {id: "Plugin", name: "Plugin"},
       ]
     );
   } else if (category === "Email") {
@@ -1530,9 +1643,11 @@ export function getProviderTypeOptions(category) {
         {id: "Huawei Cloud SMS", name: "Huawei Cloud SMS"},
         {id: "UCloud SMS", name: "UCloud SMS"},
         {id: "Twilio SMS", name: "Twilio SMS"},
+        {id: "Twilio Verify", name: "Twilio Verify"},
         {id: "SmsBao SMS", name: "SmsBao SMS"},
         {id: "SUBMAIL SMS", name: "SUBMAIL SMS"},
         {id: "Msg91 SMS", name: "Msg91 SMS"},
+        {id: "Plugin", name: "Plugin"},
       ]
     );
   } else if (category === "Storage") {
@@ -1573,6 +1688,7 @@ export function getProviderTypeOptions(category) {
       {id: "FastSpring", name: "FastSpring"},
       {id: "Lemon Squeezy", name: "Lemon Squeezy"},
       {id: "Adyen", name: "Adyen"},
+      {id: "Plugin", name: "Plugin"},
     ]);
   } else if (category === "Captcha") {
     return ([
@@ -1606,6 +1722,7 @@ export function getProviderTypeOptions(category) {
       {id: "Viber", name: "Viber"},
       {id: "CUCloud", name: "CUCloud"},
       {id: "WeCom", name: "WeCom"},
+      {id: "Plugin", name: "Plugin"},
     ]);
   } else if (category === "Face ID") {
     return ([
@@ -1620,6 +1737,7 @@ export function getProviderTypeOptions(category) {
     return ([
       {id: "Jumio", name: "Jumio"},
       {id: "Alibaba Cloud", name: "Alibaba Cloud"},
+      {id: "Plugin", name: "Plugin"},
     ]);
   } else if (category === "Audit") {
     return ([
@@ -1721,6 +1839,19 @@ export function getProvidersRule(application, item) {
   const showForm = isPasswordEnabled(application) || isCodeSigninEnabled(application) ||
     isWebAuthnEnabled(application) || isLdapEnabled(application) || isMagicLinkEnabled(application);
   return showForm ? "small" : "big";
+}
+
+// The login page offers a credential form, the sign-in providers or a QR panel; without any of them it has nothing to sign in with.
+export function hasAnySigninMethod(application) {
+  if (isPasswordEnabled(application) || isCodeSigninEnabled(application) || isWebAuthnEnabled(application) ||
+    isLdapEnabled(application) || isFaceIdEnabled(application) || isMagicLinkEnabled(application)) {
+    return true;
+  }
+  const providersShown = (application?.signinItems ?? []).some(item => item.name === "Providers" && item.visible);
+  if (providersShown && (application?.providers ?? []).some(item => isProviderVisibleForSignIn(item))) {
+    return true;
+  }
+  return (application?.signinMethods ?? []).some(item => (item.name === "WeChat" || item.name === "Device login") && item.rule === "Login page");
 }
 
 export function getAutoSigninDefaultValue(application) {
@@ -2126,7 +2257,7 @@ export function getDefaultHtmlEmailContent() {
         <img src="${getBrandLogoMarkUrl()}" alt="${Conf.BrandName}" width="96">
     </div>
     <p><strong>%{user.friendlyName}</strong>, here is your verification code</p>
-    <p>Use this code for your transaction. It's valid for 5 minutes</p>
+    <p>Use this code for your transaction. It's valid for 10 minutes</p>
     <div class="code">
         %s
     </div>
@@ -2616,8 +2747,9 @@ export function getApiPaths() {
     }
     if (obj === "user") {
       res.push("remove-user-from-group", "upload-users");
-      res.push("check-user-password", "set-password", "reset-email-or-phone");
+      res.push("check-user-password", "set-password", "reset-email-or-phone", "merge-user");
       res.push("verify-identification");
+      res.push("forbid-user", "unforbid-user"); // Custom events for the user being forbidden or unforbidden by any path
     }
     if (obj === "group") {
       res.push("upload-groups");
@@ -2744,6 +2876,7 @@ export function createFormAndSubmit(url, params) {
   }
 
   document.body.appendChild(form);
+  leavingPage = unloadsPage(url);
   form.submit();
   setTimeout(() => {form.remove();}, 500);
 }
@@ -2760,6 +2893,11 @@ export function getForgetLink(application) {
   return application.forgetUrl;
 }
 
+/** The backend never signs anyone up into the built-in organization, whose members are global admins. */
+export function isSignupAllowed(application) {
+  return !!application?.enableSignUp && application.organization !== "built-in";
+}
+
 /** The OAuth params have to survive the hop, or the signup cannot hand back a code. */
 export function getSignupLink(application) {
   if (!application) {
@@ -2767,23 +2905,24 @@ export function getSignupLink(application) {
   }
 
   let url;
-  if (window.location.pathname.includes("/login/oauth/authorize")) {
-    url = window.location.pathname.replace("/login/oauth/authorize", "/signup/oauth/authorize");
+  if (application.signupUrl) {
+    // the application's own signup page, also when signing in through OAuth
+    url = application.signupUrl;
+  } else if (getRoutePath().includes("/login/oauth/authorize")) {
+    url = getRoutePath().replace("/login/oauth/authorize", "/signup/oauth/authorize");
   } else if (authConfig.appName === application.name) {
     url = "/signup";
-  } else if (!application.signupUrl) {
+  } else {
     url = application.isShared
       ? `/signup/${application.name}-org-${application.organization}`
       : `/signup/${application.name}`;
-  } else {
-    url = application.signupUrl;
   }
   return url + window.location.search;
 }
 
 /** The sign-in URL carries the OAuth params, so remember it before leaving for the signup or forget page. */
 export function storeSigninUrl() {
-  sessionStorage.setItem("signinUrl", window.location.pathname + window.location.search);
+  sessionStorage.setItem("signinUrl", getRoutePath() + window.location.search);
 }
 
 export function getStoredSigninUrl() {
@@ -2804,8 +2943,8 @@ export function getLoginLink(application) {
   let url;
   if (application === null) {
     url = null;
-  } else if (window.location.pathname.includes("/signup/oauth/authorize")) {
-    url = window.location.pathname.replace("/signup/oauth/authorize", "/login/oauth/authorize");
+  } else if (getRoutePath().includes("/signup/oauth/authorize")) {
+    url = getRoutePath().replace("/signup/oauth/authorize", "/login/oauth/authorize");
   } else if (authConfig.appName === application.name) {
     url = "/login";
   } else if (application.signinUrl === "") {

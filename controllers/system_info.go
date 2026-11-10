@@ -15,8 +15,12 @@
 package controllers
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 
+	"github.com/casdoor/casdoor/edition"
+	"github.com/casdoor/casdoor/upgrade"
 	"github.com/casdoor/casdoor/util"
 	"github.com/go-git/go-git/v5"
 )
@@ -60,6 +64,70 @@ func (c *ApiController) GetVersionInfo() {
 	}
 
 	c.ResponseOk(util.GetBuiltInVersionInfo())
+}
+
+// GetLicense
+// @Title GetLicense
+// @Tag System API
+// @Description get the edition that the license of this Casdoor gives, and for a global admin the license details
+// @Success 200 {object} edition.LicenseInfo The Response object
+// @router /get-license [get]
+func (c *ApiController) GetLicense() {
+	info := edition.GetLicenseInfo()
+	if !c.IsGlobalAdmin() {
+		info = &edition.LicenseInfo{Edition: info.Edition, Features: info.Features}
+	}
+
+	c.ResponseOk(info)
+}
+
+// GetUpgradeInfo
+// @Title GetUpgradeInfo
+// @Tag System API
+// @Description get the latest Casdoor release, how this Casdoor is deployed and the progress of an upgrade
+// @Success 200 {object} upgrade.UpgradeInfo The Response object
+// @router /get-upgrade-info [get]
+func (c *ApiController) GetUpgradeInfo() {
+	if !c.RequireGlobalAdmin() {
+		return
+	}
+
+	c.ResponseOk(upgrade.GetUpgradeInfo())
+}
+
+// UpgradeSystem
+// @Title UpgradeSystem
+// @Tag System API
+// @Description upgrade an official release binary of Casdoor to the latest release and restart it
+// @Param   body    body   string  true        "The JSON {version}, the release to upgrade to, which must be the latest one"
+// @Success 200 {object} controllers.Response The Response object
+// @router /upgrade-system [post]
+func (c *ApiController) UpgradeSystem() {
+	if !c.RequireGlobalAdmin() {
+		return
+	}
+
+	if !strings.HasPrefix(c.Ctx.Input.Header("Content-Type"), "application/json") {
+		c.ResponseError("the request body must be JSON")
+		return
+	}
+
+	var req struct {
+		Version string `json:"version"`
+	}
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, &req)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	err = upgrade.StartUpgrade(req.Version, c.GetSessionUsername())
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	c.ResponseOk()
 }
 
 // Health

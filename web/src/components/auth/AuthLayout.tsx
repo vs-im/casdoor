@@ -1,12 +1,16 @@
 import * as React from "react";
 import i18next from "i18next";
-import {AlertCircle, ArrowLeft} from "lucide-react";
 import * as Conf from "@/Conf";
+import {AlertCircle, ArrowLeft} from "lucide-react";
 import {PoweredBy} from "@/components/layout/PoweredBy";
 import {Button} from "@/components/ui/button";
 import {LanguageSelect} from "@/components/common/LanguageSelect";
 import {ThemeToggle} from "@/components/common/ThemeToggle";
+import {ThemeShowcaseBar} from "@/components/common/ThemeShowcaseBar";
+import {CloudLoginLink, showCloudLoginLink} from "@/components/common/CloudPromo";
+import {EditionSwitcher} from "@/components/common/EditionPreview";
 import {CustomHtml, CustomStyle} from "@/components/common/CustomHtml";
+import {Loading} from "@/components/common/Loading";
 import {getSafeHtml, isTrustedApplication} from "@/lib/custom-html";
 import {
   getOrganizationCookieChrome,
@@ -15,8 +19,9 @@ import {
   useCustomHead,
 } from "@/hooks/use-application-chrome";
 import {useIsMobile} from "@/hooks/use-mobile";
-import {useIsDark} from "@/hooks/use-theme";
+import {useForcedTheme, useIsDark} from "@/hooks/use-theme";
 import * as Setting from "@/lib/setting";
+import {useShowcaseApplication, useShowcaseBundle} from "@/lib/theme-showcase";
 import {cn} from "@/lib/utils";
 
 const PHONE_QUERY = "(max-width: 639.98px)";
@@ -36,12 +41,15 @@ interface AuthLayoutProps {
   onBack?: () => void;
   /** rendered under the panel, outside it: the "no account? sign up" line */
   footer?: React.ReactNode;
+  /** pinned to the panel's top right corner: the switch to the QR code */
+  corner?: React.ReactNode;
   /**
    * Rendered inside the application editor's preview: the application's theme,
    * title, favicon and custom head belong to the visitor's page, not to the
-   * console the preview is embedded in.
+   * console the preview is embedded in. "theme" is a preview that has a frame
+   * of its own, the Marketplace's theme preview, so the theme is applied there.
    */
-  preview?: boolean;
+  preview?: boolean | "theme";
 }
 
 /** The "we cannot sign you in" panel, port of auth/Util.js renderMessageLarge(). */
@@ -65,7 +73,7 @@ export function AuthDivider({label}: {label?: string}) {
   return (
     <div className="flex items-center gap-3">
       <span className="h-px flex-1 bg-border" />
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
         {label || i18next.t("general:Or")}
       </span>
       <span className="h-px flex-1 bg-border" />
@@ -155,6 +163,17 @@ function getPanelBackground(css: string | undefined | null): string | null {
 }
 
 /**
+ * The spinner an entry page shows while its application loads, already on the
+ * organization's palette: before the application arrives, useApplicationTheme
+ * reads it from the organizationTheme cookie the backend set on this page.
+ */
+export function AuthLoading({application, preview}: {application?: any; preview?: boolean}) {
+  const shown = useShowcaseApplication(application, !preview);
+  useApplicationTheme(shown, !preview);
+  return <Loading className="min-h-screen" />;
+}
+
+/**
  * Centred panel shared by the sign-in, sign-up, password-reset and result pages.
  *
  * The panel is a single column: logo, heading, form, and a line under the card
@@ -163,7 +182,7 @@ function getPanelBackground(css: string | undefined | null): string | null {
  * `login-logo-box` — so form CSS written against the old pages still lands.
  */
 export function AuthLayout({
-  application,
+  application: ownApplication,
   children,
   className,
   wide,
@@ -172,9 +191,17 @@ export function AuthLayout({
   onLanguageChange,
   onBack,
   footer,
+  corner,
   preview,
 }: AuthLayoutProps) {
-  useApplicationTheme(application, !preview);
+  const themePreview = preview === "theme";
+  // on a demo site the Marketplace themes take turns on every entry page
+  const application = useShowcaseApplication(ownApplication, !preview);
+  const showcased = !!useShowcaseBundle(!preview);
+  const themeData = useApplicationTheme(application, !preview || themePreview);
+  // an application that hides the theme switch is painted light, or dark when its theme says so
+  const themeLocked = !Setting.isSigninItemVisible(application, "Theme");
+  useForcedTheme(themeLocked && !preview ? "light" : null);
   // an application can force the dark palette regardless of the visitor's own
   // preference, and the logo has to follow the palette that is actually painted
   const isDark = useIsDark();
@@ -203,8 +230,8 @@ export function AuthLayout({
   }
 
   // the customized form styling is meant for the standalone page, an embedded
-  // one keeps the host page's own look, as the antd pages did
-  const embedded = Setting.inIframe();
+  // one keeps the host page's own look, as the antd pages did, unless the host asked for a theme
+  const embedded = Setting.inIframe() && !themePreview && !showcased;
   const backgroundUrl = embedded
     ? undefined
     : (isMobile ? application?.formBackgroundUrlMobile : application?.formBackgroundUrl);
@@ -217,6 +244,12 @@ export function AuthLayout({
   // a bled panel paints no background of its own — index.css drops the one the
   // application's form CSS asked for along with the rest of its card
   const panelIsLight = isDark && !bleed && !!panelBackground && isLightColor(panelBackground);
+  // the commercial and enterprise editions dress the page up, but only while it
+  // keeps the default theme: any branding of the application's own turns it off
+  const editionLook = Conf.Edition !== "Community" && !embedded && !formCss && !backgroundUrl && !sidePanel &&
+    !showcased && themeData === Conf.getThemeDefault();
+  // the enterprise one puts the panel on a dark backdrop, except on a phone, where the panel is the page
+  const darkBackdrop = editionLook && Conf.Edition === "Enterprise" && !bleed;
 
   // the application's logo and the organization's are different things, so the
   // dark twin painted here is the application's own, never the organization's
@@ -235,6 +268,8 @@ export function AuthLayout({
     <div
       className={cn(
         "login-background relative flex min-h-screen flex-col",
+        editionLook && "login-edition",
+        darkBackdrop && "login-backdrop-dark",
         // the tint is what lifts the card off the page; a panel that has
         // dissolved into the page has nothing to be lifted off
         bleed ? "bg-background" : "bg-muted/40 dark:bg-background",
@@ -245,8 +280,11 @@ export function AuthLayout({
       style={backgroundUrl ? {backgroundImage: `url(${backgroundUrl})`} : undefined}
     >
       {embedded ? null : <CustomStyle css={formCss} />}
+      {/* embedded, the panel has no edge of its own: the corner goes to the frame's, the host page's dialog */}
+      {embedded ? corner : null}
 
-      <div className="flex items-center justify-end gap-1 p-3 sm:p-4">
+      <div className="login-topbar flex items-center justify-end gap-1 p-3 sm:p-4">
+        {preview || embedded ? null : <EditionSwitcher className="mr-auto" />}
         {hideLanguages ? null : (
           <LanguageSelect
             className="rounded-full text-muted-foreground hover:text-foreground"
@@ -254,7 +292,7 @@ export function AuthLayout({
             onLanguageChange={onLanguageChange}
           />
         )}
-        <ThemeToggle className="rounded-full text-muted-foreground hover:text-foreground" />
+        {themeLocked ? null : <ThemeToggle className="rounded-full text-muted-foreground hover:text-foreground" />}
       </div>
 
       <div
@@ -277,7 +315,7 @@ export function AuthLayout({
           {/* one box: an application's own `.login-panel` styles the card itself */}
           <div
             className={cn(
-              "login-panel flex w-full items-center overflow-hidden text-card-foreground",
+              "login-panel relative flex w-full items-center overflow-hidden text-card-foreground",
               panelIsLight && "theme-scope-light",
               bleed ? "login-panel-bleed bg-transparent" : "rounded-xl border bg-card shadow-sm",
               // the padding sits on the element an application restyles, so its own
@@ -285,6 +323,7 @@ export function AuthLayout({
               sidePanel ? null : bleed ? "px-1 pt-4" : "px-6 pt-6 sm:px-8 sm:pt-8",
             )}
           >
+            {embedded ? null : corner}
             {sidePanel ? (
               <CustomHtml html={application.formSideHtml} trusted={trusted} className="side-image hidden w-[420px] shrink-0 self-stretch lg:block" />
             ) : null}
@@ -298,11 +337,11 @@ export function AuthLayout({
               {hideLogo ? null : (
                 <div className="login-logo-box mb-6 flex justify-center">
                   {application?.homepageUrl ? (
-                    <a href={application.homepageUrl} target="_blank" rel="noreferrer">
-                      <img src={logo} alt={application?.displayName ?? Conf.BrandName} className="h-10 max-w-full object-contain" />
+                    <a href={application.homepageUrl} target="_blank" rel="noreferrer" className="flex w-full max-w-[185px] justify-center">
+                      <img src={logo} alt={application?.displayName ?? Conf.BrandName} className="h-auto max-h-32 w-auto max-w-[185px] object-contain" />
                     </a>
                   ) : (
-                    <img src={logo} alt={application?.displayName ?? Conf.BrandName} className="h-10 max-w-full object-contain" />
+                    <img src={logo} alt={application?.displayName ?? Conf.BrandName} className="h-auto max-h-32 w-auto max-w-[185px] object-contain" />
                   )}
                 </div>
               )}
@@ -325,6 +364,11 @@ export function AuthLayout({
           </div>
 
           {footer ? <div className="mt-6 px-4 text-center text-sm text-muted-foreground">{footer}</div> : null}
+          {!preview && showCloudLoginLink() ? (
+            <div className="mt-6 flex justify-center px-4">
+              <CloudLoginLink />
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -339,9 +383,11 @@ export function AuthLayout({
         />
       ) : (
         <footer id="footer" className={footerClassName}>
-          <PoweredBy />
+          <PoweredBy dark={darkBackdrop} />
         </footer>
       )}
+
+      {preview ? null : <ThemeShowcaseBar />}
     </div>
   );
 }

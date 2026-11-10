@@ -7,8 +7,7 @@ import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {PasswordInput} from "@/components/common/PasswordInput";
 import {Label} from "@/components/ui/label";
-import {Loading} from "@/components/common/Loading";
-import {AuthLayout} from "@/components/auth/AuthLayout";
+import {AuthLayout, AuthLoading} from "@/components/auth/AuthLayout";
 import {SendCodeInput} from "@/components/auth/SendCodeInput";
 import {PasswordRequirements, checkPasswordComplexity} from "@/lib/password-checker";
 import {authConfig} from "@/auth/Auth";
@@ -53,7 +52,7 @@ export default function ForgetPage() {
   }, [applicationName, params.applicationName]);
 
   if (application === undefined) {
-    return <Loading className="min-h-screen" />;
+    return <AuthLoading />;
   }
 
   if (application === null) {
@@ -214,7 +213,7 @@ export default function ForgetPage() {
         ? () => setStep("verify")
         : undefined;
 
-  const signinLink = Setting.getLoginLink(application) || "/login";
+  const signinLink = Setting.getStoredSigninUrl() || Setting.getLoginLink(application) || "/login";
   const backToSigninClass = "inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline";
 
   return (
@@ -330,6 +329,11 @@ export default function ForgetPage() {
                 application={application}
                 applicationId={Setting.getApplicationName(application)}
                 checkUser={account}
+                onComplete={() => {
+                  if (!loading) {
+                    verifyCode();
+                  }
+                }}
               />
             </div>
 
@@ -370,6 +374,11 @@ export default function ForgetPage() {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
               />
+              {confirm !== "" && confirm !== password ? (
+                <p className="text-xs text-destructive">
+                  {i18next.t("signup:Your confirmed password is inconsistent with the password!")}
+                </p>
+              ) : null}
             </div>
             <Button type="submit" className="w-full" loading={loading}>
               {i18next.t("forget:Change Password")}

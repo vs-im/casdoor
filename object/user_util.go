@@ -159,6 +159,11 @@ func GetUserByFields(organization string, field string) (*User, error) {
 		if user != nil || err != nil {
 			return user, err
 		}
+
+		user, err = getUserByNationalPhone(organization, field)
+		if user != nil || err != nil {
+			return user, err
+		}
 	}
 
 	// check user ID
@@ -176,14 +181,49 @@ func GetUserByFields(organization string, field string) (*User, error) {
 	return nil, nil
 }
 
+// getUserByNationalPhone matches a phone number typed in the national format (e.g. "0796488996")
+// against the normalized number stored at signup, trying each country code of the organization.
+func getUserByNationalPhone(organization string, phone string) (*User, error) {
+	if phone == "" || strings.ContainsAny(phone, "@+") {
+		return nil, nil
+	}
+
+	org, err := getOrganization("admin", organization)
+	if err != nil || org == nil {
+		return nil, err
+	}
+
+	for _, countryCode := range org.CountryCodes {
+		if countryCode == "" || countryCode == "All" {
+			continue
+		}
+
+		normalizedPhone, normalizedCountryCode, ok := util.GetNormalizedPhone(phone, countryCode)
+		if !ok || normalizedPhone == phone {
+			continue
+		}
+
+		user, err := GetUserByPhoneAndCountryCode(organization, normalizedPhone, normalizedCountryCode)
+		if user != nil || err != nil {
+			return user, err
+		}
+	}
+
+	return nil, nil
+}
+
 // GetUserByFieldsForSharedApp looks up a user for a shared application login.
 // If the application is shared and the user is not found in the given organization,
 // it searches all organizations that have this app as their default application.
+// For a non-shared application, it searches the external users and groups of the application.
 // Returns the User directly to avoid a redundant lookup in the caller.
 func GetUserByFieldsForSharedApp(application *Application, organization string, field string) (*User, error) {
 	user, err := GetUserByFields(organization, field)
-	if err != nil || user != nil || application == nil || !application.IsShared {
+	if err != nil || user != nil || application == nil {
 		return user, err
+	}
+	if !application.IsShared {
+		return getExternalUserByFields(application, field)
 	}
 
 	var orgs []*Organization
@@ -206,6 +246,45 @@ func GetUserByFieldsForSharedApp(application *Application, organization string, 
 	}
 
 	return nil, nil
+}
+
+// getExternalUserByFields looks up a user of another organization that the application lets sign in.
+// "organization/username" names the organization, otherwise the organizations of the external users
+// and groups are searched, and a name matching users in more than one of them finds no user.
+func getExternalUserByFields(application *Application, field string) (*User, error) {
+	organizations := []string{}
+	if strings.Contains(field, "/") {
+		var organization string
+		organization, field = util.GetOwnerAndNameFromIdNoCheck(field)
+		organizations = append(organizations, organization)
+	} else {
+		for _, id := range append(application.ExternalUsers, application.ExternalGroups...) {
+			organization, _ := util.GetOwnerAndNameFromIdNoCheck(id)
+			if !util.InSlice(organizations, organization) {
+				organizations = append(organizations, organization)
+			}
+		}
+	}
+
+	var result *User
+	for _, organization := range organizations {
+		if organization == "" || organization == application.Organization {
+			continue
+		}
+
+		user, err := GetUserByFields(organization, field)
+		if err != nil {
+			return nil, err
+		}
+		if user == nil || !application.IsExternalUser(user) {
+			continue
+		}
+		if result != nil {
+			return nil, nil
+		}
+		result = user
+	}
+	return result, nil
 }
 
 func SetUserField(user *User, field string, value string) (bool, error) {
@@ -1127,7 +1206,7 @@ func getAppUserApplication(name string) (*Application, error) {
 }
 
 func (application *Application) IsDynamicClient() bool {
-	return util.InSlice(application.Tags, "dcr")
+	return util.InSlice(application.Tags, "dcr") || util.InSlice(application.Tags, cimdTag)
 }
 
 func GetAppUserId(application *Application) string {
@@ -1282,6 +1361,7 @@ func replaceAttributeValue(user *User, value string) []string {
 
 	valueList = replaceAttributeValues("$user.owner", user.Owner, valueList)
 	valueList = replaceAttributeValues("$user.name", user.Name, valueList)
+	valueList = replaceAttributeValues("$user.displayName", user.DisplayName, valueList)
 	valueList = replaceAttributeValues("$user.email", user.Email, valueList)
 	valueList = replaceAttributeValues("$user.id", user.Id, valueList)
 	valueList = replaceAttributeValues("$user.phone", user.Phone, valueList)

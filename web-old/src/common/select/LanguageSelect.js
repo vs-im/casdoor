@@ -20,11 +20,7 @@ import {GlobalOutlined} from "@ant-design/icons";
 
 function flagIcon(country, alt) {
   return (
-    <img
-      width={24}
-      alt={alt}
-      src={`${Setting.StaticBaseUrl}/flag-icons/${country}.svg`}
-    />
+    <img width={24} alt={alt} src={`${Setting.StaticBaseUrl}/flag-icons/${country}.svg`} />
   );
 }
 
@@ -41,13 +37,11 @@ class LanguageSelect extends React.Component {
   }
 
   getLanguages() {
-    return this.props.languages ?? Setting.Countries.map((item) => item.key);
+    return this.props.languages ?? Setting.Countries.map(item => item.key);
   }
 
   getLanguageItems(languages) {
-    return Setting.Countries.filter((country) =>
-      languages.includes(country.key)
-    );
+    return Setting.Countries.filter((country) => languages.includes(country.key));
   }
 
   getSelectorMode() {
@@ -63,48 +57,15 @@ class LanguageSelect extends React.Component {
   }
 
   renderDropdown(languageItems) {
-    const items = languageItems.map((country) =>
-      Setting.getItem(
-        country.label,
-        country.key,
-        flagIcon(country.country, country.alt)
-      )
-    );
+    const items = languageItems.map((country) => Setting.getItem(country.label, country.key, flagIcon(country.country, country.alt)));
     const onClick = (e) => {
       this.triggerLanguageChange(e.key);
     };
 
-    const lang = Setting.getLanguage() || "en";
-    const langItem =
-      languageItems.find((i) => i.key === lang) || languageItems[0];
-    let icon = (
-      <GlobalOutlined style={{fontSize: "16px", color: "#8897AD"}} />
-    );
-    if (langItem) {
-      icon = (
-        <img
-          alt={langItem.alt}
-          src={`${Setting.StaticBaseUrl}/flag-icons/${langItem.country}.svg`}
-          style={{
-            width: "24px",
-            height: "16px",
-            objectFit: "cover",
-            borderRadius: "4px",
-          }}
-        />
-      );
-    }
-
     return (
       <Dropdown menu={{items, onClick}}>
-        <div
-          className="select-box"
-          style={{
-            display: items.length === 0 ? "none" : null,
-            ...this.props.style,
-          }}
-        >
-          {icon}
+        <div className="select-box" style={{display: items.length === 0 ? "none" : null, ...this.props.style}}>
+          <GlobalOutlined style={{fontSize: "24px"}} />
         </div>
       </Dropdown>
     );
@@ -115,9 +76,7 @@ class LanguageSelect extends React.Component {
       return null;
     }
 
-    const options = languageItems.map((country) =>
-      Setting.getOption(country.label, country.key)
-    );
+    const options = languageItems.map((country) => Setting.getOption(country.label, country.key));
     let selectedLanguage = this.state.selectedLanguage || Setting.getLanguage();
     if (!options.some((item) => item.value === selectedLanguage)) {
       selectedLanguage = options[0].value;

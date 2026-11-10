@@ -16,6 +16,7 @@ package controllers
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"time"
 
@@ -23,7 +24,10 @@ import (
 	"github.com/beego/beego/v2/server/web"
 	"github.com/casdoor/casdoor/mcpself"
 	"github.com/casdoor/casdoor/object"
+	"github.com/casdoor/casdoor/tracing"
 	"github.com/casdoor/casdoor/util"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ApiController
@@ -259,10 +263,26 @@ func (c *ApiController) renewSessionIdForUser(userId string) {
 		return
 	}
 
+	if c.isSessionCreatedInRequest() {
+		return
+	}
+
 	err := c.SessionRegenerateID()
 	if err != nil {
 		logs.Error("SessionRegenerateID failed, error: %s", err)
 	}
+}
+
+// isSessionCreatedInRequest reports whether the session ID was generated for this request and is already being set in the response
+func (c *ApiController) isSessionCreatedInRequest() bool {
+	sessionId := c.StartSession().SessionID(context.Background())
+	cookies := (&http.Response{Header: c.Ctx.ResponseWriter.Header()}).Cookies()
+	for _, cookie := range cookies {
+		if cookie.Name == web.BConfig.WebConfig.Session.SessionName && cookie.Value == sessionId {
+			return true
+		}
+	}
+	return false
 }
 
 // SetSessionUsername ...
@@ -370,4 +390,10 @@ func (c *ApiController) McpResponseError(id interface{}, code int, message strin
 	c.Ctx.Output.Header("Content-Type", "application/json")
 	c.Data["json"] = resp
 	c.ServeJSON()
+}
+
+// traceStep starts a child span of the request's trace, for the steps of the sign-in
+func (c *ApiController) traceStep(name string, attributes ...attribute.KeyValue) (context.Context, trace.Span) {
+	parent, _ := c.Ctx.Input.GetData("otelContext").(context.Context)
+	return tracing.Start(parent, name, attributes...)
 }

@@ -87,9 +87,9 @@ export default function ApplicationEditPage() {
   }
 
   const idpInitiatedSsoUrl =
-    `${window.location.origin}/login/saml/authorize/${application.owner}/${encodeURIComponent(applicationName)}`;
+    `${Setting.getOriginUrl()}/login/saml/authorize/${application.owner}/${encodeURIComponent(applicationName)}`;
   const samlMetadataUrl =
-    `${window.location.origin}/api/saml/metadata?application=admin/${encodeURIComponent(applicationName)}` +
+    `${Setting.getOriginUrl()}/api/saml/metadata?application=admin/${encodeURIComponent(applicationName)}` +
     `&enablePostBinding=${enableSamlPostBinding}`;
 
   const save = async(exitAfterSave: boolean) => {
@@ -119,6 +119,12 @@ export default function ApplicationEditPage() {
       return;
     }
 
+    const providerRows = applicationProviders.map((item: any) => ({
+      ...item,
+      provider: item.provider ?? providerObjs.find((provider: any) => provider.name === item.name),
+    }));
+    const hasSigninMethod = Setting.hasAnySigninMethod({...application, providers: providerRows, signinMethods, signinItems});
+
     const isAdd = mode === "add";
     setSaving(true);
     await submitEdit({
@@ -127,6 +133,9 @@ export default function ApplicationEditPage() {
       add: (record) => ApplicationBackend.addApplication(record),
       update: (record) => ApplicationBackend.updateApplication("admin", applicationName, record),
       onSaved: () => {
+        if (!hasSigninMethod) {
+          Setting.showMessage("warning", i18next.t("application:No sign-in method is enabled, users will have no way to sign in. Enable one in Signin methods, or turn on Can signin for a provider."));
+        }
         setMode("edit");
         if (exitAfterSave) {
           navigate("/applications");

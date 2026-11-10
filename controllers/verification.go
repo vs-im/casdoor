@@ -281,7 +281,7 @@ func (c *ApiController) SendVerificationCode() {
 		} else if vform.Type == object.VerifyTypePhone {
 			// Prefer resolving the user directly by phone, consistent with the later login switch,
 			// so that Dynamic CAPTCHA is not skipped due to missing/invalid country code.
-			user, err = object.GetUserByPhone(organization.Name, vform.Dest)
+			user, err = object.GetUserByPhoneWithCountryCode(organization.Name, vform.Dest, vform.CountryCode)
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -356,6 +356,11 @@ func (c *ApiController) SendVerificationCode() {
 			return
 		}
 
+		if vform.Method == ResetVerification && !isUserDestMergeable(user, object.VerifyTypeEmail, vform.Dest, "") {
+			c.ResponseError(c.T("check:Email already exists"))
+			return
+		}
+
 		if vform.Method == LoginVerification || vform.Method == ForgetVerification {
 			if user != nil && util.GetMaskedEmail(user.Email) == vform.Dest {
 				vform.Dest = user.Email
@@ -367,8 +372,9 @@ func (c *ApiController) SendVerificationCode() {
 				return
 			}
 
-			// the verification code grant of a native app signs the address up with the code
-			if user == nil && (vform.Method == ForgetVerification || !application.IsVerificationCodeSignupEnabled(object.VerifyTypeEmail)) {
+			// the verification code grant of a native app signs the address up with the code, and
+			// so does the signup page after a sign-in with it
+			if user == nil && (vform.Method == ForgetVerification || !application.IsVerificationCodeSignupEnabled(object.VerifyTypeEmail) && !application.IsCodeSigninSignupEnabled(object.VerifyTypeEmail)) {
 				c.ResponseError(c.T("verification:the user does not exist, please sign up first"))
 				return
 			}
@@ -457,10 +463,10 @@ func (c *ApiController) SendVerificationCode() {
 				vform.Dest = user.Phone
 			}
 
-			if user, err = object.GetUserByPhone(organization.Name, vform.Dest); err != nil {
+			if user, err = object.GetUserByPhoneWithCountryCode(organization.Name, vform.Dest, vform.CountryCode); err != nil {
 				c.ResponseError(err.Error())
 				return
-			} else if user == nil && (vform.Method == ForgetVerification || !application.IsVerificationCodeSignupEnabled(object.VerifyTypePhone)) {
+			} else if user == nil && (vform.Method == ForgetVerification || !application.IsVerificationCodeSignupEnabled(object.VerifyTypePhone) && !application.IsCodeSigninSignupEnabled(object.VerifyTypePhone)) {
 				c.ResponseError(c.T("verification:the user does not exist, please sign up first"))
 				return
 			}
@@ -482,6 +488,11 @@ func (c *ApiController) SendVerificationCode() {
 				if user = c.getCurrentUser(); user != nil {
 					vform.CountryCode = user.GetCountryCode(vform.CountryCode)
 				}
+			}
+
+			if vform.Method == ResetVerification && !isUserDestMergeable(user, object.VerifyTypePhone, vform.Dest, vform.CountryCode) {
+				c.ResponseError(c.T("check:Phone already exists"))
+				return
 			}
 		} else if vform.Method == MfaAuthVerification {
 			if user == nil {
@@ -608,7 +619,7 @@ func (c *ApiController) ResetEmailOrPhone() {
 		return
 	}
 
-	countryCode := user.GetCountryCode("")
+	countryCode := user.GetCountryCode(c.Ctx.Request.Form.Get("countryCode"))
 	if destType == object.VerifyTypePhone {
 		normalizedPhone, normalizedCountryCode, isValid := util.GetNormalizedPhone(dest, countryCode)
 		if !isValid {

@@ -12,10 +12,12 @@ import {useCertOptions, useOrganizationOptions} from "@/hooks/use-options";
 import {getSyncerTableColumns} from "@/lib/syncer-columns";
 import * as SyncerBackend from "@/backend/SyncerBackend";
 import * as Setting from "@/lib/setting";
+import {EditionNotice, useEdition} from "@/components/common/EditionNotice";
+import {ActionSelect} from "@/components/common/ActionSelect";
 
 const TYPES = [
   "Database", "Keycloak", "WeCom", "Azure AD", "Active Directory", "Google Workspace",
-  "DingTalk", "Lark", "Okta", "SCIM", "AWS IAM",
+  "DingTalk", "Lark", "Okta", "SCIM", "AWS IAM", "Plugin",
 ];
 
 const DATABASE_TYPES = [
@@ -32,11 +34,20 @@ const SYNCER_TABLE_TYPES = ["string", "integer", "boolean"];
 
 /** the types that talk to an API instead of a database, so they have no schema fields */
 const API_TYPES = [
-  "WeCom", "Azure AD", "Google Workspace", "DingTalk", "Lark", "Okta", "SCIM", "AWS IAM",
+  "WeCom", "Azure AD", "Google Workspace", "DingTalk", "Lark", "Okta", "SCIM", "AWS IAM", "Plugin",
 ];
+
+/** the types that need a commercial edition license */
+const COMMERCIAL_TYPES = ["Keycloak"];
 
 /** these have no host at all: the SDK knows the endpoint */
 const NO_HOST_TYPES = ["WeCom", "DingTalk", "Lark"];
+
+/** Feishu (mainland China) and Lark (global) are separate platforms; an empty host means Lark */
+const LARK_DOMAINS = [
+  {id: "https://open.feishu.cn", name: "Feishu (open.feishu.cn)"},
+  {id: "https://open.larksuite.com", name: "Lark (open.larksuite.com)"},
+];
 
 const isApiType = (type: string) => API_TYPES.includes(type);
 
@@ -89,6 +100,7 @@ export default function SyncerEditPage() {
   const {account} = useAccount();
   const organizations = useOrganizationOptions();
 
+  const edition = useEdition();
   const fields: EditField[] = [
     {
       type: "select",
@@ -111,8 +123,32 @@ export default function SyncerEditPage() {
           type: value,
           tableColumns: getSyncerTableColumns(value),
           table: value === "Keycloak" ? "user_entity" : ctx.record.table,
-          host: isApiType(value) ? "" : ctx.record.host,
+          host: value === "Lark" ? LARK_DOMAINS[0].id : isApiType(value) ? "" : ctx.record.host,
         }),
+    },
+    {
+      type: "custom",
+      name: "plugin",
+      labelKey: "general:Action",
+      when: (ctx) => ctx.record.type === "Plugin",
+      render: (ctx, update) => (
+        <ActionSelect owner={ctx.record.organization} kind="syncer" value={ctx.record.plugin} onChange={(v) => update("plugin", v)} />
+      ),
+    },
+    {
+      type: "textarea",
+      name: "metadata",
+      labelKey: "provider:Metadata",
+      rows: 6,
+      placeholder: "{}",
+      when: (ctx) => ctx.record.type === "Plugin",
+    },
+    {
+      type: "custom",
+      name: "edition",
+      labelKey: "system:License",
+      when: (ctx) => COMMERCIAL_TYPES.includes(ctx.record.type) && edition === "Community",
+      render: () => <EditionNotice />,
     },
     {
       type: "select",
@@ -131,11 +167,36 @@ export default function SyncerEditPage() {
       when: (ctx) => ctx.record.databaseType === "postgres",
       options: () => SSL_MODES.map((item) => ({value: item, label: item})),
     },
+    ...[
+      {name: "sslRootCert", labelKey: "syncer:SSL root certificate", placeholder: "-----BEGIN CERTIFICATE-----"},
+      {name: "sslCert", labelKey: "syncer:SSL client certificate", placeholder: "-----BEGIN CERTIFICATE-----"},
+      {name: "sslKey", labelKey: "syncer:SSL client private key", placeholder: "-----BEGIN PRIVATE KEY-----"},
+    ].map(({name, labelKey, placeholder}): EditField => ({
+      type: "textarea",
+      name,
+      labelKey,
+      rows: 4,
+      placeholder,
+      when: (ctx) => ctx.record.databaseType === "postgres" && !!ctx.record.sslMode && ctx.record.sslMode !== "disable",
+    })),
     {
       type: "text",
       name: "host",
       labelKey: (ctx) => hostLabelKey(ctx.record.type),
       when: (ctx) => !NO_HOST_TYPES.includes(ctx.record.type),
+    },
+    {
+      type: "custom",
+      name: "host",
+      labelKey: "syncer:Lark platform",
+      when: (ctx) => ctx.record.type === "Lark",
+      render: (ctx, update) => (
+        <SelectField
+          value={ctx.record.host || LARK_DOMAINS[1].id}
+          onChange={(value) => update("host", value)}
+          options={LARK_DOMAINS}
+        />
+      ),
     },
     {
       type: "number",

@@ -38,6 +38,26 @@ config: |
 # if you use your own secret, leave Value.config: ""
 # configFromSecret: casdoor
 
+# -- Password of the built-in `admin` user when Casdoor creates the database. It applies only
+# to a new database; an existing installation keeps its password. Leave it empty to set the
+# password on the welcome page at /init-admin.
+#
+# For a real deployment read it from an existing Secret, so the password stays out of the
+# values file and the Helm release:
+#
+#   initAdminPassword:
+#     existingSecret: casdoor-admin
+#     existingSecretKey: initAdminPassword
+#
+# `value` is for local tests only.
+initAdminPassword:
+  # -- Initial password, used when `existingSecret` is empty.
+  value: ""
+  # -- Name of an existing Secret that holds the initial password.
+  existingSecret: ""
+  # -- Key of the initial password in `existingSecret`.
+  existingSecretKey: initAdminPassword
+
 # -- Declarative configuration: organizations, applications, users, providers, roles, permissions, ... in the
 # init data format (https://casdoor.ai/docs/deployment/data-initialization). It is stored in a Secret and applied
 # by Casdoor at startup, and with watchInterval set, a change rolled out by `helm upgrade` is applied again
@@ -113,14 +133,33 @@ securityContext: {}
   # runAsUser: 1000
 
 probe:
+  # -- HTTP path the probes request, /api/health needs no sign-in and does not query the database
+  path: /api/health
+  # -- Holds off the liveness and readiness probes until Casdoor has started, which can take minutes on the
+  # first start (database migration) or on a busy node: up to failureThreshold * periodSeconds
+  startup:
+    enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 30
   readiness:
     enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
   liveness:
     enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
 
 service:
   type: ClusterIP
   port: 8000
+  annotations: {}
 
 ingress:
   enabled: false

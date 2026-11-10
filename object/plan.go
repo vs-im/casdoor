@@ -16,6 +16,7 @@ package object
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/casdoor/casdoor/util"
@@ -36,6 +37,7 @@ type Plan struct {
 	PaymentProviders []string `xorm:"varchar(100)" json:"paymentProviders"` // payment providers for related product
 	IsEnabled        bool     `json:"isEnabled"`
 	IsExclusive      bool     `json:"isExclusive"` // if true, a user can only have at most one subscription of this plan
+	AutoRenew        bool     `json:"autoRenew"`
 
 	Role    string   `xorm:"varchar(100)" json:"role"`
 	Options []string `xorm:"-" json:"options"`
@@ -50,8 +52,14 @@ func (plan *Plan) GetId() string {
 	return fmt.Sprintf("%s/%s", plan.Owner, plan.Name)
 }
 
-func getDuration(period string) (string, string, error) {
-	startTime := time.Now()
+func (plan *Plan) GetRoleId() string {
+	if plan.Role == "" || strings.Contains(plan.Role, "/") {
+		return plan.Role
+	}
+	return util.GetId(plan.Owner, plan.Role)
+}
+
+func getDurationFrom(period string, startTime time.Time) (string, string, error) {
 	var endTime time.Time
 
 	if period == PeriodYearly {

@@ -21,7 +21,7 @@ import {SearchableSelect} from "@/components/common/SearchableSelect";
 import {EditPageShell} from "@/components/crud/EditPageShell";
 import {EditableTable} from "@/components/crud/EditableTable";
 import {MapTable} from "@/components/crud/MapTable";
-import {FormRow, formGridClass} from "@/components/crud/FormRow";
+import {formGridClass} from "@/components/crud/FormRow";
 import {AffiliationAddressSelect, AffiliationField, useAffiliation} from "@/components/user/AffiliationSelect";
 import {CartTable} from "@/components/user/CartTable";
 import {CasdoorAppQrCode, CasdoorAppUrl, CasdoorAuthenticatorLink} from "@/components/user/CasdoorAppConnector";
@@ -36,6 +36,7 @@ import {MfaItemsTable} from "@/components/auth/mfa/MfaItemsTable";
 import {isAccountItemVisible} from "@/lib/account-items";
 import {PasswordModal} from "@/components/user/PasswordModal";
 import {ResetModal} from "@/components/user/ResetModal";
+import {PersonalDataActions, RevealButton} from "@/components/user/PersonalInfo";
 import {TransactionTable} from "@/components/user/TransactionTable";
 import {WebauthnCredentialTable} from "@/components/user/WebauthnCredentialTable";
 import {useAccount} from "@/hooks/use-account";
@@ -151,7 +152,16 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
   }
 
   const isAdmin = Setting.isLocalAdminUser(account);
-  const isSelf = account?.owner === user.owner && account?.name === user.name;
+  const isSelf = !!account && (user.id && account.id ? user.id === account.id : account.owner === user.owner && account.name === user.name);
+  // The form layout and MFA items are a per-organization policy, and `get-user-application`
+  // is the only way a non-admin can read their own organization, so prefer it over the
+  // admin-only `get-organization` this page also fetches.
+  const userOrganization = application?.organizationObj ?? organization;
+  // only offer the methods in the MFA items, an enabled one stays so it can still be edited or disabled
+  const allowedMfaTypes = Setting.getAllowedMfaTypes(user, userOrganization);
+  const visibleMfaItems = mfaItems.filter(
+    (item: any) => item.enabled || allowedMfaTypes.length === 0 || allowedMfaTypes.includes(item.mfaType),
+  );
 
   const save = async(exitAfterSave: boolean) => {
     const isAdd = mode === "add";
@@ -240,13 +250,15 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
     });
   };
 
-  // The form layout is a per-organization policy, and `get-user-application` is the
-  // only way a non-admin can read their own organization, so prefer it over the
-  // admin-only `get-organization` this page also fetches.
-  const userOrganization = application?.organizationObj ?? organization;
   const isSelfOrAdmin = isSelf || isAdmin;
 
   const avatarUrl = Setting.getEffectiveAvatarUrl(user);
+
+  const extraInputs: Record<string, React.ReactNode> = {
+    "Deleted time": <Input value={Setting.getFormattedDate(user.deletedTime) ?? ""} disabled />,
+    "Last signin time": <Input value={Setting.getFormattedDate(user.lastSigninTime) ?? ""} disabled />,
+    "Last signin IP": <Input value={user.lastSigninIp ?? ""} disabled />,
+  };
 
   const rows: Record<string, React.ReactNode> = {
     "Organization": (
@@ -311,8 +323,17 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
     ),
     "Email": (
       <AccountItemRow name="Email" labelKey="general:Email">
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Input type="email" value={user.email ?? ""} disabled={!isAdmin} onChange={(e) => updateField("email", e.target.value)} />
+          {!isSelf ? <RevealButton userId={`${user.owner}/${user.name}`} field="email" value={user.email} onReveal={(v) => updateField("email", v)} /> : null}
+          {isAdmin ? (
+            <label className="flex shrink-0 items-center gap-2 text-sm">
+              <Switch checked={!!user.emailVerified} onCheckedChange={(v) => updateField("emailVerified", v)} />
+              {i18next.t("user:Verified")}
+            </label>
+          ) : user.emailVerified ? (
+            <Badge variant="success">{i18next.t("user:Verified")}</Badge>
+          ) : null}
           {/* the backend resolves the current user itself, so only the user can reset their own */}
           {isSelf ? (
             <ResetModal application={application} destType="email" buttonText={i18next.t("user:Reset Email...")} />
@@ -331,6 +352,7 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
             />
           </div>
           <Input value={user.phone ?? ""} disabled={!isAdmin} onChange={(e) => updateField("phone", e.target.value)} />
+          {!isSelf ? <RevealButton userId={`${user.owner}/${user.name}`} field="phone" value={user.phone} onReveal={(v) => updateField("phone", v)} /> : null}
           {isSelf ? (
             <ResetModal
               application={application}
@@ -570,7 +592,10 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
     ),
     "ID card": (
       <AccountItemRow name="ID card" labelKey="user:ID card">
-        <Input value={user.idCard ?? ""} onChange={(e) => updateField("idCard", e.target.value)} />
+        <div className="flex items-center gap-2">
+          <Input value={user.idCard ?? ""} onChange={(e) => updateField("idCard", e.target.value)} />
+          {!isSelf ? <RevealButton userId={`${user.owner}/${user.name}`} field="idCard" value={user.idCard} onReveal={(v) => updateField("idCard", v)} /> : null}
+        </div>
       </AccountItemRow>
     ),
     "Real name": (
@@ -611,7 +636,9 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
           >
             {user.isVerified ? i18next.t("user:Verified") : i18next.t("user:Verify Identity")}
           </Button>
-          {user.isVerified ? (
+          {isAdmin ? (
+            <Switch checked={!!user.isVerified} onCheckedChange={(v) => updateField("isVerified", v)} />
+          ) : user.isVerified ? (
             <Badge variant="success">{i18next.t("user:Identity verified")}</Badge>
           ) : null}
         </div>
@@ -955,16 +982,31 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
         <Input value={Setting.getFormattedDate(user.lastChangePasswordTime) ?? ""} disabled />
       </AccountItemRow>
     ),
+    "Deleted time": (
+      <AccountItemRow name="Deleted time" labelKey="user:Deleted time">
+        {extraInputs["Deleted time"]}
+      </AccountItemRow>
+    ),
+    "Last signin time": (
+      <AccountItemRow name="Last signin time" labelKey="user:Last signin time">
+        {extraInputs["Last signin time"]}
+      </AccountItemRow>
+    ),
+    "Last signin IP": (
+      <AccountItemRow name="Last signin IP" labelKey="user:Last signin IP">
+        {extraInputs["Last signin IP"]}
+      </AccountItemRow>
+    ),
     "Multi-factor authentication": (
       <AccountItemRow name="Multi-factor authentication" labelKey="mfa:Multi-factor authentication" block>
         <div className="space-y-2">
           <div className="divide-y rounded-lg border">
-            {mfaItems.length === 0 ? (
+            {visibleMfaItems.length === 0 ? (
               <div className="p-4 text-center text-sm text-muted-foreground">
                 {i18next.t("general:No data")}
               </div>
             ) : (
-              mfaItems.map((item: any) => (
+              visibleMfaItems.map((item: any) => (
                 <div key={item.mfaType} className="flex flex-wrap items-center gap-2 p-3">
                   <span className="text-sm font-medium">{item.mfaType}</span>
                   {item.secret ? (
@@ -1119,23 +1161,15 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
     ),
   };
 
-  // rows this frontend adds on top of the antd list; no account item governs them
-  const extraRows = (
-    <>
-      <FormRow block labelKey="user:Is verified">
-        <Switch checked={!!user.isVerified} onCheckedChange={(v) => updateField("isVerified", v)} />
-      </FormRow>
-      <FormRow block labelKey="user:Deleted time">
-        <Input value={Setting.getFormattedDate(user.deletedTime) ?? ""} disabled />
-      </FormRow>
-      <FormRow block labelKey="user:Last signin time">
-        <Input value={Setting.getFormattedDate(user.lastSigninTime) ?? ""} disabled />
-      </FormRow>
-      <FormRow block labelKey="user:Last signin IP">
-        <Input value={user.lastSigninIp ?? ""} disabled />
-      </FormRow>
-    </>
-  );
+  // organizations whose account items predate these rows still see them, in the first tab
+  const configuredItemNames = new Set(((userOrganization?.accountItems ?? []) as any[]).map((item) => item.name));
+  const extraRows = Object.entries(extraInputs)
+    .filter(([name]) => !configuredItemNames.has(name))
+    .map(([name, input]) => (
+      <AccountItemRow key={name} labelKey={`user:${name}`}>
+        {input}
+      </AccountItemRow>
+    ));
 
   // `organization.accountItems` decides which rows appear, in which order and
   // under which tab, exactly as getUniqueTabs()/getAccountItemsByTab() do in
@@ -1193,7 +1227,6 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
           // showing every row beats showing an empty form
           <div className={formGridClass}>
             {Object.entries(rows).map(([name, row]) => <React.Fragment key={name}>{row}</React.Fragment>)}
-            {extraRows}
           </div>
         ) : tabNames.length <= 1 ? (
           <div className={formGridClass}>
@@ -1218,6 +1251,11 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
           </Tabs>
         )}
       </AccountItemsProvider>
+      {isSelf ? (
+        <div className={formGridClass}>
+          <PersonalDataActions user={user} organization={userOrganization} />
+        </div>
+      ) : null}
     </EditPageShell>
   );
 }

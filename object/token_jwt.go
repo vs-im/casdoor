@@ -24,7 +24,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/casdoor/casdoor/gm"
 	"github.com/casdoor/casdoor/util"
+	"github.com/emmansun/gmsm/sm3"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -34,6 +36,8 @@ type OidcIdTokenClaims struct {
 	AuthTime *jwt.NumericDate `json:"auth_time,omitempty"`
 	AtHash   string           `json:"at_hash,omitempty"`
 	CHash    string           `json:"c_hash,omitempty"`
+	// the hashed Casdoor session id, the same "sid" as in the Back-Channel Logout token
+	Sid string `json:"sid,omitempty"`
 }
 
 type Claims struct {
@@ -47,8 +51,6 @@ type Claims struct {
 	Provider string `json:"provider,omitempty"`
 
 	SigninMethod string `json:"signinMethod,omitempty"`
-	// Sid is the sha256 hash (GetSessionIdHash) of the Beego session id the token was minted under (OIDC "sid"), empty when the grant had no session
-	Sid string `json:"sid,omitempty"`
 	OidcIdTokenClaims
 	jwt.RegisteredClaims
 }
@@ -174,7 +176,6 @@ type ClaimsShort struct {
 	Provider  string `json:"provider,omitempty"`
 
 	SigninMethod string `json:"signinMethod,omitempty"`
-	Sid          string `json:"sid,omitempty"`
 	OidcIdTokenClaims
 	jwt.RegisteredClaims
 }
@@ -198,7 +199,6 @@ type ClaimsWithoutThirdIdp struct {
 	Provider  string `json:"provider,omitempty"`
 
 	SigninMethod string `json:"signinMethod,omitempty"`
-	Sid          string `json:"sid,omitempty"`
 	OidcIdTokenClaims
 	jwt.RegisteredClaims
 }
@@ -343,7 +343,6 @@ func getShortClaims(claims Claims) ClaimsShort {
 		SigninMethod:      claims.SigninMethod,
 		Provider:          claims.Provider,
 		OidcIdTokenClaims: claims.OidcIdTokenClaims,
-		Sid:               claims.Sid,
 	}
 	return res
 }
@@ -359,7 +358,6 @@ func getClaimsWithoutThirdIdp(claims Claims) ClaimsWithoutThirdIdp {
 		Azp:                 claims.Azp,
 		SigninMethod:        claims.SigninMethod,
 		Provider:            claims.Provider,
-		Sid:                 claims.Sid,
 		OidcIdTokenClaims:   claims.OidcIdTokenClaims,
 	}
 	return res
@@ -467,14 +465,13 @@ func getClaimsCustom(claims Claims, tokenField []string, tokenAttributes []*JwtI
 	if claims.CHash != "" {
 		res["c_hash"] = claims.CHash
 	}
+	if claims.Sid != "" {
+		res["sid"] = claims.Sid
+	}
 
 	// Always include azp if present (authorized party)
 	if claims.Azp != "" {
 		res["azp"] = claims.Azp
-	}
-
-	if claims.Sid != "" {
-		res["sid"] = claims.Sid
 	}
 
 	// Always include nonce and scope as they are built-in OAuth/OIDC fields (even if empty)
@@ -530,19 +527,28 @@ func getClaimsCustom(claims Claims, tokenField []string, tokenAttributes []*JwtI
 		}
 	}
 
+	for name, value := range getTokenAttributeClaims(claims.User, tokenAttributes) {
+		res[name] = value
+	}
+
+	return res
+}
+
+func getTokenAttributeClaims(user *User, tokenAttributes []*JwtItem) map[string]interface{} {
+	res := map[string]interface{}{}
 	for _, item := range tokenAttributes {
 		var value interface{}
 
 		// If Category is "Existing Field", get the actual field value from the user
 		if item.Category == "Existing Field" {
-			fieldValue, found := getUserFieldValue(claims.User, item.Value)
+			fieldValue, found := getUserFieldValue(user, item.Value)
 			if !found {
 				continue
 			}
 			value = fieldValue
 		} else {
 			// Default behavior: use replaceAttributeValue for "Static Value" or empty category
-			valueList := replaceAttributeValue(claims.User, item.Value)
+			valueList := replaceAttributeValue(user, item.Value)
 			if len(valueList) == 0 {
 				continue
 			}
@@ -616,13 +622,13 @@ func refineUser(user *User) *User {
 // from a non-native organization carry both the plain client_id and the
 // org-suffixed variant "<client_id>-org-<org>", so that verifiers configured
 // with either form accept the token. Users of the native (built-in)
-// organization keep the plain client_id audience.
+// organization keep the plain client_id audience, and so does a URL client_id.
 func getTokenAudience(application *Application, user *User, resource string) jwt.ClaimStrings {
 	if resource != "" {
 		return jwt.ClaimStrings{resource}
 	}
 
-	if application.IsShared && user.Owner != "built-in" {
+	if application.IsShared && user.Owner != "built-in" && !IsClientIdMetadataUrl(application.ClientId) {
 		return jwt.ClaimStrings{application.ClientId, application.ClientId + "-org-" + user.Owner}
 	}
 
@@ -639,6 +645,18 @@ func getSessionIdClaim(sessionId string) string {
 	return GetSessionIdHash(sessionId)
 }
 
+// getTokenUser shapes the claims from a copy, so that refineUser() does not clear the
+// password of the user object the caller keeps using
+func getTokenUser(application *Application, user *User) (*User, error) {
+	userCopy := *user
+	groups, err := userCopy.GetGroupsForToken(application)
+	if err != nil {
+		return nil, err
+	}
+	userCopy.Groups = groups
+	return refineUser(&userCopy), nil
+}
+
 // jwtTokenOptions carries what the ID token has to say about the authorization request
 type jwtTokenOptions struct {
 	// AuthTime is when the user last entered credentials, 0 if unknown
@@ -647,7 +665,9 @@ type jwtTokenOptions struct {
 	Code string
 	// WithAtHash adds the at_hash of the access token issued together with the ID token
 	WithAtHash bool
-	// fork: SessionId is the Beego session the token is minted under, its hash goes into the "sid" claim
+	// RefreshScope is the scope of the grant when a refresh asks for a narrower access token
+	RefreshScope string
+	// SessionId is the Beego session id the tokens are minted under, its hash is the "sid" of the ID token
 	SessionId string
 }
 
@@ -660,6 +680,8 @@ func getOidcHash(value string, method jwt.SigningMethod) string {
 		h = sha512.New384()
 	case "RS512", "ES512", "PS512":
 		h = sha512.New()
+	case gm.Alg:
+		h = sm3.New()
 	default:
 		h = sha256.New()
 	}
@@ -680,19 +702,15 @@ func generateJwtTokenWithOptions(application *Application, user *User, provider 
 		refreshExpireTime = expireTime
 	}
 
-	// the claims are shaped from a copy, so that refineUser() below does not clear the
-	// password of the user object the caller keeps using
-	userCopy := *user
-	user = &userCopy
-
-	groups, err := user.GetGroupsForToken(application)
+	user, err := getTokenUser(application, user)
 	if err != nil {
 		return "", "", "", "", err
 	}
-	user.Groups = groups
-	user = refineUser(user)
 
-	_, originBackend := getOriginFromHost(host)
+	issuer, err := GetOidcIssuerByApplication(host, application)
+	if err != nil {
+		return "", "", "", "", err
+	}
 
 	name := util.GenerateId()
 	jti := util.GetId(application.Owner, name)
@@ -707,14 +725,14 @@ func generateJwtTokenWithOptions(application *Application, user *User, provider 
 		TokenType: "access-token",
 		Nonce:     nonce,
 		// FIXME: A workaround for custom claim by reusing `tag` in user info
-		Tag:          user.Tag,
-		Scope:        scope,
-		Azp:          application.ClientId,
-		Provider:     provider,
-		SigninMethod: signinMethod,
-		Sid:          getSessionIdClaim(options.SessionId),
+		Tag:               user.Tag,
+		Scope:             scope,
+		Azp:               application.ClientId,
+		Provider:          provider,
+		SigninMethod:      signinMethod,
+		OidcIdTokenClaims: OidcIdTokenClaims{Sid: getSessionIdClaim(options.SessionId)},
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    originBackend,
+			Issuer:    issuer,
 			Subject:   user.Id,
 			Audience:  getTokenAudience(application, user, ""),
 			ExpiresAt: jwt.NewNumericDate(expireTime),
@@ -742,6 +760,14 @@ func generateJwtTokenWithOptions(application *Application, user *User, provider 
 		claims.Audience = getTokenAudience(application, user, resource)
 	}
 
+	// RFC 6749 section 6: the refresh token keeps the scope of the grant
+	refreshClaims := claims
+	refreshClaims.TokenType = "refresh-token"
+	refreshClaims.ExpiresAt = jwt.NewNumericDate(refreshExpireTime)
+	if options.RefreshScope != "" {
+		refreshClaims.Scope = options.RefreshScope
+	}
+
 	var token *jwt.Token
 	var refreshToken *jwt.Token
 	// the ID token is created once the access token is signed, its at_hash depends on it
@@ -751,39 +777,17 @@ func generateJwtTokenWithOptions(application *Application, user *User, provider 
 		application.TokenFormat = "JWT"
 	}
 
-	var jwtMethod jwt.SigningMethod
-
-	if application.TokenSigningMethod == "RS256" {
-		jwtMethod = jwt.SigningMethodRS256
-	} else if application.TokenSigningMethod == "RS512" {
-		jwtMethod = jwt.SigningMethodRS512
-	} else if application.TokenSigningMethod == "ES256" {
-		jwtMethod = jwt.SigningMethodES256
-	} else if application.TokenSigningMethod == "ES512" {
-		jwtMethod = jwt.SigningMethodES512
-	} else if application.TokenSigningMethod == "ES384" {
-		jwtMethod = jwt.SigningMethodES384
-	} else {
-		jwtMethod = jwt.SigningMethodRS256
-	}
+	jwtMethod := getJwtSigningMethod(application)
 
 	// the JWT token length in "JWT-Empty" mode will be very short, as User object only has two properties: owner and name
 	if application.TokenFormat == "JWT" {
-		claimsWithoutThirdIdp := getClaimsWithoutThirdIdp(claims)
-
-		token = jwt.NewWithClaims(jwtMethod, claimsWithoutThirdIdp)
+		token = jwt.NewWithClaims(jwtMethod, getClaimsWithoutThirdIdp(claims))
 		newIdToken = func() *jwt.Token { return jwt.NewWithClaims(jwtMethod, getClaimsWithoutThirdIdp(idClaims)) }
-		claimsWithoutThirdIdp.ExpiresAt = jwt.NewNumericDate(refreshExpireTime)
-		claimsWithoutThirdIdp.TokenType = "refresh-token"
-		refreshToken = jwt.NewWithClaims(jwtMethod, claimsWithoutThirdIdp)
+		refreshToken = jwt.NewWithClaims(jwtMethod, getClaimsWithoutThirdIdp(refreshClaims))
 	} else if application.TokenFormat == "JWT-Empty" {
-		claimsShort := getShortClaims(claims)
-
-		token = jwt.NewWithClaims(jwtMethod, claimsShort)
+		token = jwt.NewWithClaims(jwtMethod, getShortClaims(claims))
 		newIdToken = func() *jwt.Token { return jwt.NewWithClaims(jwtMethod, getShortClaims(idClaims)) }
-		claimsShort.ExpiresAt = jwt.NewNumericDate(refreshExpireTime)
-		claimsShort.TokenType = "refresh-token"
-		refreshToken = jwt.NewWithClaims(jwtMethod, claimsShort)
+		refreshToken = jwt.NewWithClaims(jwtMethod, getShortClaims(refreshClaims))
 	} else if application.TokenFormat == "JWT-Custom" {
 		claimsCustom := getClaimsCustom(claims, application.TokenFields, application.TokenAttributes)
 		claimsCustom = updateClaimsWithRoles(claimsCustom, roleNames, application.TokenFields)
@@ -792,17 +796,13 @@ func generateJwtTokenWithOptions(application *Application, user *User, provider 
 		newIdToken = func() *jwt.Token {
 			return jwt.NewWithClaims(jwtMethod, getClaimsCustom(idClaims, application.TokenFields, application.TokenAttributes))
 		}
-		refreshClaims := getRefreshClaimsCustom(claims, application.TokenFields, application.TokenAttributes, refreshExpireTime)
-		refreshClaims = updateClaimsWithRoles(refreshClaims, roleNames, application.TokenFields)
-		refreshToken = jwt.NewWithClaims(jwtMethod, refreshClaims)
+		refreshClaimsCustom := getRefreshClaimsCustom(refreshClaims, application.TokenFields, application.TokenAttributes, refreshExpireTime)
+		refreshClaimsCustom = updateClaimsWithRoles(refreshClaimsCustom, roleNames, application.TokenFields)
+		refreshToken = jwt.NewWithClaims(jwtMethod, refreshClaimsCustom)
 	} else if application.TokenFormat == "JWT-Standard" {
-		claimsStandard := getStandardClaims(claims)
-
-		token = jwt.NewWithClaims(jwtMethod, claimsStandard)
+		token = jwt.NewWithClaims(jwtMethod, getStandardClaims(claims))
 		newIdToken = func() *jwt.Token { return jwt.NewWithClaims(jwtMethod, getStandardClaims(idClaims)) }
-		claimsStandard.ExpiresAt = jwt.NewNumericDate(refreshExpireTime)
-		claimsStandard.TokenType = "refresh-token"
-		refreshToken = jwt.NewWithClaims(jwtMethod, claimsStandard)
+		refreshToken = jwt.NewWithClaims(jwtMethod, getStandardClaims(refreshClaims))
 	} else {
 		return "", "", "", "", fmt.Errorf("unknown application TokenFormat: %s", application.TokenFormat)
 	}
@@ -827,21 +827,12 @@ func generateJwtTokenWithOptions(application *Application, user *User, provider 
 		key                interface{}
 	)
 
-	if strings.Contains(application.TokenSigningMethod, "RS") || application.TokenSigningMethod == "" {
-		// RSA private key
-		key, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(cert.PrivateKey))
-	} else if strings.Contains(application.TokenSigningMethod, "ES") {
-		// ES private key
-		key, err = jwt.ParseECPrivateKeyFromPEM([]byte(cert.PrivateKey))
-	} else if strings.Contains(application.TokenSigningMethod, "Ed") {
-		// Ed private key
-		key, err = jwt.ParseEdPrivateKeyFromPEM([]byte(cert.PrivateKey))
-	}
+	key, err = getJwtSigningKey(jwtMethod, cert.PrivateKey)
 	if err != nil {
 		return "", "", "", "", err
 	}
 
-	token.Header["kid"] = cert.Name
+	token.Header["kid"] = cert.GetKeyId()
 	tokenString, err = token.SignedString(key)
 	if err != nil {
 		return "", "", "", "", err
@@ -858,10 +849,27 @@ func generateJwtTokenWithOptions(application *Application, user *User, provider 
 		idClaims.AtHash = getOidcHash(tokenString, jwtMethod)
 	}
 	idToken := newIdToken()
-	idToken.Header["kid"] = cert.Name
+	idToken.Header["kid"] = cert.GetKeyId()
 	idTokenString, err = idToken.SignedString(key)
 
 	return tokenString, refreshTokenString, idTokenString, name, err
+}
+
+func getJwtSigningMethod(application *Application) jwt.SigningMethod {
+	switch application.TokenSigningMethod {
+	case "RS512":
+		return jwt.SigningMethodRS512
+	case "ES256":
+		return jwt.SigningMethodES256
+	case "ES384":
+		return jwt.SigningMethodES384
+	case "ES512":
+		return jwt.SigningMethodES512
+	case gm.Alg:
+		return gm.SigningMethodSm2
+	default:
+		return jwt.SigningMethodRS256
+	}
 }
 
 func ParseJwtTokenWithoutValidation(token string) (*jwt.Token, error) {
@@ -884,16 +892,9 @@ func ParseJwtToken(token string, cert *Cert) (*Claims, error) {
 			return nil, fmt.Errorf("the certificate field should not be empty for the cert: %v", cert)
 		}
 
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); ok {
-			// RSA certificate
-			certificate, err = jwt.ParseRSAPublicKeyFromPEM([]byte(cert.Certificate))
-		} else if _, ok := token.Method.(*jwt.SigningMethodECDSA); ok {
-			// ES certificate
-			certificate, err = jwt.ParseECPublicKeyFromPEM([]byte(cert.Certificate))
-		} else {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-
+		kid, _ := token.Header["kid"].(string)
+		publicKey := cert.getCertificateByKeyId(kid)
+		certificate, err = getJwtVerifyKey(token, publicKey)
 		if err != nil {
 			return nil, err
 		}

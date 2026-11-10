@@ -152,7 +152,6 @@ export function getOAuthGetParameters(params) {
   const relayState = getRefinedValue(lowercaseQueries["RelayState".toLowerCase()]);
   const noRedirect = getRefinedValue(lowercaseQueries["noRedirect".toLowerCase()]);
   const resource = getRefinedValue(queries.get("resource"));
-  const action = getRefinedValue(queries.get("action"));
 
   if (clientId === "" && samlRequest === "") {
     // login
@@ -174,7 +173,6 @@ export function getOAuthGetParameters(params) {
       noRedirect: noRedirect,
       resource: resource,
       type: "code",
-      action: action,
     };
   }
 }

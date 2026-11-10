@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/casdoor/casdoor/certificate"
+	"github.com/casdoor/casdoor/gm"
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/util"
 	"github.com/xorm-io/core"
@@ -46,6 +47,11 @@ type Cert struct {
 
 	Certificate string `xorm:"mediumtext" json:"certificate"`
 	PrivateKey  string `xorm:"mediumtext" json:"privateKey"`
+
+	KeyId               string `xorm:"varchar(100)" json:"keyId"`
+	PreviousKeyId       string `xorm:"varchar(100)" json:"previousKeyId"`
+	PreviousCertificate string `xorm:"mediumtext" json:"previousCertificate"`
+	RotatedTime         string `xorm:"varchar(100)" json:"rotatedTime"`
 }
 
 func GetMaskedCert(cert *Cert) *Cert {
@@ -137,6 +143,14 @@ func getCert(owner string, name string) (*Cert, error) {
 }
 
 func GetCert(id string) (*Cert, error) {
+	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
+	if err != nil {
+		return nil, err
+	}
+	return getCert(owner, name)
+}
+
+func GetCertEx(id string) (*Cert, error) {
 	owner, name, err := util.GetOwnerAndNameFromIdWithError(id)
 	if err != nil {
 		return nil, err
@@ -258,6 +272,16 @@ func (p *Cert) populateContent() error {
 		p.CryptoAlgorithm = "RS256"
 	}
 
+	if p.CryptoAlgorithm == gm.Alg {
+		certificate, privateKey, err := gm.GenerateCertificate(p.ExpireInYears, p.Name, p.Owner)
+		if err != nil {
+			return err
+		}
+		p.Certificate = certificate
+		p.PrivateKey = privateKey
+		return nil
+	}
+
 	sigAlgorithm := p.CryptoAlgorithm[:2]
 	shaSize, err := util.ParseIntWithError(p.CryptoAlgorithm[2:])
 	if err != nil {
@@ -321,7 +345,7 @@ func RenewCert(cert *Cert) (bool, error) {
 
 func getCertByApplication(application *Application) (*Cert, error) {
 	if application.Cert != "" {
-		return GetCert(util.GetId(application.Organization, application.Cert))
+		return GetCertEx(util.GetId(application.Organization, application.Cert))
 	} else {
 		return GetDefaultCert()
 	}

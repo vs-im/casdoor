@@ -15,6 +15,9 @@
 package controllers
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/casdoor/casdoor/object"
@@ -46,15 +49,38 @@ func (c *RootController) GetOidcDiscoveryByApplication() {
 	c.ServeJSON()
 }
 
+// GetOidcDiscoveryByOrganization
+// @Title GetOidcDiscoveryByOrganization
+// @Tag OIDC API
+// @Description Get Oidc Discovery and OAuth 2.0 Authorization Server Metadata of an organization that has its own issuer
+// @Param organization path string true "organization name"
+// @Success 200 {object} object.OidcDiscovery
+// @router /orgs/:organization/.well-known/openid-configuration [get]
+func (c *RootController) GetOidcDiscoveryByOrganization() {
+	organization := c.Ctx.Input.Param(":organization")
+	oidcDiscovery, err := object.GetOidcDiscoveryByOrganization(c.Ctx.Request.Host, organization)
+	if err != nil {
+		c.responseWellKnownError(http.StatusInternalServerError, err)
+		return
+	}
+	if oidcDiscovery == nil {
+		c.responseWellKnownError(http.StatusNotFound, fmt.Errorf("the organization: %s doesn't exist or doesn't have its own issuer", organization))
+		return
+	}
+
+	c.Data["json"] = oidcDiscovery
+	c.ServeJSON()
+}
+
 // GetJwks
 // @Title GetJwks
 // @Tag OIDC API
 // @Success 200 {object} jose.JSONWebKey
 // @router /.well-known/jwks [get]
 func (c *RootController) GetJwks() {
-	jwks, err := object.GetJsonWebKeySet("")
+	jwks, err := object.GetJsonWebKeySetWithSm2("")
 	if err != nil {
-		c.ResponseError(err.Error())
+		c.responseWellKnownError(http.StatusInternalServerError, err)
 		return
 	}
 	c.Data["json"] = jwks
@@ -69,9 +95,9 @@ func (c *RootController) GetJwks() {
 // @router /.well-known/:application/jwks [get]
 func (c *RootController) GetJwksByApplication() {
 	application := c.Ctx.Input.Param(":application")
-	jwks, err := object.GetJsonWebKeySet(application)
+	jwks, err := object.GetJsonWebKeySetWithSm2(application)
 	if err != nil {
-		c.ResponseError(err.Error())
+		c.responseWellKnownError(http.StatusInternalServerError, err)
 		return
 	}
 	c.Data["json"] = jwks
@@ -98,7 +124,7 @@ func (c *RootController) GetWebFinger() {
 
 	webfinger, err := object.GetWebFinger(resource, rels, host, "")
 	if err != nil {
-		c.ResponseError(err.Error())
+		c.responseWebFingerError(err)
 		return
 	}
 
@@ -129,7 +155,7 @@ func (c *RootController) GetWebFingerByApplication() {
 
 	webfinger, err := object.GetWebFinger(resource, rels, host, application)
 	if err != nil {
-		c.ResponseError(err.Error())
+		c.responseWebFingerError(err)
 		return
 	}
 
@@ -162,4 +188,20 @@ func (c *RootController) GetOAuthServerMetadataByApplication() {
 	host := c.Ctx.Request.Host
 	c.Data["json"] = object.GetOidcDiscovery(host, application)
 	c.ServeJSON()
+}
+
+// responseWellKnownError responds with an error status instead of 200, the standard clients of these endpoints only check the status
+func (c *RootController) responseWellKnownError(status int, err error) {
+	c.Ctx.Output.SetStatus(status)
+	c.ResponseError(err.Error())
+}
+
+func (c *RootController) responseWebFingerError(err error) {
+	status := http.StatusInternalServerError
+	if errors.Is(err, object.ErrWebFingerInvalidResource) {
+		status = http.StatusBadRequest
+	} else if errors.Is(err, object.ErrWebFingerUserNotFound) {
+		status = http.StatusNotFound
+	}
+	c.responseWellKnownError(status, err)
 }

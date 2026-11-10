@@ -42,6 +42,7 @@ import (
 const (
 	UserPropertiesWechatUnionId = "wechatUnionId"
 	UserPropertiesWechatOpenId  = "wechatOpenId"
+	UserPropertiesMergedUsers   = "mergedUsers"
 )
 
 const UserEnforcerId = "built-in/user-enforcer-built-in"
@@ -271,6 +272,28 @@ type Userinfo struct {
 	Groups        []string     `json:"groups,omitempty"`
 	Roles         []string     `json:"roles,omitempty"`
 	Permissions   []string     `json:"permissions,omitempty"`
+
+	CustomClaims map[string]interface{} `json:"-"`
+}
+
+func (u Userinfo) MarshalJSON() ([]byte, error) {
+	type userinfo Userinfo
+	data, err := json.Marshal(userinfo(u))
+	if err != nil || len(u.CustomClaims) == 0 {
+		return data, err
+	}
+
+	res := map[string]interface{}{}
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		return nil, err
+	}
+	for name, value := range u.CustomClaims {
+		if _, ok := res[name]; !ok {
+			res[name] = value
+		}
+	}
+	return json.Marshal(res)
 }
 
 type ManagedAccount struct {
@@ -373,6 +396,11 @@ func GetUserCount(owner, field, value string, groupName string) (int64, error) {
 	return session.Count(&User{})
 }
 
+func GetUserCountWithFilter(owner string, cond builder.Cond) (int64, error) {
+	session := GetSession(owner, -1, -1, "", "", "", "")
+	return session.And(cond).Count(&User{})
+}
+
 func GetOnlineUserCount(owner string, isOnline int) (int64, error) {
 	return ormer.Engine.Where("is_online = ?", isOnline).Count(&User{Owner: owner})
 }
@@ -437,6 +465,16 @@ func GetPaginationUsers(owner string, offset, limit int, field, value, sortField
 
 	session := GetSessionForUser(owner, offset, limit, field, value, sortField, sortOrder)
 	err := session.Find(&users)
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func GetPaginationUsersWithFilter(owner string, offset, limit int, cond builder.Cond) ([]*User, error) {
+	users := []*User{}
+	session := GetSession(owner, offset, limit, "", "", "", "")
+	err := session.And(cond).Find(&users)
 	if err != nil {
 		return nil, err
 	}
@@ -572,9 +610,27 @@ func GetUserByPhone(owner string, phone string) (*User, error) {
 
 	if existed {
 		return &user, nil
-	} else {
-		return nil, nil
 	}
+
+	if regionCode == "" {
+		return getUserByNationalPhone(owner, phone)
+	}
+	return nil, nil
+}
+
+// GetUserByPhoneWithCountryCode looks up the user of a phone number typed with the chosen country code,
+// a national number like "0796488996" is normalized the same way as the one stored at signup
+func GetUserByPhoneWithCountryCode(owner string, phone string, countryCode string) (*User, error) {
+	if countryCode != "" && !strings.HasPrefix(phone, "+") {
+		if e164, ok := util.GetE164Number(phone, countryCode); ok {
+			user, err := GetUserByPhone(owner, e164)
+			if user != nil || err != nil {
+				return user, err
+			}
+		}
+	}
+
+	return GetUserByPhone(owner, phone)
 }
 
 func GetUserByPhoneOnly(phone string) (*User, error) {
@@ -730,6 +786,22 @@ func GetMaskedUser(user *User, isAdminOrSelf bool, errs ...error) (*User, error)
 	return user, nil
 }
 
+func getOAuthDisplayProperties(properties map[string]string) map[string]string {
+	res := map[string]string{}
+	for key, value := range properties {
+		if !strings.HasPrefix(key, "oauth_") {
+			continue
+		}
+		for _, suffix := range []string{"_id", "_username", "_displayName", "_email", "_avatarUrl"} {
+			if strings.HasSuffix(key, suffix) {
+				res[key] = value
+				break
+			}
+		}
+	}
+	return res
+}
+
 func GetFilteredUser(user *User, isAdmin bool, isAdminOrSelf bool, accountItems []*AccountItem) (*User, error) {
 	if accountItems == nil || len(accountItems) == 0 {
 		return user, nil
@@ -771,6 +843,11 @@ func GetFilteredUser(user *User, isAdmin bool, isAdminOrSelf bool, accountItems 
 						user.Properties[infoKey] = ""
 					}
 				}
+				continue
+			}
+		case "Properties":
+			if isAdminOrSelf {
+				user.Properties = getOAuthDisplayProperties(user.Properties)
 				continue
 			}
 		}
@@ -841,7 +918,7 @@ func GetDefaultUserUpdateColumns(isAdmin bool) []string {
 	columns := append([]string{}, userSelfColumns...)
 	if isAdmin {
 		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "balance_credit", "balance_currency", "mfa_items", "register_type", "register_source",
-			"is_admin", "is_forbidden", "is_deleted", "uid_number", "email_verified")
+			"is_admin", "is_forbidden", "is_deleted", "uid_number", "email_verified", "is_verified")
 		columns = append(columns, userProviderColumns...)
 	}
 	return columns
@@ -900,6 +977,11 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 		user.FaceIds = oldUser.FaceIds
 	}
 
+	// only a merge lists the accounts merged into a user, the applications hand their data over by it
+	if !isAdmin {
+		setUserProperty(user, UserPropertiesMergedUsers, getUserProperty(oldUser, UserPropertiesMergedUsers))
+	}
+
 	if user.Id != oldUser.Id && user.Id == "" {
 		user.Id = oldUser.Id
 	}
@@ -934,9 +1016,13 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 		return false, err
 	}
 
+	if affected != 0 {
+		triggerUserForbiddenWebhook(oldUser, user, columns)
+	}
+
 	if affected != 0 && isUserAccessRevoked(oldUser, user, columns) {
 		// The tokens and sessions are keyed by the old user name, it may have just been renamed
-		err = terminateUserAccess(oldUser)
+		err = TerminateUserAccess(oldUser)
 		if err != nil {
 			return true, fmt.Errorf("the user: %s is updated, but terminating its access failed: %w", id, err)
 		}
@@ -1012,8 +1098,12 @@ func UpdateUserForAllFields(id string, user *User) (bool, error) {
 		return false, err
 	}
 
+	if affected != 0 {
+		triggerUserForbiddenWebhook(oldUser, user, nil)
+	}
+
 	if affected != 0 && isUserAccessRevoked(oldUser, user, nil) {
-		err = terminateUserAccess(oldUser)
+		err = TerminateUserAccess(oldUser)
 		if err != nil {
 			return true, fmt.Errorf("the user: %s is updated, but terminating its access failed: %w", id, err)
 		}
@@ -1253,10 +1343,27 @@ func isUserAccessRevoked(oldUser *User, user *User, columns []string) bool {
 	return false
 }
 
-// terminateUserAccess forces the user offline, it expires the user's tokens and drops all of its
+// triggerUserForbiddenWebhook sends a dedicated "forbid-user" or "unforbid-user" event once the
+// update is saved, it covers every caller (API, syncers, LDAP) and not only the "update-user" API
+func triggerUserForbiddenWebhook(oldUser *User, user *User, columns []string) {
+	if columns != nil && !util.InSlice(columns, "is_forbidden") {
+		return
+	}
+	if oldUser.IsForbidden == user.IsForbidden {
+		return
+	}
+
+	if user.IsForbidden {
+		TriggerWebhookForUser("forbid-user", user)
+	} else {
+		TriggerWebhookForUser("unforbid-user", user)
+	}
+}
+
+// TerminateUserAccess forces the user offline, it expires the user's tokens and drops all of its
 // sessions, in the same way as the "logout from all applications" flow. It does nothing when the
 // user has neither active tokens nor sessions, so it is safe to call it more than once
-func terminateUserAccess(user *User) error {
+func TerminateUserAccess(user *User) error {
 	tokens, err := GetActiveTokensByUser(user.Owner, user.Name)
 	if err != nil {
 		return err
@@ -1278,7 +1385,7 @@ func terminateUserAccess(user *User) error {
 		sessionIds = append(sessionIds, session.SessionId...)
 	}
 
-	// The host is empty, so the issuer falls back to the configured origin
+	// There is no request host here, the logout token and LogoutRequest take the issuer the sign-in was made with
 	sendBackchannelLogoutForTokens(user, tokens, "", "")
 	SendSamlLogout(user.Owner, user.Name, nil, "")
 
@@ -1305,7 +1412,7 @@ func terminateUserAccess(user *User) error {
 
 func DeleteUser(user *User) (bool, error) {
 	// Forced offline the user first, its tokens would otherwise outlive the user row
-	err := terminateUserAccess(user)
+	err := TerminateUserAccess(user)
 	if err != nil {
 		return false, err
 	}
@@ -1347,19 +1454,22 @@ func DeleteUser(user *User) (bool, error) {
 }
 
 func GetUserInfo(user *User, scope string, aud string, host string) (*Userinfo, error) {
-	_, originBackend := getOriginFromHost(host)
-
-	resp := Userinfo{
-		Sub: user.Id,
-		Iss: originBackend,
-		Aud: aud,
-	}
-
 	// Build a TokenFields whitelist from the application config.
 	// If the application has no TokenFields configured (empty list), all fields are allowed.
 	application, err := GetApplicationByClientId(aud)
 	if err != nil {
 		return nil, err
+	}
+
+	issuer, err := GetOidcIssuerByApplication(host, application)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := Userinfo{
+		Sub: user.Id,
+		Iss: issuer,
+		Aud: aud,
 	}
 	allowedFields := make(map[string]bool)
 	hasWhitelist := application != nil && len(application.TokenFields) > 0
@@ -1438,6 +1548,20 @@ func GetUserInfo(user *User, scope string, aud string, host string) (*Userinfo, 
 		if allowed("IsVerified") {
 			resp.IsVerified = user.IsVerified
 		}
+	}
+
+	if application != nil && application.TokenFormat == "JWT-Custom" && len(application.TokenAttributes) > 0 {
+		tokenUser := *user
+		err = ExtendUserWithRolesAndPermissions(&tokenUser)
+		if err != nil {
+			return nil, err
+		}
+
+		refinedUser, err := getTokenUser(application, &tokenUser)
+		if err != nil {
+			return nil, err
+		}
+		resp.CustomClaims = getTokenAttributeClaims(refinedUser, application.TokenAttributes)
 	}
 
 	return &resp, nil

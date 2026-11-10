@@ -29,8 +29,11 @@ import {TransactionTable} from "@/components/user/TransactionTable";
 import * as OrganizationBackend from "@/backend/OrganizationBackend";
 import * as TransactionBackend from "@/backend/TransactionBackend";
 import * as Setting from "@/lib/setting";
+import {EditionNotice} from "@/components/common/EditionNotice";
+import {SecurityPolicyTab} from "@/components/organization/SecurityPolicyTab";
+import {EnterprisePolicyTab} from "@/components/organization/EnterprisePolicyTab";
 
-const PASSWORD_TYPES = ["plain", "salt", "sha512-salt", "md5-salt", "bcrypt", "pbkdf2-salt", "argon2id", "pbkdf2-django"];
+const PASSWORD_TYPES = ["plain", "salt", "sha512-salt", "md5-salt", "bcrypt", "pbkdf2-salt", "argon2id", "pbkdf2-django", "pbkdf2-sm3"];
 const TOKEN_FORMATS = ["JWT", "JWT-Empty", "JWT-Custom", "JWT-Standard"];
 const OBFUSCATOR_TYPES = ["Plain", "AES", "DES"];
 const VIEW_RULES = ["Public", "Self", "Admin"];
@@ -185,6 +188,8 @@ export default function OrganizationEditPage() {
           <TabsTrigger value="basic">{i18next.t("application:Basic")}</TabsTrigger>
           <TabsTrigger value="password">{i18next.t("general:Password type")}</TabsTrigger>
           <TabsTrigger value="account">{i18next.t("organization:Account items")}</TabsTrigger>
+          <TabsTrigger value="security">{i18next.t("application:Security")}</TabsTrigger>
+          <TabsTrigger value="enterprise">{i18next.t("general:Compliance")}</TabsTrigger>
           <TabsTrigger value="advanced">{i18next.t("provider:Advanced")}</TabsTrigger>
         </TabsList>
 
@@ -315,6 +320,7 @@ export default function OrganizationEditPage() {
           </FormRow>
           <FormRow labelKey="organization:Enable exclusive signin across applications">
             <Switch checked={!!organization.enableExclusiveSignin} onCheckedChange={(v) => update("enableExclusiveSignin", v)} />
+            {organization.enableExclusiveSignin ? <EditionNotice /> : null}
           </FormRow>
           {organization.enableExclusiveSignin ? (
             <FormRow labelKey="application:Max sessions">
@@ -339,6 +345,7 @@ export default function OrganizationEditPage() {
               onChange={(value) => update("passwordType", value)}
               options={PASSWORD_TYPES.map((item) => ({id: item, name: item}))}
             />
+            {organization.passwordType === "pbkdf2-sm3" ? <EditionNotice edition="Enterprise" /> : null}
           </FormRow>
           <FormRow labelKey="general:Password salt">
             <Input value={organization.passwordSalt ?? ""} onChange={(e) => update("passwordSalt", e.target.value)} />
@@ -496,6 +503,14 @@ export default function OrganizationEditPage() {
           </FormRow>
         </TabsContent>
 
+        <TabsContent value="security" className={formGridClass}>
+          <SecurityPolicyTab owner={organization.name} policy={organization.securityPolicy} onChange={(policy) => update("securityPolicy", policy)} />
+        </TabsContent>
+
+        <TabsContent value="enterprise" className={formGridClass}>
+          <EnterprisePolicyTab owner={organization.name} policy={organization.enterprisePolicy} onChange={(policy) => update("enterprisePolicy", policy)} />
+        </TabsContent>
+
         <TabsContent value="advanced" className={formGridClass}>
           <FormRow labelKey="organization:Default token format">
             <SelectField
@@ -521,6 +536,12 @@ export default function OrganizationEditPage() {
             <Switch
               checked={!!organization.useEmailAsUsername}
               onCheckedChange={(v) => update("useEmailAsUsername", v)}
+            />
+          </FormRow>
+          <FormRow labelKey="organization:Use organization issuer">
+            <Switch
+              checked={!!organization.useOrganizationIssuer}
+              onCheckedChange={(v) => update("useOrganizationIssuer", v)}
             />
           </FormRow>
           <FormRow labelKey="organization:Use permanent avatar">
@@ -654,12 +675,69 @@ export default function OrganizationEditPage() {
               onCheckedChange={(v) => update("enableRadius", v)}
             />
           </FormRow>
+          <FormRow labelKey="organization:Skip MFA for RADIUS">
+            <Switch
+              checked={!!organization.disableRadiusMfa}
+              disabled={!Setting.isAdminUser(account)}
+              onCheckedChange={(v) => update("disableRadiusMfa", v)}
+            />
+          </FormRow>
           <FormRow labelKey="organization:Enable dynamic client registration">
             <Switch
               checked={!!organization.dcrPolicy && organization.dcrPolicy !== "disabled"}
               disabled={!Setting.isAdminUser(account)}
               onCheckedChange={(v) => update("dcrPolicy", v ? "open" : "disabled")}
             />
+          </FormRow>
+          <FormRow labelKey="organization:Trusted ID-JAG issuers" block>
+            <EditableTable
+              rows={organization.idJagIssuers ?? []}
+              onChange={(rows) => update("idJagIssuers", rows)}
+              newRow={() => ({issuer: "", jwksUri: "", subject: "", audience: "", user: ""})}
+              disabled={!Setting.isAdminUser(account)}
+              columns={[
+                {
+                  key: "issuer",
+                  title: i18next.t("application:Issuer"),
+                  width: "34%",
+                  render: (row: any, _i, patch) => (
+                    <Input
+                      value={row.issuer ?? ""}
+                      placeholder="https://your-org.okta.com"
+                      aria-invalid={!(row.issuer ?? "").trim()}
+                      disabled={!Setting.isAdminUser(account)}
+                      onChange={(e) => patch({issuer: e.target.value})}
+                    />
+                  ),
+                },
+                {
+                  key: "jwksUri",
+                  title: i18next.t("application:JWKS URL"),
+                  width: "34%",
+                  render: (row: any, _i, patch) => (
+                    <Input
+                      value={row.jwksUri ?? ""}
+                      placeholder={i18next.t("application:Discovered from the issuer if empty")}
+                      disabled={!Setting.isAdminUser(account)}
+                      onChange={(e) => patch({jwksUri: e.target.value})}
+                    />
+                  ),
+                },
+                {
+                  key: "user",
+                  title: i18next.t("general:User"),
+                  render: (row: any, _i, patch) => (
+                    <Input
+                      value={row.user ?? ""}
+                      placeholder="{email}"
+                      disabled={!Setting.isAdminUser(account)}
+                      onChange={(e) => patch({user: e.target.value})}
+                    />
+                  ),
+                },
+              ]}
+            />
+            {(organization.idJagIssuers ?? []).length > 0 ? <EditionNotice /> : null}
           </FormRow>
           <FormRow labelKey="organization:Admin navbar items" block>
             <NavItemTree

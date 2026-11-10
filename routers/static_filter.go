@@ -17,6 +17,8 @@ package routers
 import (
 	"compress/gzip"
 	stdcontext "context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"html"
 	"io"
@@ -87,6 +89,33 @@ func GetSwaggerFolder() string {
 	}
 
 	return path
+}
+
+// serveSwaggerForAdmin serves the swagger folder to admins when it is not registered as a static path (runmode is not dev),
+// so the Swagger item of the admin menu still works in production
+func serveSwaggerForAdmin(ctx *context.Context) bool {
+	urlPath := ctx.Request.URL.Path
+	if urlPath != "/swagger" && !strings.HasPrefix(urlPath, "/swagger/") {
+		return false
+	}
+
+	userId := getSessionUser(ctx)
+	if userId == "" {
+		return false
+	}
+
+	user, err := object.GetUser(userId)
+	if err != nil || !user.IsAdminUser() {
+		return false
+	}
+
+	if urlPath == "/swagger" {
+		http.Redirect(ctx.ResponseWriter, ctx.Request, basePath+"/swagger/", http.StatusFound)
+		return true
+	}
+
+	http.StripPrefix("/swagger", http.FileServer(http.Dir(GetSwaggerFolder()))).ServeHTTP(ctx.ResponseWriter, ctx.Request)
+	return true
 }
 
 func fastAutoSignin(ctx *context.Context) (string, error) {
@@ -163,7 +192,10 @@ func fastAutoSignin(ctx *context.Context) (string, error) {
 	if strings.Contains(redirectUri, "?") {
 		sep = "&"
 	}
-	issuer := object.GetOidcDiscovery(ctx.Request.Host, "").Issuer
+	issuer, err := object.GetOidcIssuerByApplication(ctx.Request.Host, application)
+	if err != nil {
+		return "", err
+	}
 	res := fmt.Sprintf("%s%scode=%s&state=%s&iss=%s", redirectUri, sep, url.QueryEscape(code.Code), url.QueryEscape(state), url.QueryEscape(issuer))
 	return res, nil
 }
@@ -240,16 +272,37 @@ func StaticFilter(ctx *context.Context) {
 	if strings.HasPrefix(urlPath, "/api/") || strings.HasPrefix(urlPath, "/.well-known/") {
 		return
 	}
+	if strings.HasPrefix(urlPath, "/orgs/") && strings.Contains(urlPath, "/.well-known/") {
+		return
+	}
 	if serveAuthCallbackHandlerScript(ctx) {
 		return
 	}
 	if serveProviderHintRedirectScript(ctx) {
 		return
 	}
+	if serveWebManifest(ctx) {
+		return
+	}
 	if strings.HasPrefix(urlPath, "/cas") && (strings.HasSuffix(urlPath, "/serviceValidate") || strings.HasSuffix(urlPath, "/proxy") || strings.HasSuffix(urlPath, "/proxyValidate") || strings.HasSuffix(urlPath, "/validate") || strings.HasSuffix(urlPath, "/p3/serviceValidate") || strings.HasSuffix(urlPath, "/p3/proxyValidate") || strings.HasSuffix(urlPath, "/samlValidate")) {
 		return
 	}
 	if strings.HasPrefix(urlPath, "/scim") {
+		return
+	}
+	if serveSwaggerForAdmin(ctx) {
+		return
+	}
+
+	// the login page reads state, nonce, PKCE etc. from the URL, so expand a request object (RFC 9101) into it first
+	if (urlPath == "/login/oauth/authorize" || urlPath == "/signup/oauth/authorize") && ctx.Request.URL.Query().Get("request") != "" {
+		query, err := object.ResolveOAuthRequestObject(ctx.Request.URL.Query())
+		if err != nil {
+			responseError(ctx, err.Error())
+			return
+		}
+
+		http.Redirect(ctx.ResponseWriter, ctx.Request, fmt.Sprintf("%s%s?%s", basePath, urlPath, query.Encode()), http.StatusFound)
 		return
 	}
 
@@ -370,8 +423,10 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, o
 	oldContent := util.ReadStringFromPath(name)
 	newContent := oldContent
 	if organizationThemeCookie != nil {
-		newContent = replaceIndexHtmlFavicon(newContent, html.EscapeString(organizationThemeCookie.Favicon))
-		newContent = strings.ReplaceAll(newContent, fmt.Sprintf("<title>%s</title>", conf.DefaultBrandName), fmt.Sprintf("<title>%s</title>", html.EscapeString(organizationThemeCookie.DisplayName)))
+		if organizationThemeCookie.Favicon != "" {
+			newContent = replaceIndexHtmlFavicon(newContent, html.EscapeString(organizationThemeCookie.Favicon))
+		}
+		newContent = addBrandingToHtml(newContent, organizationThemeCookie)
 	}
 
 	// Whatever the organization did not override is branded for the deployment
@@ -382,6 +437,7 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, o
 	// do not mis-detect the page language (e.g. Chrome offering to translate a
 	// Chinese page into Chinese because the static shell declares lang="en").
 	if strings.HasSuffix(name, "index.html") {
+		w.Header().Set("Cache-Control", "no-cache")
 		lang := getIndexHtmlLanguage(r)
 		newContent = strings.ReplaceAll(newContent, `<html lang="en">`, fmt.Sprintf(`<html lang="%s">`, lang))
 		var cdnEnabled bool
@@ -391,11 +447,72 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string, o
 			// the cached CDN version after the page turned the CDN off
 			modTime = time.Time{}
 		}
+		newContent = addBasePathToHtml(newContent)
+		newContent = addWebConfigToHtml(newContent)
+		newContent = addIssuerToHtml(newContent, r)
+
+		headHtml, settingTime := object.GetHeadHtml()
+		if headHtml != "" {
+			newContent = strings.Replace(newContent, "</head>", headHtml+"</head>", 1)
+		}
+		// a 304 by the file's modification time would keep the old head HTML after the setting is changed
+		if !modTime.IsZero() && settingTime.After(modTime) {
+			modTime = settingTime
+		}
 	}
 
 	newContent = strings.ReplaceAll(newContent, oldStaticBaseUrl, newStaticBaseUrl)
 
 	http.ServeContent(w, r, d.Name(), modTime, strings.NewReader(newContent))
+}
+
+// addWebConfigToHtml puts the web config into the page too: a page embedded in another site does not get the
+// jsonWebConfig cookie
+func addWebConfigToHtml(content string) string {
+	webConfig, err := json.Marshal(conf.GetWebConfig())
+	if err != nil {
+		return content
+	}
+
+	meta := fmt.Sprintf(`<meta name="casdoor-web-config" content="%s">`, html.EscapeString(string(webConfig)))
+	return strings.Replace(content, "</head>", meta+"</head>", 1)
+}
+
+// getClientIdOfPage returns the client_id of the authorization request a page belongs to: in the query string of the
+// sign-in page, or in the state of the callback page of a third-party sign-in
+func getClientIdOfPage(r *http.Request) string {
+	clientId := r.URL.Query().Get("client_id")
+	if clientId != "" {
+		return clientId
+	}
+
+	state, err := base64.StdEncoding.DecodeString(r.URL.Query().Get("state"))
+	if err != nil {
+		return ""
+	}
+	query, err := url.ParseQuery(strings.TrimPrefix(string(state), "?"))
+	if err != nil {
+		return ""
+	}
+	return query.Get("client_id")
+}
+
+// addIssuerToHtml tells the frontend the issuer it has to send back as `iss` in authorization responses (RFC 9207),
+// the issuer of the client's organization when the organization has its own issuer
+func addIssuerToHtml(content string, r *http.Request) string {
+	issuer := object.GetOidcIssuer(r.Host)
+	if clientId := getClientIdOfPage(r); clientId != "" {
+		application, err := object.GetApplicationByClientId(clientId)
+		if err == nil && application != nil {
+			applicationIssuer, err := object.GetOidcIssuerByApplication(r.Host, application)
+			if err == nil {
+				issuer = applicationIssuer
+			}
+		}
+	}
+
+	meta := fmt.Sprintf(`<meta name="casdoor-issuer" content="%s">`, html.EscapeString(issuer))
+	return strings.Replace(content, "</head>", meta+"</head>", 1)
 }
 
 type gzipResponseWriter struct {

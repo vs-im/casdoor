@@ -41,7 +41,7 @@ func newAppleTestProvider(t *testing.T) *GothIdProvider {
 		t.Fatal(err)
 	}
 	pemKey := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
-	p, err := NewGothIdProvider("Apple", "app.example.ios", "TEAMID1234", "KEYID12345", pemKey, "https://example.com/callback", "")
+	p, err := NewGothIdProvider("Apple", "", "app.example.ios", "TEAMID1234", "KEYID12345", pemKey, "https://example.com/callback", "")
 	if err != nil {
 		t.Fatalf("apple provider: %v", err)
 	}

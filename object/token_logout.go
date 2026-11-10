@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/casdoor/casdoor/util"
@@ -33,9 +33,18 @@ type LogoutTokenClaims struct {
 	jwt.RegisteredClaims
 }
 
-func generateLogoutToken(application *Application, user *User, sessionId string, host string) (string, error) {
+func generateLogoutToken(application *Application, user *User, signinToken *Token, sessionId string, host string) (string, error) {
 	nowTime := time.Now()
-	_, originBackend := getOriginFromHost(host)
+	// The application checks "iss" against the ID token it got, which may have been issued on another host
+	// than the one of this request, or without any request at all when the user is forced offline
+	issuer := getTokenIssuer(signinToken)
+	if issuer == "" {
+		var err error
+		issuer, err = GetOidcIssuerByApplication(host, application)
+		if err != nil {
+			return "", err
+		}
+	}
 
 	events := map[string]interface{}{
 		"http://schemas.openid.net/event/backchannel-logout": map[string]interface{}{},
@@ -44,16 +53,19 @@ func generateLogoutToken(application *Application, user *User, sessionId string,
 	claims := LogoutTokenClaims{
 		Events: events,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:   originBackend,
-			Subject:  user.Id,
-			Audience: []string{application.ClientId},
-			IssuedAt: jwt.NewNumericDate(nowTime),
-			ID:       util.GetId(application.Owner, util.GenerateId()),
+			Issuer:    issuer,
+			Subject:   user.Id,
+			Audience:  []string{application.ClientId},
+			IssuedAt:  jwt.NewNumericDate(nowTime),
+			ExpiresAt: jwt.NewNumericDate(nowTime.Add(2 * time.Minute)),
+			ID:        util.GetId(application.Owner, util.GenerateId()),
 		},
 	}
 
-	// fork: the same hashed "sid" as the ID token carries (getSessionIdClaim), not the session cookie
-	claims.Sid = getSessionIdClaim(sessionId)
+	// The raw id is the Casdoor session cookie, so only its hash leaves Casdoor, the one in the ID token's "sid"
+	if sessionId != "" {
+		claims.Sid = GetSessionIdHash(sessionId)
+	}
 
 	cert, err := getCertByApplication(application)
 	if err != nil {
@@ -63,33 +75,31 @@ func generateLogoutToken(application *Application, user *User, sessionId string,
 		return "", fmt.Errorf("no cert found for application: %s", application.GetId())
 	}
 
-	var (
-		token *jwt.Token
-		key   interface{}
-	)
-
-	signingMethod := application.TokenSigningMethod
-	if strings.Contains(signingMethod, "ES") {
-		token = jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-		key, err = jwt.ParseECPrivateKeyFromPEM([]byte(cert.PrivateKey))
-	} else {
-		token = jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-		key, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(cert.PrivateKey))
-	}
+	var key interface{}
+	token := jwt.NewWithClaims(getJwtSigningMethod(application), claims)
+	key, err = getJwtSigningKey(token.Method, cert.PrivateKey)
 	if err != nil {
 		return "", err
 	}
 
-	token.Header["kid"] = cert.Name
+	token.Header["kid"] = cert.GetKeyId()
 	return token.SignedString(key)
 }
 
 // SendBackchannelLogout sends OIDC Back-Channel Logout tokens to all registered
 // backchannel_logout_uri endpoints for applications that have active tokens for the user.
+// With a sessionId, only the applications signed in with that Casdoor session are told and the
+// logout token carries its "sid", without one every session of the user at the applications ends.
 // See https://openid.net/specs/openid-connect-backchannel-1_0.html
 func SendBackchannelLogout(organization, username, sessionId, host string) {
 	tokens, err := GetActiveTokensByUser(organization, username)
-	if err != nil || len(tokens) == 0 {
+	if err != nil {
+		return
+	}
+	if sessionId != "" {
+		tokens = slices.DeleteFunc(tokens, func(token *Token) bool { return token.SessionId != sessionId })
+	}
+	if len(tokens) == 0 {
 		return
 	}
 
@@ -118,13 +128,30 @@ func sendBackchannelLogoutForTokens(user *User, tokens []*Token, sessionId strin
 			continue
 		}
 
-		logoutToken, err := generateLogoutToken(application, user, sessionId, host)
+		logoutToken, err := generateLogoutToken(application, user, token, sessionId, host)
 		if err != nil {
 			continue
 		}
 
 		go postLogoutForm(application, application.BackchannelLogoutUri, url.Values{"logout_token": {logoutToken}})
 	}
+}
+
+func getTokenIssuer(token *Token) string {
+	for _, tokenString := range []string{token.IdToken, token.AccessToken} {
+		if tokenString == "" {
+			continue
+		}
+
+		jwtToken, err := ParseJwtTokenWithoutValidation(tokenString)
+		if err != nil {
+			continue
+		}
+		if claims, ok := jwtToken.Claims.(*Claims); ok && claims.Issuer != "" {
+			return claims.Issuer
+		}
+	}
+	return ""
 }
 
 func postLogoutForm(application *Application, logoutUrl string, form url.Values) {

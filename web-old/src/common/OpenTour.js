@@ -33,34 +33,17 @@ class OpenTour extends React.Component {
   };
 
   render() {
-    return this.canTour() ? (
-      <Tooltip title={i18next.t("general:Click to open tour")}>
-        <div
-          className="select-box"
-          style={{
-            display: Setting.isMobile() ? "none" : null,
-            ...this.props.style,
-          }}
-          onClick={() => TourConfig.setIsTourVisible(true)}
-        >
-          <QuestionCircleOutlined
-            style={{fontSize: "16px", color: "#8897AD"}}
-          />
+    return (
+      this.canTour() ?
+        <Tooltip title={i18next.t("general:Click to open tour")}>
+          <div className="select-box" style={{display: Setting.isMobile() ? "none" : null, ...this.props.style}} onClick={() => TourConfig.setIsTourVisible(true)} >
+            <QuestionCircleOutlined style={{fontSize: "24px"}} />
+          </div>
+        </Tooltip>
+        :
+        <div className="select-box" style={{display: Setting.isMobile() ? "none" : null, cursor: "not-allowed", ...this.props.style}} >
+          <QuestionCircleOutlined style={{fontSize: "24px", color: "#adadad"}} />
         </div>
-      </Tooltip>
-    ) : (
-      <div
-        className="select-box"
-        style={{
-          display: Setting.isMobile() ? "none" : null,
-          cursor: "not-allowed",
-          ...this.props.style,
-        }}
-      >
-        <QuestionCircleOutlined
-          style={{fontSize: "16px", color: "#adadad"}}
-        />
-      </div>
     );
   }
 }

@@ -64,16 +64,16 @@ export function ApplicationBasicTab({
       {mode === "add" ? null : (
         <FormRow labelKey="general:Login page" block>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => Setting.copyToClipboard(`${window.location.origin}${signInUrl}`)}>
+            <Button variant="outline" size="sm" onClick={() => Setting.copyToClipboard(`${Setting.getOriginUrl()}${signInUrl}`)}>
               <Copy />
               {i18next.t("application:Copy signin page URL")}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => Setting.copyToClipboard(`${window.location.origin}${signUpUrl}`)}>
+            <Button variant="outline" size="sm" onClick={() => Setting.copyToClipboard(`${Setting.getOriginUrl()}${signUpUrl}`)}>
               <Copy />
               {i18next.t("application:Copy signup page URL")}
             </Button>
             {Setting.hasPromptPage(application) ? (
-              <Button variant="outline" size="sm" onClick={() => Setting.copyToClipboard(`${window.location.origin}${promptUrl}`)}>
+              <Button variant="outline" size="sm" onClick={() => Setting.copyToClipboard(`${Setting.getOriginUrl()}${promptUrl}`)}>
                 <Copy />
                 {i18next.t("application:Copy prompt page URL")}
               </Button>
@@ -119,6 +119,17 @@ export function ApplicationBasicTab({
       <FormRow labelKey="general:Is shared">
         <Switch checked={!!application.isShared} onCheckedChange={(v) => updateField("isShared", v)} />
       </FormRow>
+      {/* a shared application already serves every organization */}
+      {application.isShared ? null : (
+        <>
+          <FormRow labelKey="application:External users">
+            <TagsInput value={application.externalUsers ?? []} onChange={(v) => updateField("externalUsers", v)} />
+          </FormRow>
+          <FormRow labelKey="application:External groups">
+            <TagsInput value={application.externalGroups ?? []} onChange={(v) => updateField("externalGroups", v)} />
+          </FormRow>
+        </>
+      )}
       <FormRow labelKey="general:Logo">
         <div className="space-y-2">
           <Input value={application.logo ?? ""} onChange={(e) => updateField("logo", e.target.value)} />

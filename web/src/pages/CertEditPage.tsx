@@ -1,3 +1,4 @@
+import * as React from "react";
 import i18next from "i18next";
 import copy from "copy-to-clipboard";
 import FileSaver from "file-saver";
@@ -9,6 +10,8 @@ import {useAccount} from "@/hooks/use-account";
 import {useOrganizationOptions} from "@/hooks/use-options";
 import * as CertBackend from "@/backend/CertBackend";
 import * as Setting from "@/lib/setting";
+import {ConfirmButton} from "@/components/common/ConfirmButton";
+import {EditionNotice} from "@/components/common/EditionNotice";
 
 const TYPES = ["SSL", "x509", "Payment"];
 
@@ -28,7 +31,11 @@ const JWT_ALGORITHMS = [
   {value: "PS256", label: "PS256 (RSASSA-PSS using SHA256 and MGF1 with SHA256)"},
   {value: "PS384", label: "PS384 (RSASSA-PSS using SHA384 and MGF1 with SHA384)"},
   {value: "PS512", label: "PS512 (RSASSA-PSS using SHA512 and MGF1 with SHA512)"},
+  {value: "SM2", label: "SM2 (SM2 + SM3, GB/T 32918)"},
 ];
+
+/** the key size is fixed by the algorithm */
+const isFixedKeySize = (algorithm: string) => algorithm.startsWith("ES") || algorithm === "SM2";
 
 /** the DNS providers Casdoor can solve the ACME challenge with */
 const SSL_PROVIDERS = ["GoDaddy", "Aliyun"];
@@ -92,7 +99,7 @@ export default function CertEditPage() {
       labelKey: "cert:Crypto algorithm",
       options: (ctx) => (isSsl(ctx) ? SSL_ALGORITHMS : JWT_ALGORITHMS),
       onChange: (value, ctx, updateFields) => {
-        const bitSize = String(value).startsWith("ES")
+        const bitSize = isFixedKeySize(String(value))
           ? 0
           : ([1024, 2048, 4096].includes(Setting.myParseInt(ctx.record.bitSize)) ? ctx.record.bitSize : 2048);
         // the stored key pair no longer matches the algorithm, so it is regenerated
@@ -100,10 +107,17 @@ export default function CertEditPage() {
       },
     },
     {
+      type: "custom",
+      name: "edition",
+      labelKey: "system:License",
+      when: (ctx) => ctx.record.cryptoAlgorithm === "SM2",
+      render: () => <EditionNotice edition="Enterprise" />,
+    },
+    {
       type: "select",
       name: "bitSize",
       labelKey: "cert:Bit size",
-      when: (ctx) => !isSsl(ctx) && !String(ctx.record.cryptoAlgorithm ?? "").startsWith("ES"),
+      when: (ctx) => !isSsl(ctx) && !isFixedKeySize(String(ctx.record.cryptoAlgorithm ?? "")),
       options: (ctx) =>
         Setting.getCryptoAlgorithmOptions(ctx.record.cryptoAlgorithm ?? "").map((item: any) => ({
           value: String(item.id),
@@ -142,6 +156,13 @@ export default function CertEditPage() {
     {type: "text", name: "account", labelKey: "cert:Account", when: isSsl},
     {type: "text", name: "accessKey", labelKey: "general:Access key", when: isSsl},
     {type: "password", name: "accessSecret", labelKey: "cert:Access secret", when: isSsl},
+    {
+      type: "custom",
+      name: "keyId",
+      labelKey: "provider:Key ID",
+      when: (ctx) => !isSsl(ctx) && !!ctx.record.certificate,
+      render: (ctx) => <KeyRotation cert={ctx.record} />,
+    },
     {
       type: "custom",
       name: "certificate",
@@ -231,6 +252,47 @@ function PemField({value, onChange, copyLabel, downloadLabel, fileName}: PemFiel
         </Button>
       </div>
       <CodeEditor value={value ?? ""} onChange={onChange} height={320} />
+    </div>
+  );
+}
+
+/** The "kid" of the tokens the cert signs, and the rotation that gives the tokens a new key */
+function KeyRotation({cert}: {cert: any}) {
+  const [rotating, setRotating] = React.useState(false);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm text-muted-foreground">
+          {cert.keyId || cert.name}
+        </div>
+        <ConfirmButton
+          variant="outline"
+          destructive={false}
+          loading={rotating}
+          title={i18next.t("cert:Rotate the key now? The tokens get a new key ID, and the previous public key stays published for the tokens it signed")}
+          onConfirm={() => {
+            setRotating(true);
+            CertBackend.rotateCert(cert.owner, cert.name)
+              .then((res: any) => {
+                if (res.status === "ok") {
+                  Setting.showMessage("success", i18next.t("general:Successfully modified"));
+                  window.location.reload();
+                } else {
+                  Setting.showMessage("error", res.msg);
+                }
+              })
+              .finally(() => setRotating(false));
+          }}
+        >
+          {i18next.t("cert:Rotate key")}
+        </ConfirmButton>
+      </div>
+      {cert.rotatedTime ? (
+        <p className="text-xs text-muted-foreground">
+          {i18next.t("cert:Rotated time")}: {Setting.getFormattedDate(cert.rotatedTime)}, {i18next.t("cert:Previous key ID")}: {cert.previousKeyId}
+        </p>
+      ) : null}
+      <EditionNotice />
     </div>
   );
 }

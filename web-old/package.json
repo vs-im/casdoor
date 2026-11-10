@@ -68,7 +68,7 @@
     "test": "craco test",
     "eject": "craco eject",
     "crowdin:sync": "crowdin upload && crowdin download",
-    "preinstall": "node -e \"if (!/bun|yarn/.test(process.env.npm_execpath)) throw new Error('Use bun for installing')\"",
+    "preinstall": "node -e \"if (process.env.npm_execpath.indexOf('yarn') === -1) throw new Error('Use yarn for installing: https://yarnpkg.com/en/docs/install')\"",
     "fix": "eslint --fix src/**/*.{js,jsx,ts,tsx}",
     "lint:css": "stylelint src/**/*.{css,less} --fix"
   },
@@ -106,8 +106,7 @@
     "lint-staged": "^13.0.3",
     "stylelint": "^14.11.0",
     "stylelint-config-recommended-less": "^1.0.4",
-    "stylelint-config-standard": "^28.0.0",
-    "uglifyjs-webpack-plugin": "^2.2.0"
+    "stylelint-config-standard": "^28.0.0"
   },
   "resolutions": {
     "@ant-design/cssinjs": "^2.1.2",

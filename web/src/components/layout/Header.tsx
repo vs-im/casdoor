@@ -14,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {CommandPaletteTrigger} from "@/components/common/CommandPalette";
+import {CloudHeaderButton, CloudMenuItem} from "@/components/common/CloudPromo";
+import {EditionMenu} from "@/components/common/EditionPreview";
 import {BreadcrumbBar} from "@/components/layout/BreadcrumbBar";
 import {LanguageSelect} from "@/components/common/LanguageSelect";
 import {OrganizationSelect} from "@/components/common/OrganizationSelect";
@@ -62,13 +64,15 @@ export function Header({onOpenPalette}: {onOpenPalette: () => void}) {
   const showOrganizationSelect = Setting.isAdminUser(account) && !location.pathname.startsWith("/trees");
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="app-header sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       {/* toggles the rail on a desktop and opens the sheet on a phone */}
       <SidebarTrigger className="-ml-1" />
       <BreadcrumbBar />
 
       <div className="ml-auto flex items-center gap-1.5">
         <CommandPaletteTrigger onOpen={onOpenPalette} />
+        <EditionMenu />
+        <CloudHeaderButton />
         {showOrganizationSelect && (
           <OrganizationSelect
             withAll
@@ -111,6 +115,7 @@ export function Header({onOpenPalette}: {onOpenPalette: () => void}) {
               <Settings />
               {i18next.t("account:My Account")}
             </DropdownMenuItem>
+            <CloudMenuItem />
             {impersonating ? (
               <DropdownMenuItem onSelect={exitImpersonation}>
                 <LogOut />

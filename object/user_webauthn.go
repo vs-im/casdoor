@@ -18,6 +18,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/casdoor/casdoor/conf"
@@ -28,7 +29,7 @@ import (
 func GetWebAuthnObject(host string) (*webauthn.WebAuthn, error) {
 	_, originBackend := getOriginFromHost(host)
 
-	rpId, rpOrigins, err := getWebAuthnRelyingParty(originBackend, conf.GetConfigString("webauthnRpId"), conf.GetConfigString("webauthnOrigins"))
+	rpId, rpOrigins, err := getWebAuthnRpIdAndOrigins(originBackend)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +37,8 @@ func GetWebAuthnObject(host string) (*webauthn.WebAuthn, error) {
 	webAuthn, err := webauthn.New(&webauthn.Config{
 		RPDisplayName: conf.GetConfigString("appname"), // Display Name for your site
 		RPID:          rpId,                            // Generally the domain name for your site
-		RPOrigins:     rpOrigins,                       // The origin URLs allowed for WebAuthn requests
+		RPOrigins:     rpOrigins,                       // The origin URLs for WebAuthn requests, without the base path
+		// RPIcon:     "https://duo.com/logo.png",           // Optional icon URL for your site
 	})
 	if err != nil {
 		return nil, err
@@ -45,52 +47,45 @@ func GetWebAuthnObject(host string) (*webauthn.WebAuthn, error) {
 	return webAuthn, nil
 }
 
-// The backend origin is always allowed so that the built-in login page keeps working;
-// webauthnOrigins adds origins of other apps sharing the RP ID (e.g. a parent domain).
-func getWebAuthnRelyingParty(originBackend string, rpIdConf string, originsConf string) (string, []string, error) {
+// getWebAuthnRpIdAndOrigins lets webAuthnRpId and webAuthnRpOrigins widen the defaults taken from the backend origin
+func getWebAuthnRpIdAndOrigins(originBackend string) (string, []string, error) {
 	localUrl, err := url.Parse(originBackend)
 	if err != nil {
 		return "", nil, fmt.Errorf("error when parsing origin: %w", err)
 	}
 
-	rpId := strings.TrimSpace(rpIdConf)
-	if rpId == "" {
-		rpId = localUrl.Hostname()
-	}
-	rpId = strings.ToLower(rpId)
+	rpId := strings.Split(localUrl.Host, ":")[0]
+	rpOrigins := []string{localUrl.Scheme + "://" + localUrl.Host}
 
-	origins := []string{strings.TrimRight(originBackend, "/")}
-	for _, origin := range strings.Split(originsConf, ",") {
+	rpIdConf := strings.ToLower(strings.TrimSpace(conf.GetConfigString("webAuthnRpId")))
+	rpOriginsConf := strings.TrimSpace(conf.GetConfigString("webAuthnRpOrigins"))
+	if rpIdConf == "" && rpOriginsConf == "" {
+		return rpId, rpOrigins, nil
+	}
+
+	if rpIdConf != "" {
+		rpId = rpIdConf
+	}
+	for _, origin := range strings.Split(rpOriginsConf, ",") {
 		origin = strings.TrimRight(strings.TrimSpace(origin), "/")
-		if origin == "" {
-			continue
-		}
-
-		duplicate := false
-		for _, existing := range origins {
-			if existing == origin {
-				duplicate = true
-				break
-			}
-		}
-		if !duplicate {
-			origins = append(origins, origin)
+		if origin != "" && !slices.Contains(rpOrigins, origin) {
+			rpOrigins = append(rpOrigins, origin)
 		}
 	}
 
-	for _, origin := range origins {
+	for _, origin := range rpOrigins {
 		originUrl, err := url.Parse(origin)
 		if err != nil || originUrl.Scheme == "" || originUrl.Host == "" {
 			return "", nil, fmt.Errorf("invalid WebAuthn origin: %s", origin)
 		}
 
 		hostname := strings.ToLower(originUrl.Hostname())
-		if hostname != rpId && !strings.HasSuffix(hostname, "."+rpId) {
-			return "", nil, fmt.Errorf("WebAuthn RP ID %s is not a registrable suffix of origin %s", rpId, origin)
+		if hostname != strings.ToLower(rpId) && !strings.HasSuffix(hostname, "."+strings.ToLower(rpId)) {
+			return "", nil, fmt.Errorf("the WebAuthn RP ID: %s is not a registrable suffix of the origin: %s", rpId, origin)
 		}
 	}
 
-	return rpId, origins, nil
+	return rpId, rpOrigins, nil
 }
 
 // WebAuthnID
