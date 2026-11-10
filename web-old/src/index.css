@@ -47,11 +47,58 @@ code {
     monospace;
 }
 
-/* Raw <a> tags without Ant Design classes (table cell links, mailto, plain hrefs, etc.) */
-a:not([class], .login-link),
-a[class=""],
-a[href^="mailto:"] {
-  transition: opacity 0.2s ease;
+.logo {
+  height: 27px;
+  margin: 17px 0 16px 15px;
+  float: left;
+}
+
+.ant-table.ant-table-medium .ant-table-title {
+  padding: 8px 12px !important;
+}
+
+/* Size the small toolbar buttons in table title bars (Add, Upload, ...) like default buttons, matching the row action buttons */
+.ant-table-title .ant-btn-sm {
+  height: 32px;
+  padding-inline: 15px;
+}
+
+/* Edit page cards put 32px buttons in their 38px title bar; give them room to breathe */
+.ant-card-small > .ant-card-head {
+  min-height: 46px !important;
+}
+
+.ant-table.ant-table-medium .ant-table-footer,
+.ant-table.ant-table-medium .ant-table-cell {
+  padding: 1px 8px !important;
+}
+
+.ant-table.ant-table-medium .ant-table-thead .ant-table-cell {
+  padding: 10px 8px !important;
+}
+
+.ant-list-sm .ant-list-item {
+  padding: 2px !important;
+}
+
+.ant-drawer-body {
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.custom-link {
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.custom-link:hover {
+  opacity: 0.65 !important;
+  color: rgb(80 80 80) !important;
+}
+
+.custom-link:active {
+  opacity: 0.4 !important;
+  color: rgb(40 40 40) !important;
+  transition: opacity 0.08s ease, color 0.08s ease;
 }
 
 /* Ant Design Typography links */
@@ -71,6 +118,13 @@ a.ant-typography-link:active {
   transition: opacity 0.08s ease;
 }
 
+/* Raw <a> tags without Ant Design classes (table cell links, mailto, plain hrefs, etc.) */
+a:not([class], .login-link),
+a[class=""],
+a[href^="mailto:"] {
+  transition: opacity 0.2s ease;
+}
+
 a:not([class], .login-link):hover,
 a[class=""]:hover,
 a[href^="mailto:"]:hover {
@@ -82,6 +136,69 @@ a[class=""]:active,
 a[href^="mailto:"]:active {
   opacity: 0.4;
   transition: opacity 0.08s ease;
+}
+
+/* Login page signin method tabs: Password / Code / WebAuthn etc. */
+.signin-methods .ant-tabs-tab .ant-tabs-tab-btn {
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.signin-methods .ant-tabs-tab:not(.ant-tabs-tab-active):hover .ant-tabs-tab-btn {
+  opacity: 0.65;
+  filter: brightness(1.2);
+}
+
+.signin-methods .ant-tabs-tab .ant-tabs-tab-btn:active {
+  opacity: 0.4;
+  filter: brightness(0.85);
+  transition: opacity 0.08s ease, filter 0.08s ease;
+}
+
+/* Login page text links: Forgot password? / sign up now */
+.login-link {
+  transition: opacity 0.2s ease, filter 0.2s ease;
+  text-decoration: none;
+}
+
+.login-link:hover {
+  opacity: 0.7;
+  filter: brightness(1.2);
+}
+
+.login-link:active {
+  opacity: 0.45;
+  filter: brightness(0.85);
+  transition: opacity 0.08s ease, filter 0.08s ease;
+}
+
+/* Login page: Auto sign in checkbox label */
+.login-auto-signin {
+  transition: opacity 0.2s ease;
+}
+
+.login-auto-signin:hover {
+  opacity: 0.7;
+}
+
+.login-auto-signin:active {
+  opacity: 0.45;
+  transition: opacity 0.08s ease;
+}
+
+.full-height-editor {
+  height: 100%;
+}
+
+.full-height-editor [class*="CodeMirror"] {
+  height: 100%;
+}
+
+.no-horizontal-scroll-editor [class*="CodeMirror-hscrollbar"] {
+  display: none !important;
+}
+
+.no-horizontal-scroll-editor [class*="CodeMirror-scroll"] {
+  overflow-x: hidden !important;
 }
 
 /* Bold overrides for key UI elements */
@@ -136,112 +253,6 @@ a[href^="mailto:"]:active {
   font-weight: 600 !important;
 }
 
-.logo {
-  height: 27px;
-  margin: 17px 0 16px 15px;
-  float: left;
-}
-
-.ant-table.ant-table-medium .ant-table-title {
-  padding: 5px 8px !important;
-}
-
-.ant-table.ant-table-medium .ant-table-footer,
-.ant-table.ant-table-medium .ant-table-cell {
-  padding: 1px 8px !important;
-}
-
-.ant-table.ant-table-medium .ant-table-thead .ant-table-cell {
-  padding: 10px 8px !important;
-}
-
-.ant-list-sm .ant-list-item {
-  padding: 2px !important;
-}
-
-.ant-drawer-body {
-  padding: 0 !important;
-  overflow: hidden !important;
-}
-
-.custom-link {
-  transition: opacity 0.2s ease, color 0.2s ease;
-}
-
-.custom-link:hover {
-  opacity: 0.65 !important;
-  color: rgb(80 80 80) !important;
-}
-
-.custom-link:active {
-  opacity: 0.4 !important;
-  color: rgb(40 40 40) !important;
-  transition: opacity 0.08s ease, color 0.08s ease;
-}
-
-/* Login page signin method tabs: Password / Code / WebAuthn etc. */
-.signin-methods .ant-tabs-tab .ant-tabs-tab-btn {
-  transition: opacity 0.2s ease, filter 0.2s ease;
-}
-
-.signin-methods .ant-tabs-tab .ant-tabs-tab-btn:active {
-  opacity: 0.4;
-  filter: brightness(0.85);
-  transition: opacity 0.08s ease, filter 0.08s ease;
-}
-
-.signin-methods .ant-tabs-tab:not(.ant-tabs-tab-active):hover .ant-tabs-tab-btn {
-  opacity: 0.65;
-  filter: brightness(1.2);
-}
-
-/* Login page text links: Forgot password? / sign up now */
-.login-link {
-  transition: opacity 0.2s ease, filter 0.2s ease;
-  text-decoration: none;
-}
-
-.login-link:hover {
-  opacity: 0.7;
-  filter: brightness(1.2);
-}
-
-.login-link:active {
-  opacity: 0.45;
-  filter: brightness(0.85);
-  transition: opacity 0.08s ease, filter 0.08s ease;
-}
-
-/* Login page: Auto sign in checkbox label */
-.login-auto-signin {
-  transition: opacity 0.2s ease;
-}
-
-.login-auto-signin:hover {
-  opacity: 0.7;
-}
-
-.login-auto-signin:active {
-  opacity: 0.45;
-  transition: opacity 0.08s ease;
-}
-
-.full-height-editor {
-  height: 100%;
-}
-
-.full-height-editor [class*="CodeMirror"] {
-  height: 100%;
-}
-
-.no-horizontal-scroll-editor [class*="CodeMirror-hscrollbar"] {
-  display: none !important;
-}
-
-.no-horizontal-scroll-editor [class*="CodeMirror-scroll"] {
-  overflow-x: hidden !important;
-}
-
 /* Table loading spinner - give the overlay enough height so spinner appears centered (antd v6) */
 .ant-table-wrapper .ant-spin.ant-spin-spinning {
   min-height: 420px;
@@ -278,12 +289,8 @@ a[href^="mailto:"]:active {
     sans-serif !important;
 }
 
-.header-dropdown ul {
-  min-width: 150px;
-}
-
-@media (prefers-color-scheme: dark) {
-  body {
-    background: grey;
-  }
+/* Table cells never wrap (scroll.x handles overflow), so shrinking only absorbs column padding */
+.ant-table-tbody > tr > td,
+.ant-table-thead > tr > th {
+  white-space: nowrap;
 }

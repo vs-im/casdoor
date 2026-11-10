@@ -288,7 +288,8 @@ const authInfo = {
   },
   PayPal: {
     scope: "openid%20profile%20email",
-    endpoint: "https://www.sandbox.paypal.com/connect",
+    endpoint: "https://www.paypal.com/connect",
+    endpoint2: "https://www.sandbox.paypal.com/connect",
   },
   SalesForce: {
     scope: "openid%20profile%20email",
@@ -374,7 +375,8 @@ const authInfo = {
 
 export function getProviderUrl(provider) {
   if (provider.category === "OAuth") {
-    const type = Setting.isCustomOAuthType(provider.type) ? "Custom" : provider.type;
+    // a Plugin provider builds its authorization URL from the template like Custom does
+    const type = Setting.isCustomOAuthType(provider.type) || provider.type === "Plugin" ? "Custom" : provider.type;
     const endpoint = authInfo[type].endpoint;
     const urlObj = new URL(endpoint);
 
@@ -387,7 +389,7 @@ export function getProviderUrl(provider) {
 
     return `${urlObj.protocol}//${host}`;
   } else {
-    const info = Setting.OtherProviderInfo[provider.category][provider.type];
+    const info = Setting.OtherProviderInfo[provider.category]?.[provider.type];
     // avoid crash when provider is not found
     if (info) {
       return info.url;
@@ -396,13 +398,41 @@ export function getProviderUrl(provider) {
   }
 }
 
+// WeChat's QR page takes a stylesheet (href) when it is framed: the code is centered and the open
+// platform app's name is left out, as it is not the name of the site the visitor is on. The title
+// goes too where the sign-in page shows its own, see getWechatQrConnectUrl
+function getWechatQrCssHref(withTitle: boolean) {
+  const css = "html,body{height:100%;margin:0;background:#fff}" +
+    ".impowerBox{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;width:auto;padding:0;margin:0}" +
+    (withTitle ? ".impowerBox .title{font-size:22px;font-weight:600;color:#171717;margin:0 0 20px}" : ".impowerBox .title{display:none}") +
+    ".impowerBox .qrcode{width:220px;height:220px;margin:0;border:1px solid #ecebe6;border-radius:16px;padding:12px}" +
+    ".impowerBox .info{width:auto}.impowerBox .status{padding:0;text-align:center}" +
+    ".impowerBox .status_browser p:nth-child(2){display:none}.impowerBox .status p{font-size:14px;color:#666}";
+  return `data:text/css;base64,${btoa(css)}`;
+}
+
+// the frame's name attribute tells /callback it is that frame, see AuthCallback and AuthCallbackHandler.js
+export const WECHAT_QR_FRAME_NAME = "casdoor-wechat-qr";
+
+/**
+ * The WeChat QR code (open platform website app) for a frame on the sign-in page. self_redirect keeps
+ * the scan's redirect in that frame, where AuthCallback hands it to the page around it.
+ */
+export function getWechatQrConnectUrl(application: any, provider: any) {
+  const url = new URL(getAuthUrl(application, provider, "signin"));
+  url.searchParams.set("self_redirect", "true");
+  url.searchParams.set("href", getWechatQrCssHref(false));
+  return url.toString();
+}
+
 export function getAuthUrl(application: any, provider: any, method: string, code?: string) {
   if (application === null || provider === null) {
     return "";
   }
-  const type = Setting.isCustomOAuthType(provider.type) ? "Custom" : provider.type;
+  // a Plugin provider builds its authorization URL from the template like Custom does
+  const type = Setting.isCustomOAuthType(provider.type) || provider.type === "Plugin" ? "Custom" : provider.type;
   let endpoint = authInfo[type].endpoint;
-  const redirectOrigin = application.forcedRedirectOrigin ? application.forcedRedirectOrigin : window.location.origin;
+  const redirectOrigin = application.forcedRedirectOrigin ? application.forcedRedirectOrigin : Setting.getOriginUrl();
   let redirectUri = `${redirectOrigin}/callback`;
   let scope = authInfo[type].scope;
   // Allow provider.scopes to override default scope if specified
@@ -436,6 +466,8 @@ export function getAuthUrl(application: any, provider: any, method: string, code
     }
   } else if (provider.type === "Lark" && provider.disableSsl) {
     endpoint = authInfo[provider.type].endpoint2;
+  } else if (provider.type === "PayPal" && provider.subType === "Sandbox") {
+    endpoint = authInfo[provider.type].endpoint2;
   }
 
   if (provider.type === "Google" || provider.type === "GitHub" || provider.type === "Facebook"
@@ -444,9 +476,9 @@ export function getAuthUrl(application: any, provider: any, method: string, code
     || provider.type === "Bitbucket" || provider.type === "Box" || provider.type === "CloudFoundry" || provider.type === "Dailymotion"
     || provider.type === "DigitalOcean" || provider.type === "Discord" || provider.type === "Dropbox" || provider.type === "EveOnline" || provider.type === "Gitea"
     || provider.type === "Heroku" || provider.type === "InfluxCloud" || provider.type === "Instagram" || provider.type === "Intercom" || provider.type === "Kakao"
-    || provider.type === "MailRu" || provider.type === "Meetup" || provider.type === "MicrosoftOnline" || provider.type === "Naver" || provider.type === "Nextcloud"
+    || provider.type === "Mailru" || provider.type === "Meetup" || provider.type === "MicrosoftOnline" || provider.type === "Naver" || provider.type === "Nextcloud"
     || provider.type === "OneDrive" || provider.type === "Oura" || provider.type === "Patreon" || provider.type === "PayPal" || provider.type === "SalesForce"
-    || provider.type === "SoundCloud" || provider.type === "Spotify" || provider.type === "Strava" || provider.type === "Stripe" || provider.type === "Tumblr"
+    || provider.type === "Soundcloud" || provider.type === "Spotify" || provider.type === "Strava" || provider.type === "Stripe" || provider.type === "Tumblr"
     || provider.type === "Twitch" || provider.type === "Typetalk" || provider.type === "Uber" || provider.type === "VK" || provider.type === "Wepay"
     || provider.type === "Xero" || provider.type === "Yahoo" || provider.type === "Yammer" || provider.type === "Yandex" || provider.type === "Zoom") {
     return `${endpoint}?client_id=${provider.clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code&state=${state}`;
@@ -471,7 +503,9 @@ export function getAuthUrl(application: any, provider: any, method: string, code
       if (provider.clientId2 && provider?.disableSsl && provider?.signName === "media") {
         return `${redirectOrigin}/callback?state=${state}&code=${"wechat_oa:" + code}`;
       }
-      return `${endpoint}?appid=${provider.clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code&state=${state}#wechat_redirect`;
+      // framed in another site, the scan comes back in the frame: a cross-origin frame may not move the page around it
+      const framed = Setting.inIframe() ? `&self_redirect=true&href=${encodeURIComponent(getWechatQrCssHref(true))}` : "";
+      return `${endpoint}?appid=${provider.clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code&state=${state}${framed}#wechat_redirect`;
     }
   } else if (provider.type === "WeCom") {
     if (provider.subType === "Internal") {
@@ -523,6 +557,10 @@ export function getAuthUrl(application: any, provider: any, method: string, code
   } else if (provider.type === "Kwai") {
     return `${endpoint}?app_id=${provider.clientId}&redirect_uri=${redirectUri}&state=${state}&response_type=code&scope=${scope}`;
   } else if (type === "Custom") {
+    if (/\{[a-zA-Z_][a-zA-Z0-9_]*\}/.test(provider.customAuthUrl ?? "")) {
+      const values: Record<string, string> = {clientId: provider.clientId, redirectUri, scope: provider.scopes ?? "", state, codeChallenge};
+      return provider.customAuthUrl.replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (_: string, name: string) => encodeURIComponent(values[name] ?? ""));
+    }
     let authUrl = `${provider.customAuthUrl}?client_id=${provider.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(provider.scopes)}&response_type=code&state=${encodeURIComponent(state)}`;
     if (provider.enablePkce) {
       authUrl += `&code_challenge=${codeChallenge}&code_challenge_method=S256`;

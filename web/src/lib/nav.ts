@@ -72,6 +72,8 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
       {key: "/applications", label: i18next.t("general:Applications")},
       {key: "/magic-links", label: i18next.t("general:Magic Links")},
       {key: "/providers", label: i18next.t("application:Providers")},
+      {key: "/marketplace", label: i18next.t("general:Marketplace")},
+      {key: "/integrations", label: i18next.t("general:Integrations")},
       {key: "/resources", label: i18next.t("general:Resources")},
       {key: "/certs", label: i18next.t("general:Certs")},
       {key: "/keys", label: i18next.t("general:Keys")},
@@ -118,6 +120,7 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
     items: [
       {key: "/sessions", label: i18next.t("general:Sessions")},
       {key: "/records", label: i18next.t("general:Records")},
+      {key: "/compliance", label: i18next.t("general:Compliance")},
       {key: "/tokens", label: i18next.t("general:Tokens")},
       {key: "/verifications", label: i18next.t("general:Verifications")},
     ],
@@ -144,7 +147,10 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
 
   const adminItems: NavItem[] = [];
   if (Setting.isAdminUser(account)) {
-    adminItems.push({key: "/sysinfo", label: i18next.t("general:System Info")});
+    adminItems.push(
+      {key: "/sysinfo", label: i18next.t("general:System Info")},
+      {key: "/settings", label: i18next.t("general:Global Settings")},
+    );
   }
   adminItems.push(
     {key: "/forms", label: i18next.t("general:Forms")},
@@ -154,10 +160,11 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
     {key: "/tickets", label: i18next.t("general:Tickets")},
   );
   if (Setting.isAdminUser(account)) {
+    adminItems.push({key: "/radius-clients", label: i18next.t("general:RADIUS Clients")});
     adminItems.push({
       key: "/swagger",
       label: i18next.t("general:Swagger"),
-      href: Setting.isLocalhost() ? `${Setting.getFullServerUrl()}/swagger` : "/swagger",
+      href: Setting.isLocalhost() ? `${Setting.getFullServerUrl()}/swagger` : Setting.withBasePath("/swagger"),
     });
   }
 

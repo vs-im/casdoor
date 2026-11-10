@@ -19,7 +19,7 @@ COPY ./${BRAND_ASSETS_DIR}/ ./public/brand/
 RUN NODE_OPTIONS="--max-old-space-size=4096" yarn run build
 
 
-FROM --platform=$BUILDPLATFORM golang:latest AS back
+FROM --platform=$BUILDPLATFORM golang:1.26.10 AS back
 WORKDIR /go/src/casdoor
 ARG TARGETOS
 ARG TARGETARCH

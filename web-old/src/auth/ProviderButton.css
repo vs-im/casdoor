@@ -29,22 +29,14 @@
   transition: filter 0.25s ease, opacity 0.25s ease;
 }
 
+.provider-link:hover .provider-img,
 .provider-img:hover {
-  filter: drop-shadow(0 0 10px rgb(120 120 120 / 75%)) drop-shadow(0 0 4px rgb(120 120 120 / 50%)) brightness(1.1);
+  filter: drop-shadow(0 0 10px rgba(120, 120, 120, 0.75)) drop-shadow(0 0 4px rgba(120, 120, 120, 0.5)) brightness(1.1);
 }
 
+.provider-link:active .provider-img,
 .provider-img:active {
-  filter: drop-shadow(0 0 6px rgb(120 120 120 / 45%)) brightness(0.9);
-  opacity: 0.8;
-  transition: filter 0.08s ease, opacity 0.08s ease;
-}
-
-.provider-link:hover .provider-img {
-  filter: drop-shadow(0 0 10px rgb(120 120 120 / 75%)) drop-shadow(0 0 4px rgb(120 120 120 / 50%)) brightness(1.1);
-}
-
-.provider-link:active .provider-img {
-  filter: drop-shadow(0 0 6px rgb(120 120 120 / 45%)) brightness(0.9);
+  filter: drop-shadow(0 0 6px rgba(120, 120, 120, 0.45)) brightness(0.9);
   opacity: 0.8;
   transition: filter 0.08s ease, opacity 0.08s ease;
 }
@@ -61,7 +53,7 @@
 }
 
 .provider-big-img > a:hover {
-  filter: brightness(1.04) drop-shadow(0 0 14px rgb(120 120 120 / 50%)) drop-shadow(0 0 5px rgb(120 120 120 / 30%));
+  filter: brightness(1.04) drop-shadow(0 0 14px rgba(120, 120, 120, 0.5)) drop-shadow(0 0 5px rgba(120, 120, 120, 0.3));
 }
 
 .provider-big-img > a:active {

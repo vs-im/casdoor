@@ -82,6 +82,7 @@ export function newApplication(account: Account) {
     ],
     signupItems: [
       {name: "ID", visible: false, required: true, rule: "Random"},
+      {name: "Logo", visible: true, required: false, rule: "None", customCss: SignupTableDefaultCssMap["Logo"]},
       {name: "Username", visible: true, required: true, rule: "None"},
       {name: "Display name", visible: true, required: true, rule: "None"},
       {name: "Password", visible: true, required: true, rule: "None"},
@@ -250,6 +251,21 @@ export function newKey(account: Account) {
   };
 }
 
+export function newRadiusClient() {
+  const randomName = Setting.getRandomName();
+  return {
+    owner: "admin",
+    name: `radius_client_${randomName}`,
+    createdTime: now(),
+    updatedTime: now(),
+    displayName: `New RADIUS Client - ${randomName}`,
+    organization: "",
+    ipRanges: "",
+    secret: "",
+    state: "Active",
+  };
+}
+
 export function newModel(account: Account) {
   const randomName = Setting.getRandomName();
   const owner = Setting.getRequestOrganization(account);
@@ -338,6 +354,7 @@ export function newPlan(account: Account) {
     currency: "USD",
     period: "Monthly",
     isEnabled: true,
+    autoRenew: false,
     paymentProviders: [],
     role: "",
     options: [],
@@ -462,6 +479,7 @@ export function newSite(account: Account) {
     alertTryTimes: 3,
     alertProviders: [],
     challenges: [],
+    publicPaths: [],
     host: "",
     port: 8000,
     hosts: [],
@@ -492,6 +510,7 @@ export function newSubscription(account: Account) {
     group: "",
     plan: "",
     state: "Active",
+    autoRenew: false,
   };
 }
 

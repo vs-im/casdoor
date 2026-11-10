@@ -37,9 +37,12 @@ func InitDb() {
 		initBuiltInProvider()
 		initBuiltInUser()
 		initBuiltInApplication()
-		initBuiltInCert()
 		initBuiltInLdap()
 	}
+
+	// cert-built-in signs the tokens of the applications without a cert, including app-built-in, so nobody
+	// can sign in when it is missing, e.g. after an earlier start failed halfway
+	initBuiltInCert()
 
 	existed = initBuiltInApiModel()
 	if !existed {
@@ -112,6 +115,9 @@ func GetDefaultAccountItems() []*AccountItem {
 		{Name: "MFA items", Visible: true, ViewRule: "Self", ModifyRule: "Self"},
 		{Name: "WebAuthn credentials", Visible: true, ViewRule: "Self", ModifyRule: "Self"},
 		{Name: "Last change password time", Visible: true, ViewRule: "Admin", ModifyRule: "Admin"},
+		{Name: "Deleted time", Visible: true, ViewRule: "Admin", ModifyRule: "Admin"},
+		{Name: "Last signin time", Visible: true, ViewRule: "Self", ModifyRule: "Admin"},
+		{Name: "Last signin IP", Visible: true, ViewRule: "Self", ModifyRule: "Admin"},
 		{Name: "Managed accounts", Visible: true, ViewRule: "Self", ModifyRule: "Self"},
 		{Name: "Face ID", Visible: true, ViewRule: "Self", ModifyRule: "Self"},
 		{Name: "MFA accounts", Visible: true, ViewRule: "Self", ModifyRule: "Self"},
@@ -314,6 +320,7 @@ func initBuiltInApplication() {
 		},
 		SignupItems: []*SignupItem{
 			{Name: "ID", Visible: false, Required: true, Prompted: false, Rule: "Random"},
+			{Name: "Logo", Visible: true, Required: false, Prompted: false, Rule: "None"},
 			{Name: "Username", Visible: true, Required: true, Prompted: false, Rule: "None"},
 			{Name: "Display name", Visible: true, Required: true, Prompted: false, Rule: "None"},
 			{Name: "Password", Visible: true, Required: true, Prompted: false, Rule: "None"},

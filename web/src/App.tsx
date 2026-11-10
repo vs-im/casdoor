@@ -18,6 +18,7 @@ import {ConsoleDisabledPage} from "@/components/common/ConsoleDisabledPage";
 import {Loading} from "@/components/common/Loading";
 import {AppLayout} from "@/components/layout/AppLayout";
 import {useAccount} from "@/hooks/use-account";
+import {useAccountHelmet} from "@/hooks/use-application-chrome";
 import * as Auth from "@/auth/Auth";
 import * as Conf from "@/Conf";
 import * as Setting from "@/lib/setting";
@@ -30,6 +31,8 @@ const ShortcutsPage = React.lazy(() => import("@/pages/ShortcutsPage"));
 const AccountPage = React.lazy(() => import("@/pages/AccountPage"));
 const MfaSetupPage = React.lazy(() => import("@/pages/auth/MfaSetupPage"));
 const SystemInfoPage = React.lazy(() => import("@/pages/SystemInfoPage"));
+const CompliancePage = React.lazy(() => import("@/pages/CompliancePage"));
+const SettingEditPage = React.lazy(() => import("@/pages/SettingEditPage"));
 
 const OrganizationListPage = React.lazy(() => import("@/pages/OrganizationListPage"));
 const OrganizationEditPage = React.lazy(() => import("@/pages/OrganizationEditPage"));
@@ -45,6 +48,9 @@ const ApplicationListPage = React.lazy(() => import("@/pages/ApplicationListPage
 const ApplicationEditPage = React.lazy(() => import("@/pages/ApplicationEditPage"));
 const ProviderListPage = React.lazy(() => import("@/pages/ProviderListPage"));
 const ProviderEditPage = React.lazy(() => import("@/pages/ProviderEditPage"));
+const MarketplacePage = React.lazy(() => import("@/pages/MarketplacePage"));
+const IntegrationListPage = React.lazy(() => import("@/pages/IntegrationListPage"));
+const IntegrationEditPage = React.lazy(() => import("@/pages/IntegrationEditPage"));
 const ResourceListPage = React.lazy(() => import("@/pages/ResourceListPage"));
 const CertListPage = React.lazy(() => import("@/pages/CertListPage"));
 const CertEditPage = React.lazy(() => import("@/pages/CertEditPage"));
@@ -112,6 +118,8 @@ const WebhookListPage = React.lazy(() => import("@/pages/WebhookListPage"));
 const WebhookEditPage = React.lazy(() => import("@/pages/WebhookEditPage"));
 const WebhookEventListPage = React.lazy(() => import("@/pages/WebhookEventListPage"));
 const TicketListPage = React.lazy(() => import("@/pages/TicketListPage"));
+const RadiusClientListPage = React.lazy(() => import("@/pages/RadiusClientListPage"));
+const RadiusClientEditPage = React.lazy(() => import("@/pages/RadiusClientEditPage"));
 const TicketEditPage = React.lazy(() => import("@/pages/TicketEditPage"));
 const LdapEditPage = React.lazy(() => import("@/pages/LdapEditPage"));
 const LdapSyncPage = React.lazy(() => import("@/pages/LdapSyncPage"));
@@ -128,11 +136,13 @@ const ResultPage = React.lazy(() => import("@/pages/auth/ResultPage"));
 const ConsentPage = React.lazy(() => import("@/pages/auth/ConsentPage"));
 const PricingPage = React.lazy(() => import("@/pages/PricingPage"));
 const QrCodePage = React.lazy(() => import("@/pages/QrCodePage"));
+const ThemePreviewPage = React.lazy(() => import("@/pages/ThemePreviewPage"));
 const PromptPage = React.lazy(() => import("@/pages/auth/PromptPage"));
 const TelegramLogin = React.lazy(() => import("@/pages/auth/TelegramLogin"));
 const CasLogout = React.lazy(() => import("@/pages/auth/CasLogout"));
 const CaptchaPage = React.lazy(() => import("@/pages/auth/CaptchaPage"));
 const MagicLinkCallback = React.lazy(() => import("@/pages/auth/MagicLinkCallback"));
+const PushConfirmPage = React.lazy(() => import("@/pages/auth/PushConfirmPage"));
 const OidcDiscoveryPage = React.lazy(() => import("@/pages/auth/OidcDiscoveryPage"));
 
 Setting.initServerUrl();
@@ -215,6 +225,8 @@ function RequireConsoleAccess({children}: {children: React.ReactNode}) {
 }
 
 export default function App() {
+  const {account} = useAccount();
+  useAccountHelmet(account);
   useRequiredMfaRedirect();
 
   return (
@@ -243,6 +255,7 @@ export default function App() {
         <Route path="/telegram-login" element={<TelegramLogin />} />
         <Route path="/captcha" element={<CaptchaPage />} />
         <Route path="/magic-link/callback" element={<MagicLinkCallback />} />
+        <Route path="/mfa/push-confirm/:id" element={<PushConfirmPage />} />
         <Route path="/.well-known/openid-configuration" element={<OidcDiscoveryPage />} />
         <Route path="/consent/:applicationName" element={<ConsentPage />} />
         <Route path="/prompt" element={<PromptPage />} />
@@ -255,6 +268,7 @@ export default function App() {
         <Route path="/buy-plan/:owner/:pricingName" element={<ProductBuyPage />} />
         <Route path="/buy-plan/:owner/:pricingName/result" element={<PaymentResultPage />} />
         <Route path="/qrcode/:owner/:paymentName" element={<QrCodePage />} />
+        <Route path="/marketplace/theme-preview" element={<ThemePreviewPage />} />
 
         {/* Console */}
         <Route
@@ -272,6 +286,7 @@ export default function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/mfa/setup" element={<MfaSetupPage />} />
           <Route path="/sysinfo" element={<SystemInfoPage />} />
+          <Route path="/settings" element={<SettingEditPage />} />
 
           <Route path="/organizations" element={<OrganizationListPage />} />
           <Route path="/organizations/:organizationName" element={<OrganizationEditPage />} />
@@ -290,6 +305,9 @@ export default function App() {
           <Route path="/magic-links" element={<MagicLinkListPage />} />
           <Route path="/providers" element={<ProviderListPage />} />
           <Route path="/providers/:organizationName/:providerName" element={<ProviderEditPage />} />
+          <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/integrations" element={<IntegrationListPage />} />
+          <Route path="/integrations/:organizationName/:integrationName" element={<IntegrationEditPage />} />
           <Route path="/resources" element={<ResourceListPage />} />
           <Route path="/certs" element={<CertListPage />} />
           <Route path="/certs/:organizationName/:certName" element={<CertEditPage />} />
@@ -322,6 +340,7 @@ export default function App() {
 
           <Route path="/sessions" element={<SessionListPage />} />
           <Route path="/records" element={<RecordListPage />} />
+          <Route path="/compliance" element={<CompliancePage />} />
           <Route path="/tokens" element={<TokenListPage />} />
           <Route path="/tokens/:tokenName" element={<TokenEditPage />} />
           <Route path="/verifications" element={<VerificationListPage />} />
@@ -357,6 +376,8 @@ export default function App() {
           <Route path="/webhook-events" element={<WebhookEventListPage />} />
           <Route path="/tickets" element={<TicketListPage />} />
           <Route path="/tickets/:organizationName/:ticketName" element={<TicketEditPage />} />
+          <Route path="/radius-clients" element={<RadiusClientListPage />} />
+          <Route path="/radius-clients/:organizationName/:radiusClientName" element={<RadiusClientEditPage />} />
           <Route path="/ldap/:organizationName/:ldapId" element={<LdapEditPage />} />
           <Route path="/ldap/sync/:organizationName/:ldapId" element={<LdapSyncPage />} />
 

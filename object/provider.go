@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/beego/beego/v2/server/web/context"
+	"github.com/casdoor/casdoor/action"
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/idp"
 	"github.com/casdoor/casdoor/idv"
@@ -68,6 +69,7 @@ type Provider struct {
 	RegionId     string `xorm:"varchar(100)" json:"regionId"`
 	SignName     string `xorm:"varchar(100)" json:"signName"`
 	TemplateCode string `xorm:"varchar(100)" json:"templateCode"`
+	BodyTemplate string `xorm:"mediumtext" json:"bodyTemplate"` // If provider type is Custom HTTP SMS, BodyTemplate is the request body with {phoneNumber}, {code} and {content} placeholders
 	AppId        string `xorm:"varchar(100)" json:"appId"`
 
 	Endpoint         string `xorm:"varchar(1000)" json:"endpoint"`
@@ -315,6 +317,9 @@ func UpdateProvider(id string, provider *Provider) (bool, error) {
 	if err := validateAuditProvider(provider); err != nil {
 		return false, err
 	}
+	if err := CheckProviderEdition(provider); err != nil {
+		return false, err
+	}
 
 	if name != provider.Name {
 		err := providerChangeTrigger(owner, name, provider.Name)
@@ -383,6 +388,9 @@ func AddProvider(provider *Provider) (bool, error) {
 	if err := validateAuditProvider(provider); err != nil {
 		return false, err
 	}
+	if err := CheckProviderEdition(provider); err != nil {
+		return false, err
+	}
 
 	affected, err := ormer.Engine.Insert(provider)
 	if err != nil {
@@ -410,11 +418,27 @@ func DeleteProvider(provider *Provider) (bool, error) {
 	return affected != 0, nil
 }
 
+// ProviderTypePlugin is a provider whose code is an action installed from the Marketplace, named by SubType
+const ProviderTypePlugin = "Plugin"
+
+func (p *Provider) getActionConfig() *action.Config {
+	return &action.Config{
+		ClientId:      p.ClientId,
+		ClientSecret:  p.ClientSecret,
+		ClientId2:     p.ClientId2,
+		ClientSecret2: p.ClientSecret2,
+		Host:          p.Host,
+		Metadata:      p.Metadata,
+		SignName:      p.SignName,
+		TemplateCode:  p.TemplateCode,
+	}
+}
+
 func GetPaymentProvider(p *Provider) (pp.PaymentProvider, error) {
 	cert := &Cert{}
 	if p.Cert != "" {
 		var err error
-		cert, err = GetCert(util.GetId(p.Owner, p.Cert))
+		cert, err = GetCertEx(util.GetId(p.Owner, p.Cert))
 		if err != nil {
 			return nil, err
 		}
@@ -433,7 +457,7 @@ func GetPaymentProvider(p *Provider) (pp.PaymentProvider, error) {
 	} else if typ == "Alipay" {
 		if p.Metadata != "" {
 			// alipay provider store rootCert's name in metadata
-			rootCert, err := GetCert(util.GetId(p.Owner, p.Metadata))
+			rootCert, err := GetCertEx(util.GetId(p.Owner, p.Metadata))
 			if err != nil {
 				return nil, err
 			}
@@ -451,7 +475,7 @@ func GetPaymentProvider(p *Provider) (pp.PaymentProvider, error) {
 	} else if typ == "GC" {
 		return pp.NewGcPaymentProvider(p.ClientId, p.ClientSecret, p.Host), nil
 	} else if typ == "WeChat Pay" {
-		pp, err := pp.NewWechatPaymentProvider(p.ClientId, p.ClientSecret, p.ClientId2, cert.Certificate, cert.PrivateKey)
+		pp, err := pp.NewWechatPaymentProvider(p.ClientId, p.ClientSecret, p.ClientId2, cert.Certificate, cert.PrivateKey, p.ClientSecret2, p.Content)
 		if err != nil {
 			return nil, err
 		}
@@ -481,7 +505,7 @@ func GetPaymentProvider(p *Provider) (pp.PaymentProvider, error) {
 		}
 		return pp, nil
 	} else if typ == "Polar" {
-		pp, err := pp.NewPolarPaymentProvider(p.ClientSecret)
+		pp, err := pp.NewPolarPaymentProvider(p.ClientSecret, p.Host)
 		if err != nil {
 			return nil, err
 		}
@@ -510,6 +534,12 @@ func GetPaymentProvider(p *Provider) (pp.PaymentProvider, error) {
 			return nil, err
 		}
 		return pp, nil
+	} else if typ == ProviderTypePlugin {
+		module, hosts, err := getActionModule(p.Owner, p.SubType)
+		if err != nil {
+			return nil, err
+		}
+		return action.NewPaymentProvider(p.SubType, module, hosts, p.getActionConfig()), nil
 	} else {
 		return nil, fmt.Errorf("the payment provider type: %s is not supported", p.Type)
 	}
@@ -719,7 +749,7 @@ func FromProviderToIdpInfo(ctx *context.Context, provider *Provider) (*idp.Provi
 	} else if provider.Type == "ADFS" || provider.Type == "AzureAD" || provider.Type == "AzureADB2C" || provider.Type == "Casdoor" || provider.Type == "Okta" || provider.Type == "OIDC" {
 		providerInfo.HostUrl = provider.Domain
 	} else if provider.Type == "Alipay" && provider.Cert != "" {
-		cert, err := GetCert(util.GetId(provider.Owner, provider.Cert))
+		cert, err := GetCertEx(util.GetId(provider.Owner, provider.Cert))
 		if err != nil {
 			return nil, fmt.Errorf("failed to load certificate for Alipay provider %s: %w", provider.Name, err)
 		}
@@ -729,7 +759,7 @@ func FromProviderToIdpInfo(ctx *context.Context, provider *Provider) (*idp.Provi
 		providerInfo.ClientSecret = cert.PrivateKey
 		providerInfo.AppCertificate = cert.Certificate
 		if provider.Metadata != "" {
-			rootCert, err := GetCert(util.GetId(provider.Owner, provider.Metadata))
+			rootCert, err := GetCertEx(util.GetId(provider.Owner, provider.Metadata))
 			if err != nil {
 				return nil, fmt.Errorf("failed to load root certificate for Alipay provider %s: %w", provider.Name, err)
 			}

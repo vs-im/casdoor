@@ -3,6 +3,7 @@ import i18next from "i18next";
 import {useLocation, useNavigate} from "react-router-dom";
 import * as Conf from "@/Conf";
 import {Alert, AlertDescription} from "@/components/ui/alert";
+import {Button} from "@/components/ui/button";
 import {Loading} from "@/components/common/Loading";
 import {AuthLayout} from "@/components/auth/AuthLayout";
 import {MfaVerify, NextMfa} from "@/components/auth/MfaVerify";
@@ -11,6 +12,7 @@ import * as Provider from "@/auth/Provider";
 import * as Util from "@/auth/Util";
 import * as ApplicationBackend from "@/backend/ApplicationBackend";
 import * as AuthBackend from "@/backend/AuthBackend";
+import * as UserBackend from "@/backend/UserBackend";
 import * as Setting from "@/lib/setting";
 
 /**
@@ -91,6 +93,9 @@ export default function AuthCallback() {
   // login and leave them unable to finish.
   const [mfa, setMfa] = React.useState<PendingMfa | null>(null);
   const [application, setApplication] = React.useState<any>(null);
+  // the third-party account being linked already belongs to another account, which can be merged into this one
+  const [merge, setMerge] = React.useState<{name: string; displayName: string; from: string} | null>(null);
+  const [merging, setMerging] = React.useState(false);
   const startedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -98,6 +103,13 @@ export default function AuthCallback() {
       return;
     }
     startedRef.current = true;
+
+    // the WeChat QR code on the sign-in page comes back here inside its frame: finish in the page itself
+    // (the frame's own name does not survive WeChat's page, its element's does; a cross-origin parent hides it)
+    if (window.frameElement?.getAttribute("name") === Provider.WECHAT_QR_FRAME_NAME) {
+      window.parent.location.replace(window.location.href);
+      return;
+    }
 
     const params = new URLSearchParams(location.search);
     const state = params.get("state") ?? "";
@@ -134,8 +146,9 @@ export default function AuthCallback() {
     };
 
     // Providers disagree on the parameter name for the authorization code.
+    // Yunzhijia sends a "ticket", which its plugin exchanges like a code
     let code =
-      params.get("code") ?? params.get("auth_code") ?? params.get("authCode") ?? null;
+      params.get("code") ?? params.get("auth_code") ?? params.get("authCode") ?? params.get("ticket") ?? null;
     const isSteam = params.get("openid.mode");
     if (isSteam !== null && code === null) {
       code = location.search;
@@ -166,8 +179,9 @@ export default function AuthCallback() {
       code,
       samlRequest: Util.getParameterIgnoreCase(innerParams, "SAMLRequest"),
       state: applicationName,
+      callbackState: state,
       invitationCode: innerParams.get("invitationCode") || "",
-      redirectUri: `${window.location.origin}/callback`,
+      redirectUri: `${Setting.getOriginUrl()}/callback`,
       method: innerParams.get("method"),
       userCode: innerParams.get("userCode") || "",
       codeVerifier,
@@ -182,8 +196,6 @@ export default function AuthCallback() {
     // closures over the ones this page decoded
     const handleOAuth = (res: any, params: URLSearchParams = innerParams, type: string = responseType) => {
       const oAuthParams = Util.getOAuthGetParameters(params);
-      const concatChar = oAuthParams?.redirectUri?.includes("?") ? "&" : "?";
-      const responseMode = oAuthParams?.responseMode || "query";
       const responseTypes = type.split(" ");
 
       // The backend answers with `data: {required: true}` instead of an authorization
@@ -199,36 +211,38 @@ export default function AuthCallback() {
         Setting.showMessage("success", i18next.t("application:Logged in successfully"));
         navigate(Setting.getFromLink());
       } else if (type === "code") {
-        if (responseMode === "form_post") {
-          Setting.createFormAndSubmit(oAuthParams?.redirectUri, {code: res.data, state: oAuthParams?.state, iss: Setting.getOAuthIssuer()});
-        } else {
-          Setting.goToLink(
-            `${oAuthParams.redirectUri}${concatChar}code=${encodeURIComponent(res.data)}&state=${encodeURIComponent(
-              oAuthParams.state,
-            )}${Setting.getOAuthIssuerParam()}`,
-          );
+        const goToRedirectUrl = () => Util.sendOAuthResponse(oAuthParams, {code: res.data});
+
+        // The backend sets data3 when the application has a prompt page: an account a
+        // provider just created may still miss what the application wants filled in.
+        const promptApplication = params.get("application") ?? applicationName;
+        if (res.data3 !== true || !promptApplication) {
+          goToRedirectUrl();
+          return;
         }
+        Promise.all([ApplicationBackend.getApplication("admin", promptApplication), AuthBackend.getAccount()])
+          .then(([appRes, accountRes]: any[]) => {
+            if (
+              appRes.status === "ok" && accountRes.status === "ok" &&
+              Setting.hasPromptPage(appRes.data) && !Setting.isPromptAnswered(accountRes.data, appRes.data)
+            ) {
+              Setting.goToLink(Util.getPromptLink(promptApplication, oAuthParams, res.data));
+            } else {
+              goToRedirectUrl();
+            }
+          })
+          .catch(goToRedirectUrl);
       } else if (responseTypes.includes("token") || responseTypes.includes("id_token")) {
-        if (responseMode === "form_post") {
-          Setting.createFormAndSubmit(oAuthParams?.redirectUri, {
-            token: responseTypes.includes("token") ? res.data : null,
-            id_token: responseTypes.includes("id_token") ? res.data3 : null,
-            token_type: "bearer",
-            state: oAuthParams?.state,
-            iss: Setting.getOAuthIssuer(),
-          });
-        } else {
-          Setting.goToLink(
-            `${oAuthParams.redirectUri}${concatChar}${type}=${encodeURIComponent(
-              type === "id_token" ? res.data3 : res.data,
-            )}&state=${encodeURIComponent(oAuthParams.state)}&token_type=bearer${Setting.getOAuthIssuerParam()}`,
-          );
-        }
+        Util.sendOAuthResponse(oAuthParams, Util.getTokenResponsePayload(type, res));
       } else if (type === "link") {
         let from = params.get("from") ?? "/";
         const oauth = params.get("oauth");
         if (oauth) {
           from += `?oauth=${oauth}`;
+        }
+        if (res.data?.merge === true) {
+          setMerge({name: res.data.name, displayName: res.data.displayName, from});
+          return;
         }
         navigate(from);
       } else if (type === "saml") {
@@ -250,8 +264,8 @@ export default function AuthCallback() {
         Setting.goToUpdatePassword(applicationName ?? undefined);
       } else if (res.data === "RequiredMfa") {
         // the account reload in the console then bounces to /mfa/setup
-        localStorage.setItem("mfaRedirectUrl", window.location.origin);
-        Setting.goToLink(window.location.origin);
+        localStorage.setItem("mfaRedirectUrl", Setting.getOriginUrl());
+        Setting.goToLink(Setting.getOriginUrl());
       } else if (res.data === NextMfa) {
         // the panel needs the application for its branding and the captcha rule
         // behind "Get Code"
@@ -352,6 +366,43 @@ export default function AuthCallback() {
           application={application}
           onSuccess={(res) => mfa.onSuccess(res)}
         />
+      </AuthLayout>
+    );
+  }
+
+  if (merge !== null) {
+    const confirmMerge = () => {
+      setMerging(true);
+      UserBackend.mergeUser({type: "provider"})
+        .then((res: any) => {
+          if (res.status === "ok") {
+            Setting.showMessage("success", i18next.t("user:Accounts merged successfully"));
+            navigate(merge.from);
+          } else {
+            setMerge(null);
+            setMsg(res.msg);
+          }
+        })
+        .finally(() => setMerging(false));
+    };
+    const otherAccount = merge.displayName ? `${merge.displayName} (${merge.name})` : merge.name;
+
+    return (
+      <AuthLayout application={application}>
+        <div className="space-y-4">
+          <h1 className="text-center text-lg font-semibold">{i18next.t("user:Merge accounts")}</h1>
+          <p className="text-sm text-muted-foreground">
+            {i18next.t("user:This third-party account is already linked to the account {account}. Merge it into the account you are signed in with? Its sign-in methods will move to your current account and it will be deleted.").replace("{account}", otherAccount)}
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" disabled={merging} onClick={() => navigate(merge.from)}>
+              {i18next.t("general:Cancel")}
+            </Button>
+            <Button className="flex-1" loading={merging} onClick={confirmMerge}>
+              {i18next.t("user:Merge accounts")}
+            </Button>
+          </div>
+        </div>
       </AuthLayout>
     );
   }

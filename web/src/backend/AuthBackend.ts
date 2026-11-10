@@ -14,6 +14,7 @@
 
 import {authConfig} from "@/auth/Auth";
 import * as Setting from "@/lib/setting";
+import {getDeviceId} from "@/lib/device";
 
 export function getAccount(query: any = "") {
   return fetch(`${authConfig.serverUrl}/api/get-account${query}`, {
@@ -91,9 +92,13 @@ export function oAuthParamsToQuery(oAuthParams) {
   const maxAgeQuery = oAuthParams.maxAge
     ? `&max_age=${encodeURIComponent(oAuthParams.maxAge)}`
     : "";
+  // the organization a URL client_id (client ID metadata document) is added to
+  const organizationQuery = oAuthParams.organization
+    ? `&organization=${encodeURIComponent(oAuthParams.organization)}`
+    : "";
 
   // code
-  return `?clientId=${oAuthParams.clientId}&responseType=${oAuthParams.responseType}&redirectUri=${encodeURIComponent(oAuthParams.redirectUri)}&type=${oAuthParams.type}&scope=${oAuthParams.scope}&state=${oAuthParams.state}&nonce=${oAuthParams.nonce}&code_challenge_method=${oAuthParams.challengeMethod}&code_challenge=${oAuthParams.codeChallenge}${resourceQuery}${promptQuery}${maxAgeQuery}`;
+  return `?clientId=${encodeURIComponent(oAuthParams.clientId)}&responseType=${encodeURIComponent(oAuthParams.responseType)}&redirectUri=${encodeURIComponent(oAuthParams.redirectUri)}&type=${encodeURIComponent(oAuthParams.type)}&scope=${encodeURIComponent(oAuthParams.scope)}&state=${encodeURIComponent(oAuthParams.state)}&nonce=${encodeURIComponent(oAuthParams.nonce)}&code_challenge_method=${encodeURIComponent(oAuthParams.challengeMethod)}&code_challenge=${encodeURIComponent(oAuthParams.codeChallenge)}${resourceQuery}${promptQuery}${maxAgeQuery}${organizationQuery}`;
 }
 
 export function getApplicationLogin(params) {
@@ -162,6 +167,7 @@ export function login(values, oAuthParams) {
     headers: {
       "Content-Type": "application/json",
       "Accept-Language": Setting.getAcceptLanguage(),
+      "X-Casdoor-Device": getDeviceId(),
     },
   }).then(res => res.json());
 }
@@ -174,6 +180,7 @@ export function loginCas(values, params) {
     headers: {
       "Content-Type": "application/json",
       "Accept-Language": Setting.getAcceptLanguage(),
+      "X-Casdoor-Device": getDeviceId(),
     },
   }).then(res => res.json());
 }

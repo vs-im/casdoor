@@ -102,14 +102,14 @@ func (c *ApiController) GetApplication() {
 	}
 
 	if c.Ctx.Input.Query("withKey") != "" && application != nil && application.Cert != "" {
-		cert, err := object.GetCert(util.GetId(application.Owner, application.Cert))
+		cert, err := object.GetCertEx(util.GetId(application.Owner, application.Cert))
 		if err != nil {
 			c.ResponseError(err.Error())
 			return
 		}
 
 		if cert == nil {
-			cert, err = object.GetCert(util.GetId(application.Organization, application.Cert))
+			cert, err = object.GetCertEx(util.GetId(application.Organization, application.Cert))
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -249,6 +249,11 @@ func (c *ApiController) UpdateApplication() {
 		return
 	}
 
+	if err = object.CheckApplicationEdition(&application); err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
 	columns := []string{}
 	if columnsStr != "" {
 		for _, col := range strings.Split(columnsStr, ",") {
@@ -295,6 +300,11 @@ func (c *ApiController) AddApplication() {
 		return
 	}
 
+	if err = object.CheckApplicationEdition(&application); err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
 	if len(application.GrantTypes) == 0 {
 		application.GrantTypes = []string{"authorization_code"}
 	}
@@ -316,7 +326,11 @@ func (c *ApiController) AddApplication() {
 	}
 
 	if !c.IsGlobalAdmin() {
-		object.KeepApplicationCustomHtml(&application, nil)
+		err = object.CheckApplicationCustomHtml(&application, nil)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
 	}
 
 	c.Data["json"] = wrapActionResponse(object.AddApplication(&application, c.GetAcceptLanguage()))

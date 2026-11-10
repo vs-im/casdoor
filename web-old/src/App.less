@@ -39,6 +39,10 @@ img {
   min-height: 100vh;
 }
 
+.panel-logo {
+  margin-bottom: 30px;
+}
+
 .select-box {
   display: flex;
   align-items: center;
@@ -84,11 +88,6 @@ img {
   max-width: 360px;
 }
 
-.language-select-box {
-  cursor: pointer;
-  padding: 7px;
-}
-
 .rightDropDown {
   display: flex;
   align-items: center;
@@ -122,17 +121,13 @@ img {
 }
 
 .forget-content {
-  margin: 50px auto;
-  max-width: 400px;
-  background: transparent;
+  padding: 10px 100px 20px;
+  margin: 30px auto;
+  border: 2px solid #fff;
+  border-radius: 7px;
+  background-color: rgb(255 255 255);
+  box-shadow: 0 0 20px rgb(0 0 0 / 20%);
 }
-
-/* stylelint-disable selector-id-pattern */
-#SignupPage-renderForm .ant-form-item-required::before,
-#SignupPage-renderForm .ant-form-item-required::after {
-  display: none !important;
-}
-/* stylelint-enable selector-id-pattern */
 
 .forget-content-dark {
   padding: 10px 100px 20px;
@@ -146,62 +141,14 @@ img {
 .login-panel {
   margin-top: 50px;
   margin-bottom: 50px;
-  padding: 10px;
   display: flex;
   background-color: rgb(255 255 255);
   overflow: hidden;
-  border-radius: 12px;
-}
-
-.forget-content-inner {
-  position: relative;
-  background-color: rgb(255 255 255);
-  padding: 10px;
-  margin: 10px;
-  border-radius: 12px;
-}
-
-.forget-content .back-inner-button {
-  position: absolute;
-  cursor: pointer;
-  left: 10px;
-  top: 10px;
-  z-index: 3;
-}
-
-@media (prefers-color-scheme: dark) {
-  .login-panel {
-    background-color: rgb(245 245 245);
-  }
-
-  .forget-content-inner {
-    background-color: rgb(245 245 245);
-    box-shadow: 0 0 5px rgb(0 0 0 / 15%);
-  }
 }
 
 .login-form {
   text-align: center;
-  padding: 20px;
-  width: calc(100vw - 40px);
-  max-width: 400px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-input.ant-input,
-input.ant-select-selection-search-input,
-span.ant-select-selection-item {
-  font-size: 16px !important;
-}
-
-.ant-form-large .ant-form-item .ant-form-item-label > label {
-  height: auto !important;
-}
-
-.ant-form-item-label {
-  padding: 0 !important;
+  padding: 30px;
 }
 
 .login-content {
@@ -230,12 +177,6 @@ span.ant-select-selection-item {
   background: #000 no-repeat;
   background-size: 100% 100%;
   background-attachment: fixed;
-}
-
-@media (prefers-color-scheme: dark) {
-  .loginBackground {
-    background: #767676 no-repeat;
-  }
 }
 
 .ant-menu-horizontal {

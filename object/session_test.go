@@ -161,7 +161,7 @@ func TestPasswordGrantCreatesSessionAndSidClaim(t *testing.T) {
 	}
 
 	// refresh: sid наследуется и в строке token, и в JWT
-	refreshed, err := RefreshToken(application, "refresh_token", token.RefreshToken, "", application.ClientId, application.ClientSecret, "", "localhost", "")
+	refreshed, err := RefreshToken(application, "refresh_token", token.RefreshToken, "", application.ClientId, application.ClientSecret, "", "localhost", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestPasswordGrantCreatesSessionAndSidClaim(t *testing.T) {
 		t.Fatalf("session rows after delete = %d, want 0", len(sessions))
 	}
 
-	refreshed, err = RefreshToken(application, "refresh_token", wrapper.RefreshToken, "", application.ClientId, application.ClientSecret, "", "localhost", "")
+	refreshed, err = RefreshToken(application, "refresh_token", wrapper.RefreshToken, "", application.ClientId, application.ClientSecret, "", "localhost", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestPasswordGrantWithoutSessionKeepsOldBehaviour(t *testing.T) {
 func TestGetClaimsCustomSid(t *testing.T) {
 	user := &User{Owner: "clients", Name: "alice", Properties: map[string]string{}}
 	sid := getSessionIdClaim("beego-sid-1")
-	claims := Claims{User: user, TokenType: "access-token", Sid: sid}
+	claims := Claims{User: user, TokenType: "access-token", OidcIdTokenClaims: OidcIdTokenClaims{Sid: sid}}
 	res := getClaimsCustom(claims, []string{"Name"}, nil)
 	if res["sid"] != sid {
 		t.Fatalf("sid claim = %v, want %s", res["sid"], sid)

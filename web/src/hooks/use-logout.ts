@@ -19,7 +19,7 @@ export function useLogout() {
         if (redirectUri !== null && redirectUri !== undefined && redirectUri !== "") {
           Setting.goToLink(redirectUri);
         } else if (owner && owner !== "built-in") {
-          Setting.goToLink(`${window.location.origin}${Setting.getOrganizationLoginPath(owner)}`);
+          Setting.goToLink(`${Setting.getOriginUrl()}${Setting.getOrganizationLoginPath(owner)}`);
         } else {
           // built-in signs in on the bare /login, which RequireAuth sends the visitor to
           navigate("/");

@@ -15,7 +15,7 @@
 import * as Setting from "@/lib/setting";
 
 export function getSubscriptions(owner, page: any = "", pageSize: any = "", field: any = "", value: any = "", sortField: any = "", sortOrder: any = "") {
-  return fetch(`${Setting.ServerUrl}/api/get-subscriptions?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${value}&sortField=${sortField}&sortOrder=${sortOrder}`, {
+  return fetch(`${Setting.ServerUrl}/api/get-subscriptions?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${encodeURIComponent(value)}&sortField=${sortField}&sortOrder=${sortOrder}`, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -42,6 +42,16 @@ export function updateSubscription(owner, name, subscription) {
     body: JSON.stringify(newSubscription),
     headers: {
       "Content-Type": "application/json",
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
+  }).then(res => res.json());
+}
+
+export function setSubscriptionAutoRenew(owner, name, autoRenew: boolean) {
+  return fetch(`${Setting.ServerUrl}/api/set-subscription-auto-renew?id=${owner}/${encodeURIComponent(name)}&autoRenew=${autoRenew}`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
       "Accept-Language": Setting.getAcceptLanguage(),
     },
   }).then(res => res.json());

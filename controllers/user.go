@@ -50,6 +50,7 @@ func (c *ApiController) GetGlobalUsers() {
 			return
 		}
 
+		c.maskPersonalInfo(users...)
 		c.ResponseOk(users)
 	} else {
 		limit := util.ParseInt(limit)
@@ -72,6 +73,7 @@ func (c *ApiController) GetGlobalUsers() {
 			return
 		}
 
+		c.maskPersonalInfo(users...)
 		c.ResponseOk(users, paginator.Nums())
 	}
 }
@@ -100,6 +102,7 @@ func (c *ApiController) GetUsers() {
 				c.ResponseError(err.Error())
 				return
 			}
+			c.maskPersonalInfo(users...)
 			c.ResponseOk(users)
 			return
 		}
@@ -110,6 +113,7 @@ func (c *ApiController) GetUsers() {
 			return
 		}
 
+		c.maskPersonalInfo(users...)
 		c.ResponseOk(users)
 	} else {
 		limit := util.ParseInt(limit)
@@ -132,6 +136,7 @@ func (c *ApiController) GetUsers() {
 			return
 		}
 
+		c.maskPersonalInfo(users...)
 		c.ResponseOk(users, paginator.Nums())
 	}
 }
@@ -250,6 +255,7 @@ func (c *ApiController) GetUser() {
 		}
 	}
 
+	c.maskPersonalInfo(user)
 	c.ResponseOk(user)
 }
 
@@ -329,6 +335,9 @@ func (c *ApiController) UpdateUser() {
 		user = mergedUser
 	}
 
+	// a console form showing the masked phone, email and ID card sends them back unchanged
+	object.RestoreMaskedPersonalInfo(&user, oldUser)
+
 	if oldUser.Owner == "built-in" && oldUser.Name == "admin" && (user.Owner != "built-in" || user.Name != "admin") {
 		c.ResponseError(c.T("auth:Unauthorized operation"))
 		return
@@ -346,6 +355,11 @@ func (c *ApiController) UpdateUser() {
 
 	if user.MfaPhoneEnabled && user.Phone == "" {
 		c.ResponseError(c.T("user:MFA phone is enabled but phone number is empty"))
+		return
+	}
+
+	if err = object.CheckUserSod(oldUser, &user, c.GetAcceptLanguage()); err != nil {
+		c.ResponseError(err.Error())
 		return
 	}
 
@@ -380,6 +394,7 @@ func (c *ApiController) UpdateUser() {
 		}
 	}
 
+	isPasswordChanged := false
 	// a password_type column means the caller writes an already hashed password as it is
 	if user.Password != "" && user.Password != "***" && user.Password != oldUser.Password && !util.InSlice(columns, "password_type") {
 		if (!isAdmin && oldUser.Tag != "guest-user") || oldUser.Ldap != "" {
@@ -402,7 +417,7 @@ func (c *ApiController) UpdateUser() {
 			return
 		}
 
-		if msg := object.CheckPasswordComplexityByOrg(organization, user.Password, c.GetAcceptLanguage()); msg != "" {
+		if msg := object.CheckPasswordComplexityByOrg(organization, user.Password, c.GetAcceptLanguage(), user.Name); msg != "" {
 			c.ResponseError(msg)
 			return
 		}
@@ -425,16 +440,26 @@ func (c *ApiController) UpdateUser() {
 
 		user.UpdateUserPassword(organization)
 		user.LastChangePasswordTime = util.GetCurrentTime()
+		user.NeedUpdatePassword = isAdmin && user.NeedUpdatePassword && (util.InSlice(columns, "need_update_password") || !oldUser.NeedUpdatePassword)
 		if len(columns) == 0 {
 			columns = object.GetDefaultUserUpdateColumns(isAdmin)
 		}
-		columns = append(columns, "password", "password_salt", "password_type", "last_change_password_time")
+		columns = append(columns, "password", "password_salt", "password_type", "last_change_password_time", "need_update_password")
+		isPasswordChanged = true
 	}
 
 	affected, err := object.UpdateUser(id, &user, columns, isAdmin)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
+	}
+
+	if affected && isPasswordChanged && oldUser.Tag != "guest-user" {
+		_, err = object.ExpireTokenByUser(oldUser.Owner, oldUser.Name)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
 	}
 
 	if affected {
@@ -773,6 +798,12 @@ func (c *ApiController) SetPassword() {
 		return
 	}
 
+	_, err = object.ExpireTokenByUser(targetUser.Owner, targetUser.Name)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
 	c.ResponseOk()
 }
 
@@ -874,6 +905,7 @@ func (c *ApiController) GetSortedUsers() {
 		return
 	}
 
+	c.maskPersonalInfo(users...)
 	c.ResponseOk(users)
 }
 
@@ -1109,16 +1141,34 @@ func (c *ApiController) VerifyIdentification() {
 		}
 	}
 
-	idvProvider := object.GetIdvProviderFromProvider(provider)
-	if idvProvider == nil {
-		c.ResponseError(c.T("provider:Failed to initialize ID Verification provider"))
-		return
-	}
+	var verified bool
+	if provider.Type == object.ProviderTypePlugin {
+		pluginProvider, err := object.GetPluginIdvProvider(provider, user.Phone)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		verified, err = pluginProvider.VerifyIdentity(user.IdCardType, user.IdCard, user.RealName)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		if !verified && pluginProvider.GetReason() != "" {
+			c.ResponseError(c.T("user:Identity verification failed") + ": " + pluginProvider.GetReason())
+			return
+		}
+	} else {
+		idvProvider := object.GetIdvProviderFromProvider(provider)
+		if idvProvider == nil {
+			c.ResponseError(c.T("provider:Failed to initialize ID Verification provider"))
+			return
+		}
 
-	verified, err := idvProvider.VerifyIdentity(user.IdCardType, user.IdCard, user.RealName)
-	if err != nil {
-		c.ResponseError(err.Error())
-		return
+		verified, err = idvProvider.VerifyIdentity(user.IdCardType, user.IdCard, user.RealName)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
 	}
 
 	if !verified {

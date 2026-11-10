@@ -50,6 +50,7 @@ type ProviderInfo struct {
 	RedirectUrl   string
 	DisableSsl    bool
 	CodeVerifier  string
+	State         string
 
 	TokenURL    string
 	AuthURL     string
@@ -116,10 +117,8 @@ func GetIdProvider(idpInfo *ProviderInfo, redirectUrl string) (IdProvider, error
 	case "OIDC":
 		return NewOidcIdProvider(idpInfo, redirectUrl), nil
 	case "Infoflow":
-		if idpInfo.SubType == "Internal" {
+		if idpInfo.SubType == "" || idpInfo.SubType == "Internal" {
 			return NewInfoflowInternalIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, idpInfo.AppId, redirectUrl), nil
-		} else if idpInfo.SubType == "Third-party" {
-			return NewInfoflowIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, idpInfo.AppId, redirectUrl), nil
 		} else {
 			return nil, fmt.Errorf("Infoflow provider subType: %s is not supported", idpInfo.SubType)
 		}
@@ -141,7 +140,7 @@ func GetIdProvider(idpInfo *ProviderInfo, redirectUrl string) (IdProvider, error
 		return NewTelegramIdProvider(idpInfo.ClientId, idpInfo.ClientSecret, redirectUrl), nil
 	default:
 		if isGothSupport(idpInfo.Type) {
-			return NewGothIdProvider(idpInfo.Type, idpInfo.ClientId, idpInfo.ClientSecret, idpInfo.ClientId2, idpInfo.ClientSecret2, redirectUrl, idpInfo.HostUrl)
+			return NewGothIdProvider(idpInfo.Type, idpInfo.SubType, idpInfo.ClientId, idpInfo.ClientSecret, idpInfo.ClientId2, idpInfo.ClientSecret2, redirectUrl, idpInfo.HostUrl)
 		}
 		if strings.HasPrefix(idpInfo.Type, "Custom") {
 			return NewCustomIdProvider(idpInfo, redirectUrl), nil

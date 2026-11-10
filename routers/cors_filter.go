@@ -40,7 +40,7 @@ func setCorsHeadersWithCredentials(ctx *context.Context, origin string, allowCre
 	if origin != "" {
 		ctx.Output.Header(headerAllowOrigin, origin)
 		ctx.Output.Header(headerAllowMethods, "POST, GET, OPTIONS, DELETE")
-		ctx.Output.Header(headerAllowHeaders, "Content-Type, Authorization")
+		ctx.Output.Header(headerAllowHeaders, "Content-Type, Authorization, X-Requested-With, X-Casdoor-Device")
 		if allowCredentials {
 			ctx.Output.Header(headerAllowCredentials, "true")
 		}
@@ -115,7 +115,7 @@ func isOriginAllowedWithoutCredentials(ctx *context.Context, origin string, isVa
 		return true, nil
 	}
 
-	if ctx.Request.Method == "POST" && (ctx.Request.RequestURI == "/api/login/oauth/access_token" || ctx.Request.RequestURI == "/api/acs") {
+	if ctx.Request.Method == "POST" && (ctx.Request.RequestURI == "/api/login/oauth/access_token" || ctx.Request.RequestURI == "/api/login/oauth/revoke" || ctx.Request.RequestURI == "/api/acs") {
 		return true, nil
 	}
 

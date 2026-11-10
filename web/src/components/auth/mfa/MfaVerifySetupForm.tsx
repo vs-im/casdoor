@@ -7,6 +7,7 @@ import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {CountryCodeSelect} from "@/components/common/CountryCodeSelect";
 import {SendCodeInput} from "@/components/auth/SendCodeInput";
+import {CodeInput} from "@/components/auth/CodeInput";
 import {CasdoorAuthenticatorLink} from "@/components/user/CasdoorAppConnector";
 import {
   EmailMfaType,
@@ -17,6 +18,8 @@ import {
   mfaSetup,
 } from "@/components/auth/mfa/constants";
 import * as MfaBackend from "@/backend/MfaBackend";
+import {PushWait} from "@/components/auth/mfa/PushWait";
+import {SelectField} from "@/components/common/SelectField";
 import * as Setting from "@/lib/setting";
 
 interface Props {
@@ -42,6 +45,20 @@ export function MfaVerifySetupForm({mfaProps, application, user, onSuccess, onFa
   );
   const [submitting, setSubmitting] = React.useState(false);
 
+  // push confirmations go through a notification provider, such as a push plugin for WeCom, DingTalk or Lark
+  const pushProviders = React.useMemo(
+    () => (application?.providers ?? [])
+      .map((item: any) => item.provider)
+      .filter((provider: any) => provider && provider.category === "Notification"),
+    [application],
+  );
+  const [pushProvider, setPushProvider] = React.useState("");
+  React.useEffect(() => {
+    if (!pushProvider && pushProviders.length > 0) {
+      setPushProvider(`${pushProviders[0].owner}/${pushProviders[0].name}`);
+    }
+  }, [pushProvider, pushProviders]);
+
   React.useEffect(() => {
     if (isSms) {
       setDest(user?.phone ?? "");
@@ -65,27 +82,27 @@ export function MfaVerifySetupForm({mfaProps, application, user, onSuccess, onFa
       return provider ? `${provider.owner}/${provider.name}` : mfaProps.secret;
     }
     if (mfaProps.mfaType === PushMfaType) {
-      const provider = application.providers?.find((el: any) => el.provider?.category === "Notification")?.provider;
-      return provider ? `${provider.owner}/${provider.name}` : mfaProps.secret;
+      return pushProvider || mfaProps.secret;
     }
     return mfaProps.secret;
   };
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = (e?: React.FormEvent, override?: {passcode: string; dest: string}) => {
+    e?.preventDefault();
     setSubmitting(true);
     const secret = resolveSecret();
+    const verifyDest = override?.dest || dest;
     MfaBackend.MfaSetupVerify({
-      passcode,
+      passcode: override?.passcode ?? passcode,
       mfaType: mfaProps.mfaType,
       secret,
-      dest,
+      dest: verifyDest,
       countryCode,
       ...user,
     })
       .then((res: any) => {
         if (res.status === "ok") {
-          onSuccess({...res, dest, countryCode, secret});
+          onSuccess({...res, dest: verifyDest, countryCode, secret});
         } else {
           onFail(res);
         }
@@ -97,6 +114,12 @@ export function MfaVerifySetupForm({mfaProps, application, user, onSuccess, onFa
         setPasscode("");
         setSubmitting(false);
       });
+  };
+
+  const verifyComplete = () => {
+    if (!submitting) {
+      submit();
+    }
   };
 
   const renderBody = () => {
@@ -147,6 +170,7 @@ export function MfaVerifySetupForm({mfaProps, application, user, onSuccess, onFa
             application={application}
             applicationId={Setting.getApplicationName(application)}
             checkUser={user?.name}
+            onComplete={verifyComplete}
           />
         </>
       );
@@ -183,14 +207,7 @@ export function MfaVerifySetupForm({mfaProps, application, user, onSuccess, onFa
           ) : null}
           <div className="space-y-2">
             <Label htmlFor="passcode">{i18next.t("mfa:Verify Code")}</Label>
-            <Input
-              id="passcode"
-              autoFocus
-              inputMode="numeric"
-              value={passcode}
-              placeholder={i18next.t("code:Enter your code")}
-              onChange={(e) => setPasscode(e.target.value)}
-            />
+            <CodeInput id="passcode" autoFocus value={passcode} onChange={setPasscode} onComplete={verifyComplete} />
           </div>
         </>
       );
@@ -213,15 +230,23 @@ export function MfaVerifySetupForm({mfaProps, application, user, onSuccess, onFa
     if (mfaProps.mfaType === PushMfaType) {
       return (
         <>
-          <Input
-            value={dest}
-            placeholder={i18next.t("mfa:Push notification receiver")}
-            onChange={(e) => setDest(e.target.value)}
+          <SelectField
+            value={pushProvider}
+            onChange={(value) => setPushProvider(value)}
+            options={pushProviders.map((item: any) => ({id: `${item.owner}/${item.name}`, name: item.displayName || item.name}))}
           />
           <Input
-            value={passcode}
-            placeholder={i18next.t("login:Verification code")}
-            onChange={(e) => setPasscode(e.target.value)}
+            value={dest}
+            placeholder={i18next.t("mfa:Push notification receiver, empty for the linked account")}
+            onChange={(e) => setDest(e.target.value)}
+          />
+          <PushWait
+            key={`${pushProvider}-${dest}`}
+            autoSend={false}
+            provider={pushProvider}
+            receiver={dest}
+            application={Setting.getApplicationName(application)}
+            onApproved={(challengeId, receiver) => submit(undefined, {passcode: challengeId, dest: receiver})}
           />
         </>
       );
@@ -233,9 +258,11 @@ export function MfaVerifySetupForm({mfaProps, application, user, onSuccess, onFa
   return (
     <form className="mx-auto w-full max-w-[320px] space-y-4" onSubmit={submit}>
       {renderBody()}
-      <Button type="submit" className="w-full" loading={submitting}>
-        {i18next.t("forget:Next Step")}
-      </Button>
+      {mfaProps.mfaType !== PushMfaType ? (
+        <Button type="submit" className="w-full" loading={submitting}>
+          {i18next.t("forget:Next Step")}
+        </Button>
+      ) : null}
     </form>
   );
 }

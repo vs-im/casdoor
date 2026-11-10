@@ -86,7 +86,7 @@ func withRecover(handler ldap.HandlerFunc, newErrorResponse func() message.Proto
 }
 
 func getTLSconfig(ldapsCertId string) (*tls.Config, error) {
-	rawCert, err := object.GetCert(ldapsCertId)
+	rawCert, err := object.GetCertEx(ldapsCertId)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func buildUserSearchEntry(user *object.User, baseDN string, attrs []string, org 
 		if added[strings.ToLower(attr)] || !IsLdapAttrAllowed(org, attr) {
 			continue
 		}
-		if _, ok := ldapAttributesMapping[attr]; !ok {
+		if _, ok := getLdapAttributeRelation(attr); !ok {
 			continue
 		}
 		e.AddAttribute(message.AttributeDescription(attr), getAttribute(attr, user))

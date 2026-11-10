@@ -34,7 +34,6 @@ type ClaimsStandard struct {
 	Address             *OIDCAddress `json:"address,omitempty"`
 	Azp                 string       `json:"azp,omitempty"`
 	Provider            string       `json:"provider,omitempty"`
-	Sid                 string       `json:"sid,omitempty"`
 
 	OidcIdTokenClaims
 	jwt.RegisteredClaims
@@ -70,7 +69,6 @@ func getStandardClaims(claims Claims) ClaimsStandard {
 		Azp:               claims.Azp,
 		Provider:          claims.Provider,
 		OidcIdTokenClaims: claims.OidcIdTokenClaims,
-		Sid:               claims.Sid,
 	}
 
 	res.Phone = ""
@@ -113,16 +111,9 @@ func ParseStandardJwtToken(token string, cert *Cert) (*ClaimsStandard, error) {
 			return nil, fmt.Errorf("the certificate field should not be empty for the cert: %v", cert)
 		}
 
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); ok {
-			// RSA certificate
-			certificate, err = jwt.ParseRSAPublicKeyFromPEM([]byte(cert.Certificate))
-		} else if _, ok := token.Method.(*jwt.SigningMethodECDSA); ok {
-			// ES certificate
-			certificate, err = jwt.ParseECPublicKeyFromPEM([]byte(cert.Certificate))
-		} else {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-
+		kid, _ := token.Header["kid"].(string)
+		publicKey := cert.getCertificateByKeyId(kid)
+		certificate, err = getJwtVerifyKey(token, publicKey)
 		if err != nil {
 			return nil, err
 		}

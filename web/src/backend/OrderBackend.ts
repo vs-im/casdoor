@@ -15,7 +15,7 @@
 import * as Setting from "@/lib/setting";
 
 export function getOrders(owner, page: any = "", pageSize: any = "", field: any = "", value: any = "", sortField: any = "", sortOrder: any = "") {
-  return fetch(`${Setting.ServerUrl}/api/get-orders?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${value}&sortField=${sortField}&sortOrder=${sortOrder}`, {
+  return fetch(`${Setting.ServerUrl}/api/get-orders?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${encodeURIComponent(value)}&sortField=${sortField}&sortOrder=${sortOrder}`, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -24,8 +24,9 @@ export function getOrders(owner, page: any = "", pageSize: any = "", field: any 
   }).then(res => res.json());
 }
 
-export function payOrder(owner, name, providerName, paymentEnv: any = "") {
-  return fetch(`${Setting.ServerUrl}/api/pay-order?id=${owner}/${encodeURIComponent(name)}&providerName=${encodeURIComponent(providerName)}&paymentEnv=${paymentEnv}`, {
+export function payOrder(owner, name, providerName, paymentEnv: any = "", autoRenew: boolean | null = null) {
+  const autoRenewParam = autoRenew === null ? "" : `&autoRenew=${autoRenew}`;
+  return fetch(`${Setting.ServerUrl}/api/pay-order?id=${owner}/${encodeURIComponent(name)}&providerName=${encodeURIComponent(providerName)}&paymentEnv=${paymentEnv}${autoRenewParam}`, {
     method: "POST",
     credentials: "include",
     headers: {

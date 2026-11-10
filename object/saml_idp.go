@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/beevik/etree"
 	"github.com/casdoor/casdoor/util"
@@ -150,10 +151,31 @@ func NewSamlResponse(application *Application, user *User, host string, certific
 }
 
 func getSamlNameId(application *Application, user *User) (string, string) {
+	nameIdFormat := "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified"
 	if application.UseEmailAsSamlNameId {
-		return user.Email, "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
+		nameIdFormat = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
 	}
-	return user.Name, "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified"
+
+	if application.SamlNameIdTemplate != "" {
+		return replaceSamlNameIdTemplate(user, application.SamlNameIdTemplate), nameIdFormat
+	}
+	if application.UseEmailAsSamlNameId {
+		return user.Email, nameIdFormat
+	}
+	return user.Name, nameIdFormat
+}
+
+func replaceSamlNameIdTemplate(user *User, template string) string {
+	emailLocalPart, emailDomain, _ := strings.Cut(user.Email, "@")
+	return strings.NewReplacer(
+		"$user.emailLocalPart", emailLocalPart,
+		"$user.emailDomain", emailDomain,
+		"$user.owner", user.Owner,
+		"$user.name", user.Name,
+		"$user.email", user.Email,
+		"$user.id", user.Id,
+		"$user.phone", user.Phone,
+	).Replace(template)
 }
 
 type X509Key struct {
@@ -313,28 +335,19 @@ func GetSamlMeta(application *Application, host string, enablePostBinding bool) 
 // decodeSamlMessage decodes a base64 SAML message, which is also deflated when it comes over the HTTP-Redirect binding
 func decodeSamlMessage(message string) ([]byte, error) {
 	message = strings.ReplaceAll(message, " ", "+")
-	defated, err := base64.StdEncoding.DecodeString(message)
+	data, err := base64.StdEncoding.DecodeString(message)
 	if err != nil {
 		return nil, fmt.Errorf("err: Failed to decode SAML request, %s", err.Error())
 	}
 
-	if strings.Contains(string(defated), "xmlns:") {
-		return defated, nil
+	// The HTTP-POST binding sends plain XML. Deflated data can also start with '<' (a non-final
+	// dynamic Huffman block), but it is practically never valid UTF-8
+	plainXml := bytes.TrimSpace(bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")))
+	if bytes.HasPrefix(plainXml, []byte("<")) && utf8.Valid(plainXml) {
+		return plainXml, nil
 	}
 
-	var buffer bytes.Buffer
-	rdr := flate.NewReader(bytes.NewReader(defated))
-	for {
-		_, err = io.CopyN(&buffer, rdr, 1024)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-	}
-
-	return buffer.Bytes(), nil
+	return io.ReadAll(flate.NewReader(bytes.NewReader(data)))
 }
 
 // getAuthnRequest parses the AuthnRequest sent by the SP, parameter samlRequest is the SAML request in base64 format
@@ -472,7 +485,7 @@ func GetSamlResponse(application *Application, user *User, samlRequest string, h
 	if application.EnableSamlAssertionSignature {
 		assertion := samlResponse.FindElement("./Assertion")
 		if assertion != nil {
-			assertionSig, err := ctx.ConstructSignature(assertion, true)
+			assertionSig, err := constructSamlSignature(ctx, assertion)
 			if err != nil {
 				return "", "", "", fmt.Errorf("err: Failed to sign SAML assertion, %s", err.Error())
 			}
@@ -482,7 +495,7 @@ func GetSamlResponse(application *Application, user *User, samlRequest string, h
 	}
 
 	// Sign the response
-	sig, err := ctx.ConstructSignature(samlResponse, true)
+	sig, err := constructSamlSignature(ctx, samlResponse)
 	if err != nil {
 		return "", "", "", fmt.Errorf("err: Failed to serializes the SAML request into bytes, %s", err.Error())
 	}
@@ -528,6 +541,7 @@ func GetSamlResponse(application *Application, user *User, samlRequest string, h
 		NameId:       nameIdValue,
 		NameIdFormat: nameIdFormat,
 		SpEntityId:   authnRequest.Issuer,
+		IdpEntityId:  originBackend,
 	})
 	if err != nil {
 		return "", "", "", err
@@ -552,9 +566,55 @@ func newSamlSigningContext(application *Application, privateKey string, certific
 	}
 
 	if application.EnableSamlC14n10 {
-		ctx.Canonicalizer = dsig.MakeC14N10ExclusiveCanonicalizerWithPrefixList(application.SamlC14nPrefix)
+		ctx.Canonicalizer = &samlC14n10Canonicalizer{prefixList: application.SamlC14nPrefix}
 	}
 	return ctx
+}
+
+// samlC14n10Canonicalizer canonicalizes a copy, as goxmldsig strips namespace declarations from the signed XML itself, and applies the prefix list to the reference only
+type samlC14n10Canonicalizer struct {
+	prefixList string
+}
+
+func (c *samlC14n10Canonicalizer) Canonicalize(el *etree.Element) ([]byte, error) {
+	el = el.Copy()
+	prefixList := c.prefixList
+	if el.Tag == dsig.SignedInfoTag {
+		addSamlInclusiveNamespaces(el, c.prefixList)
+		prefixList = ""
+	}
+	return dsig.MakeC14N10ExclusiveCanonicalizerWithPrefixList(prefixList).Canonicalize(el)
+}
+
+func (c *samlC14n10Canonicalizer) Algorithm() dsig.AlgorithmID {
+	return dsig.CanonicalXML10ExclusiveAlgorithmId
+}
+
+// addSamlInclusiveNamespaces writes the prefix list into the exclusive C14N transform, where the SP reads it from
+func addSamlInclusiveNamespaces(signedInfo *etree.Element, prefixList string) {
+	if signedInfo == nil || strings.TrimSpace(prefixList) == "" {
+		return
+	}
+
+	for _, transform := range signedInfo.FindElements("./Reference/Transforms/Transform") {
+		if transform.SelectAttrValue(dsig.AlgorithmAttr, "") == string(dsig.CanonicalXML10ExclusiveAlgorithmId) {
+			inclusiveNamespaces := transform.CreateElement("ec:InclusiveNamespaces")
+			inclusiveNamespaces.CreateAttr("xmlns:ec", string(dsig.CanonicalXML10ExclusiveAlgorithmId))
+			inclusiveNamespaces.CreateAttr("PrefixList", prefixList)
+		}
+	}
+}
+
+func constructSamlSignature(ctx *dsig.SigningContext, el *etree.Element) (*etree.Element, error) {
+	sig, err := ctx.ConstructSignature(el, true)
+	if err != nil {
+		return nil, err
+	}
+
+	if c, ok := ctx.Canonicalizer.(*samlC14n10Canonicalizer); ok {
+		addSamlInclusiveNamespaces(sig.SelectElement(dsig.SignedInfoTag), c.prefixList)
+	}
+	return sig, nil
 }
 
 // NewSamlResponse11 return a saml1.1 response(not 2.0)
@@ -602,11 +662,8 @@ func NewSamlResponse11(application *Application, user *User, requestID string, h
 	// nameIdentifier inside subject
 	nameIdentifier := subject.CreateElement("saml:NameIdentifier")
 	// nameIdentifier.CreateAttr("Format", "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
-	if application.UseEmailAsSamlNameId {
-		nameIdentifier.SetText(user.Email)
-	} else {
-		nameIdentifier.SetText(user.Name)
-	}
+	nameIdValue, _ := getSamlNameId(application, user)
+	nameIdentifier.SetText(nameIdValue)
 
 	// subjectConfirmation inside subject
 	subjectConfirmation := subject.CreateElement("saml:SubjectConfirmation")
@@ -615,11 +672,7 @@ func NewSamlResponse11(application *Application, user *User, requestID string, h
 	attributeStatement := assertion.CreateElement("saml:AttributeStatement")
 	subjectInAttribute := attributeStatement.CreateElement("saml:Subject")
 	nameIdentifierInAttribute := subjectInAttribute.CreateElement("saml:NameIdentifier")
-	if application.UseEmailAsSamlNameId {
-		nameIdentifierInAttribute.SetText(user.Email)
-	} else {
-		nameIdentifierInAttribute.SetText(user.Name)
-	}
+	nameIdentifierInAttribute.SetText(nameIdValue)
 
 	subjectConfirmationInAttribute := subjectInAttribute.CreateElement("saml:SubjectConfirmation")
 	subjectConfirmationInAttribute.CreateElement("saml:ConfirmationMethod").SetText("urn:oasis:names:tc:SAML:1.0:cm:artifact")

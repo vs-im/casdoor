@@ -37,9 +37,8 @@ class RegionSelect extends React.Component {
         size={this.props.size}
         showSearch
         optionFilterProp="label"
-        style={{width: "100%", fontSize: 16}}
+        style={{width: "100%"}}
         value={value}
-        defaultValue={this.props.defaultValue || undefined}
         placeholder="Please select country/region"
         onChange={(val) => {this.onChange(val);}}
         filterOption={(input, option) => (option?.label ?? "").toLowerCase().includes(input.toLowerCase())}

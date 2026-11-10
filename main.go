@@ -20,8 +20,6 @@ import (
 
 	"github.com/beego/beego/v2/core/logs"
 	"github.com/beego/beego/v2/server/web"
-	_ "github.com/beego/beego/v2/server/web/session/redis"
-	_ "github.com/beego/beego/v2/server/web/session/redis_cluster"
 	"github.com/casdoor/casdoor/authz"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/ldap"
@@ -30,17 +28,28 @@ import (
 	"github.com/casdoor/casdoor/radius"
 	"github.com/casdoor/casdoor/routers"
 	"github.com/casdoor/casdoor/service"
+	"github.com/casdoor/casdoor/tracing"
 	"github.com/casdoor/casdoor/util"
 )
 
 func main() {
+	if util.RunAsService(runServer) {
+		return
+	}
+
+	runServer()
+}
+
+func runServer() {
 	web.BConfig.WebConfig.Session.SessionOn = true
 	web.BConfig.WebConfig.Session.SessionName = "casdoor_session_id"
 	if redisConfig := conf.GetRedisConfig(); redisConfig == nil {
-		web.BConfig.WebConfig.Session.SessionProvider = routers.FileSessionProvider
+		web.BConfig.WebConfig.Session.SessionProvider = routers.GetLazySessionProvider("file")
 		web.BConfig.WebConfig.Session.SessionProviderConfig = "./tmp"
 	} else {
-		web.BConfig.WebConfig.Session.SessionProvider, web.BConfig.WebConfig.Session.SessionProviderConfig = redisConfig.GetSessionProvider()
+		provider, providerConfig := redisConfig.GetSessionProvider()
+		web.BConfig.WebConfig.Session.SessionProvider = routers.GetLazySessionProvider(provider)
+		web.BConfig.WebConfig.Session.SessionProviderConfig = providerConfig
 	}
 	sessionCookieLifeTime := 3600 * 24 * 30
 	if val, err := conf.GetConfigInt64("sessionCookieLifeTime"); err == nil && val > 0 {
@@ -56,6 +65,7 @@ func main() {
 	object.CreateTables()
 
 	object.InitDb()
+	object.InitSetting()
 
 	// Handle export command
 	if object.ShouldExportData() {
@@ -81,6 +91,9 @@ func main() {
 	object.InitCleanupCasTickets()
 	object.InitSamlAssertionStore()
 	object.InitExpirePermissions()
+	object.InitUpdateSubscriptionStates()
+	object.InitSecurityPolicyJobs()
+	tracing.Init()
 
 	object.InitSiteMap()
 	if len(object.SiteMap) != 0 {
@@ -99,6 +112,8 @@ func main() {
 	}
 	web.SetStaticPath("/files", "files")
 	// https://studygolang.com/articles/2303
+	web.InsertFilter("*", web.BeforeStatic, routers.TracingFilter)
+	web.InsertFilter("/api/forward-auth", web.BeforeStatic, routers.ForwardAuthFilter)
 	web.InsertFilter("*", web.BeforeStatic, routers.RequestBodyFilter)
 	web.InsertFilter("*", web.BeforeStatic, routers.ContentTypeFilter)
 	web.InsertFilter("*", web.BeforeStatic, routers.UploadedFileFilter)
@@ -111,6 +126,7 @@ func main() {
 	web.InsertFilter("*", web.BeforeRouter, routers.RecordMessage)
 	web.InsertFilter("*", web.BeforeRouter, routers.FieldValidationFilter)
 	web.InsertFilter("*", web.AfterExec, routers.AfterRecordMessage, web.WithReturnOnOutput(false))
+	web.InsertFilter("*", web.FinishRouter, routers.TracingEndFilter, web.WithReturnOnOutput(false))
 
 	var logAdapter string
 	logConfigMap := make(map[string]interface{})
@@ -152,5 +168,5 @@ func main() {
 		service.Start()
 	}
 
-	web.Run(fmt.Sprintf(":%v", port))
+	web.RunWithMiddleWares(fmt.Sprintf(":%v", port), routers.BasePathMiddleware)
 }

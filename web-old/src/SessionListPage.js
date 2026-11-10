@@ -36,32 +36,19 @@ class SessionListPage extends BaseListPage {
     SessionBackend.deleteSession(this.state.data[i], sessionId)
       .then((res) => {
         if (res.status === "ok") {
-          Setting.showMessage(
-            "success",
-            i18next.t("general:Successfully deleted")
-          );
+          Setting.showMessage("success", i18next.t("general:Successfully deleted"));
           this.fetch({
             pagination: {
               ...this.state.pagination,
-              current:
-                this.state.pagination.current > 1 &&
-                this.state.data.length === 1
-                  ? this.state.pagination.current - 1
-                  : this.state.pagination.current,
+              current: this.state.pagination.current > 1 && this.state.data.length === 1 ? this.state.pagination.current - 1 : this.state.pagination.current,
             },
           });
         } else {
-          Setting.showMessage(
-            "error",
-            `${i18next.t("general:Failed to delete")}: ${res.msg}`
-          );
+          Setting.showMessage("error", `${i18next.t("general:Failed to delete")}: ${res.msg}`);
         }
       })
-      .catch((error) => {
-        Setting.showMessage(
-          "error",
-          `${i18next.t("general:Failed to connect to server")}: ${error}`
-        );
+      .catch(error => {
+        Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
       });
   }
 
@@ -84,7 +71,11 @@ class SessionListPage extends BaseListPage {
         sorter: true,
         ...this.getColumnSearchProps("owner"),
         render: (text, record, index) => {
-          return <Link to={`/organizations/${text}`}>{text}</Link>;
+          return (
+            <Link to={`/organizations/${text}`}>
+              {text}
+            </Link>
+          );
         },
       },
       {
@@ -115,25 +106,13 @@ class SessionListPage extends BaseListPage {
                 title={confirmTitle}
                 description={confirmContent}
                 open={isActive}
-                onConfirm={() => {
-                  this.deleteSession(index, item);
-                  this.setState({confirmTagKey: null});
-                }}
+                onConfirm={() => {this.deleteSession(index, item); this.setState({confirmTagKey: null});}}
                 onCancel={() => this.setState({confirmTagKey: null})}
-                onOpenChange={(visible) => {
-                  if (!visible && isActive) {
-                    this.setState({confirmTagKey: null});
-                  }
-                }}
+                onOpenChange={(visible) => {if (!visible && isActive) {this.setState({confirmTagKey: null});}}}
                 okText={i18next.t("general:OK")}
                 cancelText={i18next.t("general:Cancel")}
               >
-                <Tag
-                  closable
-                  onClose={(e) => this.handleTagClose(index, item, e)}
-                >
-                  {item}
-                </Tag>
+                <Tag closable onClose={(e) => this.handleTagClose(index, item, e)}>{item}</Tag>
               </Popconfirm>
             );
           });
@@ -144,16 +123,15 @@ class SessionListPage extends BaseListPage {
         dataIndex: "",
         key: "op",
         width: "70px",
-        fixed: Setting.isMobile() ? "false" : "right",
+        fixed: (Setting.isMobile()) ? "false" : "right",
         render: (text, record, index) => {
           return (
             <div>
               <PopconfirmModal
-                title={
-                  i18next.t("general:Sure to delete") + `: ${record.name} ?`
-                }
+                title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
                 onConfirm={() => this.deleteSession(index)}
-              ></PopconfirmModal>
+              >
+              </PopconfirmModal>
             </div>
           );
         },
@@ -163,27 +141,18 @@ class SessionListPage extends BaseListPage {
     const paginationProps = {
       total: this.state.pagination.total,
       pageSize: this.state.pagination.pageSize,
-      current: this.state.pagination.current,
       showQuickJumper: true,
       showSizeChanger: true,
-      showTotal: () =>
-        i18next
-          .t("general:{total} in total")
-          .replace("{total}", this.state.pagination.total),
+      showTotal: () => i18next.t("general:{total} in total").replace("{total}", this.state.pagination.total),
     };
 
     return (
       <div>
-        <Table
-          scroll={{x: "max-content"}}
-          columns={columns}
-          dataSource={sessions}
-          rowKey={(record) => `${record.owner}/${record.name}`}
-          size="middle"
-          bordered
-          pagination={paginationProps}
+        <Table scroll={{x: true}} columns={columns} dataSource={sessions} rowKey={(record) => `${record.owner}/${record.name}`} size="middle" bordered pagination={paginationProps}
           title={() => (
-            <div>{i18next.t("general:Sessions")}&nbsp;&nbsp;&nbsp;&nbsp;</div>
+            <div>
+              {i18next.t("general:Sessions")}&nbsp;&nbsp;&nbsp;&nbsp;
+            </div>
           )}
           loading={this.getTableLoading()}
           onChange={this.handleTableChange}
@@ -193,49 +162,38 @@ class SessionListPage extends BaseListPage {
   }
 
   fetch = (params = {}) => {
-    let field = params.searchedColumn,
-      value = params.searchText;
-    const sortField = params.sortField,
-      sortOrder = params.sortOrder;
+    let field = params.searchedColumn, value = params.searchText;
+    const sortField = params.sortField, sortOrder = params.sortOrder;
     if (params.contentType !== undefined && params.contentType !== null) {
       field = "contentType";
       value = params.contentType;
     }
     this.setState({loading: true});
-    SessionBackend.getSessions(
-      Setting.isDefaultOrganizationSelected(this.props.account)
-        ? ""
-        : Setting.getRequestOrganization(this.props.account),
-      params.pagination.current,
-      params.pagination.pageSize,
-      field,
-      value,
-      sortField,
-      sortOrder
-    ).then((res) => {
-      this.setState({
-        loading: false,
-      });
-      if (res.status === "ok") {
+    SessionBackend.getSessions(Setting.isDefaultOrganizationSelected(this.props.account) ? "" : Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
+      .then((res) => {
         this.setState({
-          data: res.data,
-          pagination: {
-            ...params.pagination,
-            total: res.data2,
-          },
-          searchText: params.searchText,
-          searchedColumn: params.searchedColumn,
+          loading: false,
         });
-      } else {
-        if (Setting.isResponseDenied(res)) {
+        if (res.status === "ok") {
           this.setState({
-            isAuthorized: false,
+            data: res.data,
+            pagination: {
+              ...params.pagination,
+              total: res.data2,
+            },
+            searchText: params.searchText,
+            searchedColumn: params.searchedColumn,
           });
         } else {
-          Setting.showMessage("error", res.msg);
+          if (Setting.isResponseDenied(res)) {
+            this.setState({
+              isAuthorized: false,
+            });
+          } else {
+            Setting.showMessage("error", res.msg);
+          }
         }
-      }
-    });
+      });
   };
 }
 

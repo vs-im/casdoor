@@ -29,6 +29,8 @@ import (
 
 const dpopMaxAgeSeconds = 300
 
+var DPoPSigningAlgs = []string{"RS256", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512"}
+
 // DPoPProofClaims represents the payload claims of a DPoP proof JWT (RFC 9449).
 type DPoPProofClaims struct {
 	Jti string `json:"jti"`
@@ -156,7 +158,7 @@ func GetDPoPHtu(host, path string) string {
 	return originBackend + path
 }
 
-func getRefreshDPoPJkt(token *Token, dpopProof string, host string) (string, *TokenError) {
+func getRefreshDPoPJkt(token *Token, dpopProof string, host string, path string) (string, *TokenError) {
 	if dpopProof == "" {
 		if token.DPoPJkt != "" {
 			return "", &TokenError{Error: "invalid_dpop_proof", ErrorDescription: "a DPoP proof is required to refresh a DPoP-bound token"}
@@ -164,7 +166,7 @@ func getRefreshDPoPJkt(token *Token, dpopProof string, host string) (string, *To
 		return "", nil
 	}
 
-	jkt, err := ValidateDPoPProof(dpopProof, "POST", GetDPoPHtu(host, "/api/login/oauth/access_token"), "")
+	jkt, err := ValidateDPoPProof(dpopProof, "POST", GetDPoPHtu(host, path), "")
 	if err != nil {
 		return "", &TokenError{Error: "invalid_dpop_proof", ErrorDescription: err.Error()}
 	}

@@ -56,6 +56,20 @@ Override any value from [values.yaml](https://github.com/casdoor/casdoor/blob/ma
 | `image.tag` | Image tag (defaults to chart appVersion) | `""` |
 | `config` | Casdoor `app.conf` content (Go template) | See values.yaml |
 | `configFromSecret` | Name of an existing Secret holding `app.conf` | `""` |
+| `initAdminPassword.value` | Password of `built-in/admin` for a new database; use `existingSecret` in production | `""` |
+| `initAdminPassword.existingSecret` | Name of an existing Secret that holds the initial password | `""` |
+| `initAdminPassword.existingSecretKey` | Key of the initial password in `existingSecret` | `initAdminPassword` |
+
+The initial admin password is used only when Casdoor creates the database, and only for `built-in/admin`. Read it from a Secret instead of putting it in the values file:
+
+```yaml
+initAdminPassword:
+  existingSecret: casdoor-admin
+```
+
+```bash
+kubectl create secret generic casdoor-admin --from-literal=initAdminPassword='<admin-password>'
+```
 
 ### Database
 
@@ -121,6 +135,7 @@ With `initData.merge: true` (the default), an object that already exists only ge
 |---|---|---|
 | `service.type` | Kubernetes service type | `ClusterIP` |
 | `service.port` | Service port | `8000` |
+| `service.annotations` | Annotations to add to the Service | `{}` |
 
 ### Ingress
 
@@ -283,5 +298,19 @@ gatewayApi:
 
 | Parameter | Description | Default |
 |---|---|---|
+| `probe.path` | HTTP path requested by all probes | `/api/health` |
+| `probe.startup.enabled` | Enable startup probe, which holds off the other probes until Casdoor has started | `true` |
+| `probe.startup.initialDelaySeconds` | Seconds before the first startup check | `0` |
+| `probe.startup.periodSeconds` | Seconds between startup checks | `10` |
+| `probe.startup.timeoutSeconds` | Seconds before a startup check times out | `5` |
+| `probe.startup.failureThreshold` | Failed startup checks before the container is restarted (`30` x `10s` allows 5 minutes to start) | `30` |
 | `probe.readiness.enabled` | Enable readiness probe | `true` |
+| `probe.readiness.initialDelaySeconds` | Seconds before the first readiness check | `0` |
+| `probe.readiness.periodSeconds` | Seconds between readiness checks | `10` |
+| `probe.readiness.timeoutSeconds` | Seconds before a readiness check times out | `5` |
+| `probe.readiness.failureThreshold` | Failed readiness checks before the pod is taken out of the Service | `3` |
 | `probe.liveness.enabled` | Enable liveness probe | `true` |
+| `probe.liveness.initialDelaySeconds` | Seconds before the first liveness check | `0` |
+| `probe.liveness.periodSeconds` | Seconds between liveness checks | `10` |
+| `probe.liveness.timeoutSeconds` | Seconds before a liveness check times out | `5` |
+| `probe.liveness.failureThreshold` | Failed liveness checks before the container is restarted | `3` |

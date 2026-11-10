@@ -149,7 +149,20 @@ func (p *DatabaseSyncerProvider) InitAdapter() error {
 		if p.Syncer.SslMode != "" {
 			sslMode = p.Syncer.SslMode
 		}
-		dataSourceName = fmt.Sprintf("user=%s password=%s host=%s port=%d sslmode=%s dbname=%s", p.Syncer.User, quotePostgresDataSourceValue(p.Syncer.Password), p.Syncer.Host, p.Syncer.Port, sslMode, p.Syncer.Database)
+		sslCerts := ""
+		if sslMode != "disable" && p.Syncer.hasPostgresCerts() {
+			host := p.Syncer.Host
+			if !isCloudIntranet {
+				host = strings.ReplaceAll(host, "dbi.", "db.")
+			}
+			sslMode, err = p.Syncer.registerPostgresTLSConfig(sslMode, host)
+			if err != nil {
+				return err
+			}
+			// keep the certificate files of the Casdoor process out of the syncer's connection
+			sslCerts = " sslrootcert='' sslcert='' sslkey=''"
+		}
+		dataSourceName = fmt.Sprintf("user=%s password=%s host=%s port=%d sslmode=%s dbname=%s%s", p.Syncer.User, quotePostgresDataSourceValue(p.Syncer.Password), p.Syncer.Host, p.Syncer.Port, sslMode, p.Syncer.Database, sslCerts)
 	} else {
 		dataSourceName = fmt.Sprintf("%s:%s@tcp(%s:%d)/", p.Syncer.User, p.Syncer.Password, p.Syncer.Host, p.Syncer.Port)
 	}
@@ -162,7 +175,11 @@ func (p *DatabaseSyncerProvider) InitAdapter() error {
 		if p.Syncer.SshType == "password" {
 			dial, sshHostKey, err = DialWithPassword(p.Syncer.SshUser, p.Syncer.SshPassword, p.Syncer.SshHost, p.Syncer.SshPort, p.Syncer.SshHostKey)
 		} else {
-			dial, sshHostKey, err = DialWithCert(p.Syncer.SshUser, p.Syncer.Owner+"/"+p.Syncer.Cert, p.Syncer.SshHost, p.Syncer.SshPort, p.Syncer.SshHostKey)
+			certOwner := p.Syncer.Organization
+			if certOwner == "" {
+				certOwner = p.Syncer.Owner
+			}
+			dial, sshHostKey, err = DialWithCert(p.Syncer.SshUser, util.GetId(certOwner, p.Syncer.Cert), p.Syncer.SshHost, p.Syncer.SshPort, p.Syncer.SshHostKey)
 		}
 		if err != nil {
 			return err

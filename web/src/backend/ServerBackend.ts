@@ -15,7 +15,7 @@
 import * as Setting from "@/lib/setting";
 
 export function getServers(owner, page: any = "", pageSize: any = "", field: any = "", value: any = "", sortField: any = "", sortOrder: any = "") {
-  return fetch(`${Setting.ServerUrl}/api/get-servers?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${value}&sortField=${sortField}&sortOrder=${sortOrder}`, {
+  return fetch(`${Setting.ServerUrl}/api/get-servers?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${encodeURIComponent(value)}&sortField=${sortField}&sortOrder=${sortOrder}`, {
     method: "GET",
     credentials: "include",
   }).then(res => res.json());
@@ -101,5 +101,15 @@ export function getMcpAccessToken(owner, applicationName) {
   return fetch(`${Setting.ServerUrl}/api/get-mcp-access-token?owner=${encodeURIComponent(owner)}&applicationName=${encodeURIComponent(applicationName)}`, {
     method: "GET",
     credentials: "include",
+  }).then(res => res.json());
+}
+
+export function getMcpRecords(owner: string, server: string, page = 1, pageSize = 50) {
+  return fetch(`${Setting.ServerUrl}/api/get-mcp-records?owner=${encodeURIComponent(owner)}&server=${encodeURIComponent(server)}&p=${page}&pageSize=${pageSize}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
   }).then(res => res.json());
 }

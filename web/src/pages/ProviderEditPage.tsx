@@ -5,6 +5,7 @@ import * as Conf from "@/Conf";
 import {UnauthorizedPage} from "@/components/common/UnauthorizedPage";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
+import {EditionNotice} from "@/components/common/EditionNotice";
 import {Switch} from "@/components/ui/switch";
 import {Textarea} from "@/components/ui/textarea";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
@@ -22,16 +23,18 @@ import {useAccount} from "@/hooks/use-account";
 import {useEditRecord} from "@/hooks/use-edit-record";
 import {useOrganizationOptions} from "@/hooks/use-options";
 import * as CertBackend from "@/backend/CertBackend";
+import * as IntegrationBackend from "@/backend/IntegrationBackend";
 import * as ProviderBackend from "@/backend/ProviderBackend";
 import * as ServerBackend from "@/backend/ServerBackend";
 import {submitEdit} from "@/lib/crud";
+import {getActionKind, parseBundle} from "@/lib/integration";
 import * as ProviderTest from "@/lib/provider-test";
 import * as Setting from "@/lib/setting";
 import {authConfig} from "@/auth/Auth";
 import copy from "copy-to-clipboard";
 
 const defaultUserMapping: Record<string, string> = {
-  id: "id",
+  id: "sub",
   username: "username",
   displayName: "displayName",
   email: "email",
@@ -67,15 +70,16 @@ const CATEGORIES = [
 const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE"];
 const CONTENT_TYPES = ["application/json", "application/x-www-form-urlencoded"];
 
-const SMS_PROVIDERS_WITHOUT_SIGN_NAME = ["Custom HTTP SMS", "Twilio SMS", "Amazon SNS", "Msg91 SMS", "Infobip SMS"];
-const SMS_PROVIDERS_WITHOUT_TEMPLATE_CODE = ["Infobip SMS"];
+const SMS_PROVIDERS_WITHOUT_SIGN_NAME = ["Custom HTTP SMS", "Twilio SMS", "Twilio Verify", "Amazon SNS", "Msg91 SMS", "Infobip SMS"];
+const SMS_PROVIDERS_WITHOUT_TEMPLATE_CODE = ["Infobip SMS", "Twilio Verify"];
 
 const SYSLOG_PROTOCOLS = ["UDP", "TCP", "TLS"];
 const SYSLOG_FACILITIES = [
   "auth", "authpriv", "user", "daemon", "security",
   "local0", "local1", "local2", "local3", "local4", "local5", "local6", "local7",
 ];
-const SYSLOG_FORMATS = ["RFC 5424", "RFC 3164"];
+// CEF and LEEF, which SIEM and situational awareness platforms read, need an enterprise edition license
+const SYSLOG_FORMATS = ["RFC 5424", "RFC 3164", "CEF", "LEEF"];
 
 const SCAN_HOST_OPTIONS = ["127.0.0.1/32", "10.0.0.0/24", "172.16.0.0/24", "192.168.1.0/24"];
 const SCAN_PORT_OPTIONS = ["80", "3000", "8080"];
@@ -119,8 +123,10 @@ function normalizeAndJoin(values: string[]) {
   return (values || []).map(item => `${item}`.trim()).filter(item => item !== "").join(",");
 }
 
-function getProviderSubTypeOptions(type: string) {
-  if (type === "Aliyun Captcha") {
+function getProviderSubTypeOptions(category: string, type: string) {
+  if (category === "OAuth" && type === "PayPal") {
+    return [{id: "Live", name: "Live"}, {id: "Sandbox", name: "Sandbox"}];
+  } else if (type === "Aliyun Captcha") {
     return [
       {id: "Embed", name: "Embed"},
       {id: "Popup", name: "Popup"},
@@ -131,10 +137,14 @@ function getProviderSubTypeOptions(type: string) {
     return [{id: "Site", name: "Site"}, {id: "Url", name: "Url"}];
   } else if (type === "MCP Scan") {
     return [{id: "Intranet Scan", name: "Intranet Scan"}];
-  } else if (type === "WeCom" || type === "Infoflow") {
+  } else if (type === "WeCom") {
     return [
       {id: "Internal", name: i18next.t("provider:Internal")},
       {id: "Third-party", name: i18next.t("provider:Third-party")},
+    ];
+  } else if (type === "Infoflow") {
+    return [
+      {id: "Internal", name: i18next.t("provider:Internal")},
     ];
   } else if (type === "WeChat") {
     return [
@@ -248,6 +258,8 @@ function getClientSecret2Label(provider: any): Label {
     return label(i18next.t("provider:From name"), i18next.t("provider:From name - Tooltip"));
   } else if (provider.type === "Aliyun Captcha") {
     return label(i18next.t("provider:App key"), i18next.t("provider:App key - Tooltip"));
+  } else if (provider.type === "WeChat Pay") {
+    return label(i18next.t("provider:Public key ID"), i18next.t("provider:Public key ID - Tooltip"));
   }
   return label(i18next.t("provider:Client secret 2"), i18next.t("provider:Client secret 2 - Tooltip"));
 }
@@ -260,9 +272,14 @@ function getAppIdLabel(provider: any): Label | null {
     } else if (provider.type === "AzureADB2C") {
       return label(i18next.t("provider:User flow"), i18next.t("provider:User flow - Tooltip"));
     }
+  } else if (provider.category === "Notification" && provider.type === "Plugin") {
+    // the agent ID of the WeCom or DingTalk app that sends the sign-in confirmations
+    return label(i18next.t("provider:Agent ID"), i18next.t("provider:Agent ID - Tooltip"));
   } else if (provider.category === "SMS") {
     if (provider.type === "Twilio SMS" || provider.type === "Azure ACS") {
       return label(i18next.t("provider:Sender number"), i18next.t("provider:Sender number - Tooltip"));
+    } else if (provider.type === "Twilio Verify") {
+      return label(i18next.t("provider:Service SID"), i18next.t("provider:Service SID - Tooltip"));
     } else if (provider.type === "Tencent Cloud SMS") {
       return label(i18next.t("provider:App ID"), i18next.t("provider:App ID - Tooltip"));
     } else if (provider.type === "Volc Engine SMS") {
@@ -383,6 +400,7 @@ export default function ProviderEditPage() {
   const organizations = useOrganizationOptions();
   const [providers, setProviders] = React.useState<any[]>([]);
   const [certs, setCerts] = React.useState<any[]>([]);
+  const [actions, setActions] = React.useState<any[]>([]);
   const [saving, setSaving] = React.useState(false);
 
   const [nameNotUserEdited, setNameNotUserEdited] = React.useState(false);
@@ -437,6 +455,18 @@ export default function ProviderEditPage() {
     getProviders(owner);
     getCerts(owner);
   }, [owner, getProviders, getCerts]);
+
+  const isPlugin = provider?.type === "Plugin";
+  React.useEffect(() => {
+    if (!isPlugin) {
+      return;
+    }
+    IntegrationBackend.getIntegrations(owner).then((res: any) => {
+      if (res.status === "ok") {
+        setActions((res.data ?? []).filter((integration: any) => integration.type === "action"));
+      }
+    });
+  }, [owner, isPlugin]);
 
   // the name/display name keep following category+type until the user types their own
   const initializedRef = React.useRef(false);
@@ -537,7 +567,7 @@ export default function ProviderEditPage() {
           navigate("/providers");
         } else {
           const next = `/providers/${provider.owner}/${provider.name}`;
-          if (next !== window.location.pathname) {
+          if (next !== Setting.getRoutePath()) {
             navigate(next, {replace: true});
           }
         }
@@ -671,7 +701,7 @@ export default function ProviderEditPage() {
   }
 
   const certOptions = certs.map((cert: any) => ({value: cert.name, label: cert.name}));
-  const subTypeOptions = getProviderSubTypeOptions(provider.type);
+  const subTypeOptions = getProviderSubTypeOptions(provider.category, provider.type);
 
   const onChangeCategory = (value: string) => {
     const patch: Record<string, any> = {category: value};
@@ -779,6 +809,8 @@ export default function ProviderEditPage() {
       }
     } else if (value === "Security Scan") {
       patch.subType = "Site";
+    } else if (value === "PayPal" && provider.category === "OAuth") {
+      patch.subType = "Live";
     } else if (value === "Aliyun Captcha") {
       // Popup stays opt-in: only Alibaba Cloud's traceless scenes require it
       patch.subType = "Embed";
@@ -868,8 +900,29 @@ export default function ProviderEditPage() {
     </React.Fragment>
   );
 
+  // an OAuth provider of type Plugin signs in through an installed action of kind "idp", its authorization URL is a
+  // template with {clientId}, {redirectUri}, {state} and {scope}
+  const renderOAuthPluginFields = () => (
+    <React.Fragment>
+      {renderActionRow()}
+      <FormRow labelKey="provider:Auth URL" tooltip={i18next.t("provider:Plugin auth URL - Tooltip")}>
+        <Input value={provider.customAuthUrl ?? ""} onChange={(e) => updateProviderField("customAuthUrl", e.target.value)} />
+      </FormRow>
+      <FormRow labelKey="provider:Scope">
+        <Input value={provider.scopes ?? ""} onChange={(e) => updateProviderField("scopes", e.target.value)} />
+      </FormRow>
+      <FormRow labelKey="general:Host">
+        <Input value={provider.host ?? ""} onChange={(e) => updateProviderField("host", e.target.value)} />
+      </FormRow>
+      <FormRow labelKey="system:License">
+        <EditionNotice edition="Enterprise" />
+      </FormRow>
+    </React.Fragment>
+  );
+
   const renderOAuthFields = () => (
     <React.Fragment>
+      {provider.type === "Plugin" ? renderOAuthPluginFields() : null}
       <FormRow labelKey="provider:Email regex">
         <Textarea rows={4} value={provider.emailRegex ?? ""} onChange={(e) => updateProviderField("emailRegex", e.target.value)} />
       </FormRow>
@@ -994,7 +1047,7 @@ export default function ProviderEditPage() {
           <Input value={provider.host ?? ""} onChange={(e) => updateProviderField("host", e.target.value)} />
         </FormRow>
       ) : null}
-      {!["Azure ACS", "SendGrid", "Resend"].includes(provider.type) ? (
+      {!["Azure ACS", "Custom HTTP Email", "SendGrid", "Resend"].includes(provider.type) ? (
         <React.Fragment>
           <FormRow label={i18next.t("general:Port")} tooltip={i18next.t("provider:Port - Tooltip")}>
             <Input type="number" value={provider.port ?? 0} onChange={(e) => updateProviderField("port", e.target.value)} />
@@ -1034,7 +1087,7 @@ export default function ProviderEditPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => updateProviderField("content", `You have requested a verification code at ${Conf.BrandName}. Here is your code: %s, please enter in 5 minutes. <reset-link>Or click %link to reset</reset-link>`)}
+              onClick={() => updateProviderField("content", `You have requested a verification code at ${Conf.BrandName}. Here is your code: %s, please enter in 10 minutes. <reset-link>Or click %link to reset</reset-link>`)}
             >
               {i18next.t("general:Reset to Default")} (Text)
             </Button>
@@ -1165,7 +1218,7 @@ export default function ProviderEditPage() {
             placeholder={i18next.t("user:Input your email")}
             onChange={(e) => updateProviderField("receiver", e.target.value)}
           />
-          {!["Azure ACS", "SendGrid", "Resend"].includes(provider.type) ? (
+          {!["Azure ACS", "Custom HTTP Email", "SendGrid", "Resend"].includes(provider.type) ? (
             <Button variant="outline" onClick={() => ProviderTest.connectSmtpServer(provider)}>
               {i18next.t("provider:Test SMTP Connection")}
             </Button>
@@ -1181,8 +1234,29 @@ export default function ProviderEditPage() {
     </React.Fragment>
   );
 
+  // the actions of the provider's kind installed from the Marketplace, for a provider of type Plugin
+  const renderActionRow = () => {
+    if (provider.type !== "Plugin") {
+      return null;
+    }
+    const kinds: Record<string, string> = {"SMS": "sms", "Notification": "push", "OAuth": "idp", "ID Verification": "idv"};
+    const kind = kinds[provider.category] ?? "payment";
+    return (
+      <FormRow label={i18next.t("general:Action")} tooltip={i18next.t("provider:Action - Tooltip")}>
+        <SelectField
+          value={provider.subType ?? ""}
+          onChange={(v) => updateProviderField("subType", v)}
+          options={actions
+            .filter((integration: any) => getActionKind(parseBundle(integration.bundle)) === kind)
+            .map((integration: any) => ({id: integration.name, name: `${integration.displayName} (${integration.name})`}))}
+        />
+      </FormRow>
+    );
+  };
+
   const renderSmsFields = () => (
     <React.Fragment>
+      {renderActionRow()}
       {!SMS_PROVIDERS_WITHOUT_SIGN_NAME.includes(provider.type) ? (
         <FormRow labelKey="provider:Sign Name">
           <Input value={provider.signName ?? ""} onChange={(e) => updateProviderField("signName", e.target.value)} />
@@ -1202,6 +1276,16 @@ export default function ProviderEditPage() {
           {provider.method !== "GET" ? (
             <FormRow labelKey="provider:HTTP body mapping" block>
               {renderSmsMappingInput()}
+            </FormRow>
+          ) : null}
+          {provider.method !== "GET" ? (
+            <FormRow labelKey="provider:HTTP body template" tooltip={i18next.t("provider:HTTP body template - Tooltip")} block>
+              <Textarea
+                rows={4}
+                value={provider.bodyTemplate ?? ""}
+                placeholder={"{\"to\": \"{phoneNumber}\", \"text\": \"{content}\", \"sender\": \"10004346\", \"templateId\": 5821}"}
+                onChange={(e) => updateProviderField("bodyTemplate", e.target.value)}
+              />
             </FormRow>
           ) : null}
           <FormRow labelKey="provider:Parameter">
@@ -1242,6 +1326,7 @@ export default function ProviderEditPage() {
     const receiverLabel = getReceiverLabel(provider);
     return (
       <React.Fragment>
+        {renderActionRow()}
         {provider.type === "CUCloud" ? (
           <FormRow labelKey="provider:Region ID">
             <Input value={provider.regionId ?? ""} onChange={(e) => updateProviderField("regionId", e.target.value)} />
@@ -1342,6 +1427,7 @@ export default function ProviderEditPage() {
           onChange={(v) => updateProviderField("templateCode", v)}
           options={SYSLOG_FORMATS.map((item) => ({id: item, name: item}))}
         />
+        {provider.templateCode === "CEF" || provider.templateCode === "LEEF" ? <EditionNotice edition="Enterprise" /> : null}
       </FormRow>
       <FormRow labelKey="general:State">
         <SelectField
@@ -1620,12 +1706,18 @@ export default function ProviderEditPage() {
           <SearchableSelect value={provider.cert ?? ""} onChange={(v) => updateProviderField("cert", v)} options={certOptions} />
         </FormRow>
       ) : null}
+      {provider.type === "WeChat Pay" ? (
+        <FormRow label={i18next.t("provider:Public key")} tooltip={i18next.t("provider:Public key ID - Tooltip")}>
+          <Textarea rows={4} value={provider.content ?? ""} onChange={(e) => updateProviderField("content", e.target.value)} />
+        </FormRow>
+      ) : null}
       {provider.type === "Alipay" ? (
         <FormRow labelKey="general:Root cert">
           <SearchableSelect value={provider.metadata ?? ""} onChange={(v) => updateProviderField("metadata", v)} options={certOptions} />
         </FormRow>
       ) : null}
-      {["GC", "FastSpring"].includes(provider.type) ? (
+      {renderActionRow()}
+      {["GC", "FastSpring", "Polar", "Plugin"].includes(provider.type) ? (
         <FormRow label={i18next.t("general:Host")} tooltip={i18next.t("provider:Host - Tooltip")}>
           <Input value={provider.host ?? ""} onChange={(e) => updateProviderField("host", e.target.value)} />
         </FormRow>
@@ -1825,7 +1917,7 @@ export default function ProviderEditPage() {
           <FormRow label={getClientId2Label(provider).label} tooltip={getClientId2Label(provider).tooltip}>
             <Input value={provider.clientId2 ?? ""} onChange={(e) => updateProviderField("clientId2", e.target.value)} />
           </FormRow>
-          {["WeChat Pay", "CUCloud"].includes(provider.type) || (provider.category === "Email" && provider.type === "Azure ACS") ? null : (
+          {provider.type === "CUCloud" || (provider.category === "Email" && provider.type === "Azure ACS") ? null : (
             <FormRow label={getClientSecret2Label(provider).label} tooltip={getClientSecret2Label(provider).tooltip}>
               {provider.category === "OAuth" && provider.type === "Apple" ? (
                 <Textarea rows={4} value={provider.clientSecret2 ?? ""} onChange={(e) => updateProviderField("clientSecret2", e.target.value)} />
@@ -1854,7 +1946,15 @@ export default function ProviderEditPage() {
       {provider.category === "Payment" ? renderPaymentFields() : null}
       {provider.category === "Storage" ? renderStorageFields() : null}
       {provider.category === "Face ID" ? renderEndpointOnlyField() : null}
-      {provider.category === "ID Verification" ? renderEndpointOnlyField() : null}
+      {provider.category === "ID Verification" && provider.type === "Plugin" ? (
+        <React.Fragment>
+          {renderActionRow()}
+          <FormRow labelKey="system:License">
+            <EditionNotice edition="Enterprise" />
+          </FormRow>
+        </React.Fragment>
+      ) : null}
+      {provider.category === "ID Verification" && provider.type !== "Plugin" ? renderEndpointOnlyField() : null}
 
       {provider.category !== "Log" && provider.category !== "Audit" ? (
         <FormRow block labelKey="provider:Provider URL">

@@ -30,12 +30,15 @@ import (
 	"time"
 
 	"github.com/casdoor/casdoor/conf"
+	"github.com/casdoor/casdoor/edition"
 	"github.com/casdoor/casdoor/form"
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/idp"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/proxy"
+	"github.com/casdoor/casdoor/tracing"
 	"github.com/casdoor/casdoor/util"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/oauth2"
 )
 
@@ -147,6 +150,9 @@ func (c *ApiController) getAuthTime() int64 {
 
 // HandleLoggedIn ...
 func (c *ApiController) HandleLoggedIn(application *object.Application, user *object.User, form *form.AuthForm) (resp *Response) {
+	_, span := c.traceStep("signin.issue", attribute.String("casdoor.application", application.Name), attribute.String("casdoor.user", user.GetId()))
+	defer span.End()
+
 	if !c.checkApplicationSignin(application, user) || !c.checkCredentialApplication(user, application, form) {
 		return
 	}
@@ -201,7 +207,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 
 	// Revoke the tokens of the displaced login before the response is built, otherwise the
 	// token that this login creates below would be revoked too
-	if application.EnableExclusiveSignin && application.MaxSessions <= 1 {
+	if application.EnableExclusiveSignin && application.MaxSessions <= 1 && edition.Has(edition.Commercial) {
 		_, err = object.ExpireTokenByUserAndApplication(user.Owner, user.Name, application.Name)
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
@@ -255,6 +261,10 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			}
 
 			resp = codeToResponseWithTokens(code, responseType)
+			if resp.Status == "ok" && resp.Data3 == nil && application.HasPromptPage() {
+				// makes the lightweight callback page hand over to the React one, which shows the prompt page
+				resp.Data3 = true
+			}
 		}
 	} else if isResponseType { // implicit flow
 		redirectUri := c.Ctx.Input.Query("redirectUri")
@@ -272,7 +282,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			if !valid {
 				resp = &Response{Status: "error", Msg: "error: invalid_scope", Data: ""}
 			} else {
-				token, err := object.GetTokenByUserWithAuth(application, user, expandedScope, nonce, c.Ctx.Input.CruSession.SessionID(context.Background()), c.Ctx.Request.Host, authTime, responseType.Token && responseType.IdToken)
+				token, err := object.GetTokenByUserWithAuth(application, user, expandedScope, nonce, c.Ctx.Input.CruSession.SessionID(context.Background()), c.Ctx.Request.Host, authTime, responseType.Token && responseType.IdToken, "")
 				if err != nil {
 					c.ResponseError(err.Error(), nil)
 					return
@@ -300,11 +310,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			return
 		}
 
-		expiresIn := authCacheCast.ExpiresIn
-		if expiresIn == 0 {
-			expiresIn = object.DeviceAuthExpiresIn
-		}
-		if authCacheCast.RequestAt.Add(time.Duration(expiresIn) * time.Second).Before(time.Now()) {
+		if authCacheCast.IsExpired() {
 			if authCacheCast.UserName != "" {
 				object.DeviceAuthMap.Delete(authCacheCast.UserName)
 			}
@@ -387,6 +393,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			c.ResponseError(err.Error(), nil)
 			return
 		}
+		object.CheckSigninRisk(user, clientIp, c.Ctx.Request.Header.Get("X-Casdoor-Device"), c.Ctx.Request.UserAgent())
 
 		if authTime != 0 {
 			c.SetSession("authTime", authTime)
@@ -416,7 +423,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			return
 		}
 
-		if application.EnableExclusiveSignin {
+		if application.EnableExclusiveSignin && edition.Has(edition.Commercial) {
 			err = object.EnforceApplicationSessionLimit(user, application.Name, sessionId, application.MaxSessions)
 			if err != nil {
 				c.ResponseError(err.Error(), nil)
@@ -434,7 +441,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 				return
 			}
 		}
-		if organization != nil && organization.EnableExclusiveSignin {
+		if organization != nil && organization.EnableExclusiveSignin && edition.Has(edition.Commercial) {
 			err = object.EnforceBrowserSessionLimit(user, sessionId, organization.MaxSessions, c.Ctx.Request.Host)
 			if err != nil {
 				c.ResponseError(err.Error(), nil)
@@ -455,6 +462,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 // @Param   redirectUri    query    string  true        "redirect uri"
 // @Param   scope    query    string  true        "scope"
 // @Param   state    query    string  true        "state"
+// @Param   organization    query    string  false        "The organization a client ID metadata document client is added to (defaults to built-in)"
 // @Success 200 {object} controllers.Response The Response object
 // @router /get-app-login [get]
 func (c *ApiController) GetApplicationLogin() {
@@ -467,12 +475,13 @@ func (c *ApiController) GetApplicationLogin() {
 	id := c.Ctx.Input.Query("id")
 	loginType := c.Ctx.Input.Query("type")
 	userCode := c.Ctx.Input.Query("userCode")
+	organization := c.Ctx.Input.Query("organization")
 
 	var application *object.Application
 	var msg string
 	var err error
 	if loginType == "code" {
-		msg, application, err = object.CheckOAuthLogin(clientId, responseType, redirectUri, scope, state, nonce, c.GetAcceptLanguage())
+		msg, application, err = object.CheckOAuthLogin(clientId, organization, responseType, redirectUri, scope, state, nonce, c.GetAcceptLanguage())
 		if err != nil {
 			c.ResponseError(err.Error())
 			return
@@ -529,6 +538,20 @@ func setHttpClient(idProvider idp.IdProvider, provider *object.Provider) {
 	} else {
 		idProvider.SetHttpClient(proxy.DefaultHttpClient)
 	}
+}
+
+// getSigninLookupUsername normalizes a phone number username to E.164 with the posted country code,
+// so that the lookup matches the number stored at signup and users from different countries
+// sharing the same local number are distinguished.
+func getSigninLookupUsername(username string, countryCode string) string {
+	if countryCode == "" || strings.Contains(username, "@") {
+		return username
+	}
+
+	if e164, ok := util.GetE164Number(username, countryCode); ok {
+		return e164
+	}
+	return username
 }
 
 func isTenantUrlProvider(provider *object.Provider) bool {
@@ -686,7 +709,7 @@ func isEmailBindable(user *object.User) bool {
 	return user.EmailVerified || user.RegisterType != "Application Signup"
 }
 
-func getUserByProvider(organization string, provider *object.Provider, providerId string) (*object.User, error) {
+func getUserByProvider(organization string, provider *object.Provider, providerId string, extra ...map[string]string) (*object.User, error) {
 	if object.IsFlexibleCustomProvider(provider.Type) {
 		return object.GetUserByThirdPartyLink(organization, provider.Name, providerId)
 	}
@@ -701,6 +724,10 @@ func getUserByProvider(organization string, provider *object.Provider, providerI
 
 	if provider.Type == "WeCom" && provider.SubType == "Internal" {
 		return object.GetUserByFieldIgnoreCase(organization, provider.Type, providerId)
+	}
+	// a member who signed in through another WeChat app of the same open platform account
+	if provider.Type == "WeChat" && len(extra) > 0 {
+		return object.GetUserByWechatUnionId(organization, extra[0]["wechat_unionid"])
 	}
 	return nil, nil
 }
@@ -755,6 +782,7 @@ func (c *ApiController) Login() {
 		c.ResponseError(err.Error())
 		return
 	}
+	defer c.recordLoginMetric(&authForm)
 
 	verificationType := ""
 
@@ -820,21 +848,12 @@ func (c *ApiController) Login() {
 				return
 			}
 
-			// If the username looks like a phone number and a countryCode is provided,
-			// normalise it to E.164 format before looking up the user so that users
-			// from different countries sharing the same local number are distinguished.
-			lookupUsername := authForm.Username
-			if !strings.Contains(authForm.Username, "@") && authForm.CountryCode != "" {
-				if e164, ok := util.GetE164Number(authForm.Username, authForm.CountryCode); ok {
-					lookupUsername = e164
-				}
-			}
-
+			lookupUsername := getSigninLookupUsername(authForm.Username, authForm.CountryCode)
 			if user, err = object.GetUserByFieldsForSharedApp(application, authForm.Organization, lookupUsername); err != nil {
 				c.ResponseError(err.Error(), nil)
 				return
 			} else if user == nil {
-				c.ResponseError(fmt.Sprintf(c.T("general:The user: %s doesn't exist"), util.GetId(authForm.Organization, authForm.Username)))
+				c.answerCodeSigninSignup(application, &authForm)
 				return
 			}
 
@@ -919,9 +938,10 @@ func (c *ApiController) Login() {
 			}
 
 			clientIp := util.GetClientIpFromRequest(c.Ctx.Request)
+			lookupUsername := getSigninLookupUsername(authForm.Username, authForm.CountryCode)
 
 			var enableCaptcha bool
-			if enableCaptcha, err = object.CheckToEnableCaptcha(application, authForm.Organization, authForm.Username, clientIp); err != nil {
+			if enableCaptcha, err = object.CheckToEnableCaptcha(application, authForm.Organization, lookupUsername, clientIp); err != nil {
 				c.ResponseError(err.Error())
 				return
 			} else if enableCaptcha {
@@ -962,19 +982,39 @@ func (c *ApiController) Login() {
 				isPasswordWithLdapEnabled = false
 			}
 
-			if application.IsShared {
+			if application.IsShared || len(application.ExternalUsers) > 0 || len(application.ExternalGroups) > 0 {
 				var resolvedUser *object.User
-				resolvedUser, err = object.GetUserByFieldsForSharedApp(application, authForm.Organization, authForm.Username)
+				resolvedUser, err = object.GetUserByFieldsForSharedApp(application, authForm.Organization, lookupUsername)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
 				}
 				if resolvedUser != nil {
 					authForm.Organization = resolvedUser.Owner
+					// "organization/username" of an external user
+					if strings.Contains(lookupUsername, "/") {
+						lookupUsername = resolvedUser.Name
+					}
 				}
 			}
 
-			user, err = object.CheckUserPassword(authForm.Organization, authForm.Username, password, c.GetAcceptLanguage(), enableCaptcha, isSigninViaLdap, isPasswordWithLdapEnabled)
+			err = object.CheckCredentialStuffing(authForm.Organization, clientIp, c.GetAcceptLanguage())
+			if err == nil {
+				_, passwordSpan := c.traceStep("signin.password", attribute.String("casdoor.organization", authForm.Organization), attribute.Bool("casdoor.ldap", isSigninViaLdap))
+				user, err = object.CheckUserPassword(authForm.Organization, lookupUsername, password, c.GetAcceptLanguage(), enableCaptcha, isSigninViaLdap, isPasswordWithLdapEnabled)
+				tracing.End(passwordSpan, err)
+				if err != nil && !isSigninViaLdap {
+					// a user imported without a password signs in with the one of the old system
+					if migratedUser, migrateErr := object.MigratePasswordOnSignin(authForm.Organization, lookupUsername, password); migrateErr == nil && migratedUser != nil {
+						user, err = migratedUser, nil
+					}
+				}
+				if err != nil {
+					object.RecordCredentialStuffingFailure(authForm.Organization, clientIp, lookupUsername)
+				} else if !isSigninViaLdap && user.Ldap == "" {
+					object.MarkWeakPasswordOnSignin(user, password)
+				}
+			}
 		}
 
 		if err != nil {
@@ -1071,8 +1111,13 @@ func (c *ApiController) Login() {
 				return
 			}
 			idpInfo.CodeVerifier = authForm.CodeVerifier
+			idpInfo.State = authForm.CallbackState
 			var idProvider idp.IdProvider
-			idProvider, err = idp.GetIdProvider(idpInfo, authForm.RedirectUri)
+			if provider.Type == object.ProviderTypePlugin {
+				idProvider, err = object.GetPluginIdProvider(provider, authForm.RedirectUri)
+			} else {
+				idProvider, err = idp.GetIdProvider(idpInfo, authForm.RedirectUri)
+			}
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -1096,7 +1141,9 @@ func (c *ApiController) Login() {
 			}
 
 			// https://github.com/golang/oauth2/issues/123#issuecomment-103715338
+			_, tokenSpan := c.traceStep("signin.provider.token", attribute.String("casdoor.provider", provider.Name), attribute.String("casdoor.provider_type", provider.Type))
 			token, err = idProvider.GetToken(authForm.Code)
+			tracing.End(tokenSpan, err)
 			if err != nil {
 				c.ResponseError(err.Error())
 				return
@@ -1107,7 +1154,9 @@ func (c *ApiController) Login() {
 				return
 			}
 
+			_, userInfoSpan := c.traceStep("signin.provider.userinfo", attribute.String("casdoor.provider", provider.Name))
 			userInfo, err = idProvider.GetUserInfo(token)
+			tracing.End(userInfoSpan, err)
 			if err != nil {
 				c.ResponseError(fmt.Sprintf(c.T("auth:Failed to login in: %s"), err.Error()))
 				return
@@ -1145,7 +1194,7 @@ func (c *ApiController) Login() {
 					return
 				}
 			} else if provider.Category == "OAuth" || object.IsFlexibleCustomProvider(provider.Type) {
-				user, err = getUserByProvider(application.Organization, provider, userInfo.Id)
+				user, err = getUserByProvider(application.Organization, provider, userInfo.Id, userInfo.Extra)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
@@ -1367,14 +1416,9 @@ func (c *ApiController) Login() {
 			}
 
 			var oldUser *object.User
-			oldUser, err = getUserByProvider(application.Organization, provider, userInfo.Id)
+			oldUser, err = getUserByProvider(application.Organization, provider, userInfo.Id, userInfo.Extra)
 			if err != nil {
 				c.ResponseError(err.Error())
-				return
-			}
-
-			if oldUser != nil {
-				c.ResponseError(fmt.Sprintf(c.T("auth:The account for provider: %s and username: %s (%s) is already linked to another account: %s (%s)"), provider.Type, userInfo.Username, userInfo.DisplayName, oldUser.Name, oldUser.DisplayName))
 				return
 			}
 
@@ -1382,6 +1426,18 @@ func (c *ApiController) Login() {
 			user, err = object.GetUser(userId)
 			if err != nil {
 				c.ResponseError(err.Error())
+				return
+			}
+
+			if oldUser != nil {
+				// the provider sign-in proved the other account too, so offer to merge it into this one
+				if user != nil && oldUser.Name != user.Name && object.GetUserMergeError(oldUser, user, c.GetAcceptLanguage()) == "" {
+					c.setPendingUserMerge(oldUser, provider.Name)
+					c.ResponseOk(map[string]interface{}{"merge": true, "name": oldUser.Name, "displayName": oldUser.DisplayName})
+					return
+				}
+
+				c.ResponseError(fmt.Sprintf(c.T("auth:The account for provider: %s and username: %s (%s) is already linked to another account: %s (%s)"), provider.Type, userInfo.Username, userInfo.DisplayName, oldUser.Name, oldUser.DisplayName))
 				return
 			}
 
@@ -1457,7 +1513,9 @@ func (c *ApiController) Login() {
 				return
 			}
 
+			_, mfaSpan := c.traceStep("signin.mfa", attribute.String("casdoor.mfa_type", authForm.MfaType))
 			err = object.VerifyMfaWithLimit(user, func() error { return c.verifyMfaPasscode(user, mfaUtil, authForm.Passcode) }, c.GetAcceptLanguage())
+			tracing.End(mfaSpan, err)
 			if err != nil {
 				c.responseSigninError(err, object.SigninReasonMfaFailed)
 				return
@@ -1514,6 +1572,15 @@ func (c *ApiController) Login() {
 				return
 			}
 
+			// the application's own idle timeout: an idle Casdoor session can't sign in to it without the password again
+			if application.InactiveTimeoutMinutes > 0 && edition.Has(edition.Commercial) {
+				if previousTime, ok := c.Ctx.Input.GetData("previousRequestTime").(time.Time); ok && time.Since(previousTime) > time.Duration(application.InactiveTimeoutMinutes)*time.Minute {
+					c.ClearUserSession()
+					c.ResponseError(fmt.Sprintf(c.T("auth:Timeout for inactivity of %d minutes"), application.InactiveTimeoutMinutes))
+					return
+				}
+			}
+
 			if authForm.Provider == "" {
 				authForm.Provider = authForm.ProviderBack
 			}
@@ -1568,6 +1635,49 @@ func (c *ApiController) Login() {
 
 	c.Data["json"] = resp
 	c.ServeJSON()
+}
+
+func (c *ApiController) recordLoginMetric(authForm *form.AuthForm) {
+	status, _ := c.Ctx.Input.GetData("responseStatus").(string)
+	if resp, ok := c.Data["json"].(*Response); ok && resp != nil {
+		status = resp.Status
+	}
+
+	userId := c.Ctx.Input.Param("recordUserId")
+	result := ""
+	if status == "error" {
+		result = "failure"
+	} else if status == "ok" && userId != "" {
+		result = "success"
+	} else {
+		return
+	}
+
+	var application *object.Application
+	if authForm.Application != "" {
+		application, _ = object.GetApplication(util.GetId("admin", authForm.Application))
+	}
+	if application == nil && authForm.ClientId != "" {
+		application, _ = object.GetApplicationByClientId(authForm.ClientId)
+	}
+
+	applicationName := ""
+	organizationName := ""
+	if application != nil {
+		applicationName = application.Name
+		organizationName = application.Organization
+	}
+
+	if userId != "" {
+		organizationName, _ = util.GetOwnerAndNameFromIdNoCheck(userId)
+	} else if authForm.Organization != "" && authForm.Organization != organizationName {
+		organization, err := object.GetOrganization(util.GetId("admin", authForm.Organization))
+		if err == nil && organization != nil {
+			organizationName = organization.Name
+		}
+	}
+
+	object.LoginCounter.WithLabelValues(organizationName, applicationName, result).Inc()
 }
 
 // SamlRequestIdSessionKey holds the ID of the AuthnRequest the browser was sent to the
@@ -1780,7 +1890,7 @@ func (c *ApiController) Callback() {
 
 	setAppleDisplayNameCookie(c.Ctx, getAppleDisplayName(c.GetString("user")))
 
-	frontendCallbackUrl := fmt.Sprintf("/callback?code=%s&state=%s", url.QueryEscape(code), url.QueryEscape(state))
+	frontendCallbackUrl := fmt.Sprintf("%s/callback?code=%s&state=%s", conf.GetBasePath(), url.QueryEscape(code), url.QueryEscape(state))
 	c.Ctx.Redirect(http.StatusFound, frontendCallbackUrl)
 }
 
@@ -1795,59 +1905,52 @@ func (c *ApiController) Callback() {
 func (c *ApiController) DeviceAuth() {
 	clientId := c.Ctx.Input.Query("client_id")
 	scope := c.Ctx.Input.Query("scope")
+	resource := c.Ctx.Input.Query("resource")
+	if clientId == "" {
+		c.responseDeviceAuthError(object.InvalidRequest, "missing client_id")
+		return
+	}
+
+	// Validate resource parameter (RFC 8707)
+	if err := object.ValidateResourceURI(resource); err != nil {
+		c.responseDeviceAuthError(object.InvalidTarget, err.Error())
+		return
+	}
+
 	application, err := object.GetApplicationByClientId(clientId)
 	if err != nil {
-		c.Data["json"] = object.TokenError{
-			Error:            err.Error(),
-			ErrorDescription: err.Error(),
-		}
-		c.ServeJSON()
+		c.responseDeviceAuthError("server_error", err.Error())
 		return
 	}
 
 	if application == nil {
-		c.Data["json"] = object.TokenError{
-			Error:            c.T("general:Invalid client_id"),
-			ErrorDescription: c.T("general:Invalid client_id"),
-		}
-		c.ServeJSON()
+		c.responseDeviceAuthError(object.InvalidClient, c.T("token:Invalid client_id"))
 		return
 	}
 
 	if !application.HasSigninMethod("Device login") {
-		c.Data["json"] = object.TokenError{
-			Error:            object.UnauthorizedClient,
-			ErrorDescription: "device login is not enabled for this application",
-		}
-		c.ServeJSON()
+		c.responseDeviceAuthError(object.UnauthorizedClient, "device login is not enabled for this application")
 		return
 	}
 
 	deviceCode := util.GenerateId()
-	userCode := util.GetRandomName()
-
-	generateTime := 0
-	for {
-		if generateTime > 5 {
-			c.Data["json"] = object.TokenError{
-				Error:            "userCode gen",
-				ErrorDescription: c.T("general:Invalid client_id"),
-			}
-			c.ServeJSON()
-			return
-		}
-		_, ok := object.DeviceAuthMap.Load(userCode)
-		if !ok {
+	userCode := ""
+	for i := 0; i < 5; i++ {
+		code := util.GetRandomName()
+		if _, ok := object.DeviceAuthMap.Load(code); !ok {
+			userCode = code
 			break
 		}
-
-		generateTime++
+	}
+	if userCode == "" {
+		c.responseDeviceAuthError("server_error", "failed to generate a unique user code")
+		return
 	}
 
 	cancelToken := util.GenerateId()
 
 	expiresIn := application.CodeResendTimeout
-	if expiresIn == 0 {
+	if expiresIn <= 0 {
 		expiresIn = object.DeviceAuthExpiresIn
 	}
 
@@ -1855,6 +1958,7 @@ func (c *ApiController) DeviceAuth() {
 		UserSignIn:    false,
 		UserName:      "",
 		Scope:         scope,
+		Resource:      resource,
 		ApplicationId: application.GetId(),
 		ClientId:      application.ClientId,
 		RequestAt:     time.Now(),
@@ -1877,6 +1981,19 @@ func (c *ApiController) DeviceAuth() {
 	object.DeviceAuthMap.Store(userCode, userAuthCache)
 
 	c.Data["json"] = object.GetDeviceAuthResponse(deviceCode, userCode, cancelToken, c.Ctx.Request.Host, expiresIn)
+	c.ServeJSON()
+}
+
+func (c *ApiController) responseDeviceAuthError(errorCode string, description string) {
+	c.Data["json"] = &object.TokenError{
+		Error:            errorCode,
+		ErrorDescription: description,
+	}
+	if errorCode == "server_error" {
+		c.Ctx.Output.SetStatus(http.StatusInternalServerError)
+	} else {
+		c.SetTokenErrorHttpStatus()
+	}
 	c.ServeJSON()
 }
 
@@ -1937,7 +2054,7 @@ func (c *ApiController) DeviceAuthComplete() {
 		return
 	}
 
-	if deviceAuthCache.RequestAt.Add(time.Duration(deviceAuthCache.ExpiresIn) * time.Second).Before(time.Now()) {
+	if deviceAuthCache.IsExpired() {
 		object.DeviceAuthMap.Delete(deviceCode)
 		c.ResponseError(c.T("auth:UserCode Expired"))
 		return

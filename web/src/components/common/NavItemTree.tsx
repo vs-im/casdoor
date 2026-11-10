@@ -38,6 +38,8 @@ function getNavItemNodes(): TreeNode[] {
           children: [
             {key: "/applications", title: i18next.t("general:Applications")},
             {key: "/providers", title: i18next.t("application:Providers")},
+            {key: "/marketplace", title: i18next.t("general:Marketplace")},
+            {key: "/integrations", title: i18next.t("general:Integrations")},
             {key: "/resources", title: i18next.t("general:Resources")},
             {key: "/certs", title: i18next.t("general:Certs")},
             {key: "/keys", title: i18next.t("general:Keys")},
@@ -97,11 +99,13 @@ function getNavItemNodes(): TreeNode[] {
           title: i18next.t("general:Admin"),
           children: [
             {key: "/sysinfo", title: i18next.t("general:System Info")},
+            {key: "/settings", title: i18next.t("general:Global Settings")},
             {key: "/forms", title: i18next.t("general:Forms")},
             {key: "/syncers", title: i18next.t("general:Syncers")},
             {key: "/webhooks", title: i18next.t("general:Webhooks")},
             {key: "/webhook-events", title: i18next.t("general:Webhook Events")},
             {key: "/tickets", title: i18next.t("general:Tickets")},
+            {key: "/radius-clients", title: i18next.t("general:RADIUS Clients")},
             {key: "/swagger", title: i18next.t("general:Swagger")},
           ],
         },

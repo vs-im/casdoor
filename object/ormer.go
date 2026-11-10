@@ -413,6 +413,21 @@ func (a *Ormer) createTable() {
 		panic(err)
 	}
 
+	err = a.Engine.Sync2(new(SigninTrace))
+	if err != nil {
+		panic(err)
+	}
+
+	err = a.Engine.Sync2(new(McpRecord))
+	if err != nil {
+		panic(err)
+	}
+
+	err = a.Engine.Sync2(new(ConsentLog))
+	if err != nil {
+		panic(err)
+	}
+
 	err = a.Engine.Sync2(new(Token))
 	if err != nil {
 		panic(err)
@@ -463,6 +478,11 @@ func (a *Ormer) createTable() {
 		panic(err)
 	}
 
+	err = a.Engine.Sync2(new(Integration))
+	if err != nil {
+		panic(err)
+	}
+
 	err = a.Engine.Sync2(new(Syncer))
 	if err != nil {
 		panic(err)
@@ -500,6 +520,11 @@ func (a *Ormer) createTable() {
 	}
 
 	err = a.Engine.Sync2(new(RadiusAccounting))
+	if err != nil {
+		panic(err)
+	}
+
+	err = a.Engine.Sync2(new(RadiusClient))
 	if err != nil {
 		panic(err)
 	}
@@ -555,6 +580,11 @@ func (a *Ormer) createTable() {
 	}
 
 	err = a.Engine.Sync2(new(SamlSession))
+	if err != nil {
+		panic(err)
+	}
+
+	err = a.Engine.Sync2(new(Setting))
 	if err != nil {
 		panic(err)
 	}

@@ -243,6 +243,7 @@ func (r *permissionRoleResolver) getRolesInRole(permissionOwner string, roleId s
 type permissionGroupResolver struct {
 	groupsByOwner map[string][]*Group
 	usersByGroup  map[string][]string
+	policyLoaded  bool
 }
 
 func newPermissionGroupResolver() *permissionGroupResolver {
@@ -306,7 +307,17 @@ func (r *permissionGroupResolver) getUsersInGroup(permissionOwner string, groupI
 		return []string{}, nil
 	}
 
-	users, err := userEnforcer.GetAllUsersByGroup(groupId)
+	// Load the policy once per resolver, GetAllUsersByGroup() would otherwise
+	// read the entire policy table again for every group of a "*" permission.
+	if !r.policyLoaded {
+		err = userEnforcer.LoadPolicy()
+		if err != nil {
+			return nil, err
+		}
+		r.policyLoaded = true
+	}
+
+	users, err := userEnforcer.getAllUsersByGroup(groupId)
 	if err != nil {
 		return nil, err
 	}
@@ -331,8 +342,10 @@ func getPermissionEnforcerTargets(permission *Permission, permissionIDs ...strin
 		if err != nil {
 			return nil, err
 		}
+		// The old ID of a renamed permission is no longer in the DB, but its old policies still need to be removed.
 		if targetPermission == nil {
-			return nil, fmt.Errorf("the permission: %s doesn't exist", permissionID)
+			visited[permissionID] = struct{}{}
+			continue
 		}
 
 		permissions = append(permissions, targetPermission)
@@ -444,7 +457,7 @@ func getRuntimeGroupingPolicies(permissions []*Permission) ([][]string, error) {
 }
 
 func loadRuntimeGroupingPolicies(enforcer *casbin.Enforcer, permission *Permission, permissionIDs ...string) error {
-	if !HasRoleDefinition(enforcer.GetModel()) {
+	if !HasRoleDefinition(enforcer.GetModel()) || !isRbacAllowed() {
 		return nil
 	}
 
@@ -692,6 +705,16 @@ func Enforce(permission *Permission, request []interface{}, permissionIds ...str
 		return false, err
 	}
 
+	err = checkAbacEdition(enforcer.GetModel(), [][]interface{}{request})
+	if err != nil {
+		return false, err
+	}
+
+	err = checkPermissionsEdition(permission, permissionIds...)
+	if err != nil {
+		return false, err
+	}
+
 	// Convert each element: JSON-object strings and maps become anonymous structs
 	// so Casbin can evaluate ABAC rules with dot-notation (e.g. r.sub.DivisionGuid).
 	interfaceRequest := util.InterfaceToEnforceArray(request)
@@ -701,6 +724,16 @@ func Enforce(permission *Permission, request []interface{}, permissionIds ...str
 
 func BatchEnforce(permission *Permission, requests [][]interface{}, permissionIds ...string) ([]bool, error) {
 	enforcer, err := getPermissionEnforcer(permission, permissionIds...)
+	if err != nil {
+		return nil, err
+	}
+
+	err = checkAbacEdition(enforcer.GetModel(), requests)
+	if err != nil {
+		return nil, err
+	}
+
+	err = checkPermissionsEdition(permission, permissionIds...)
 	if err != nil {
 		return nil, err
 	}
@@ -732,10 +765,29 @@ func getEnforcers(userId string) ([]*casbin.Enforcer, error) {
 		permissions = append(permissions, permissionsByRole...)
 	}
 
+	if !isRbacAllowed() {
+		directPermissions, err := getPermissionsByUser(userId)
+		if err != nil {
+			return nil, err
+		}
+		directIds := map[string]bool{}
+		for _, permission := range directPermissions {
+			directIds[permission.GetId()] = true
+		}
+		for _, permission := range permissions {
+			if !directIds[permission.GetId()] {
+				return nil, requireRbac()
+			}
+		}
+	}
+
+	return getPermissionEnforcers(permissions)
+}
+
+func getPermissionEnforcers(permissions []*Permission) ([]*casbin.Enforcer, error) {
 	var enforcers []*casbin.Enforcer
 	for _, permission := range permissions {
-		var enforcer *casbin.Enforcer
-		enforcer, err = getPermissionEnforcer(permission)
+		enforcer, err := getPermissionEnforcer(permission)
 		if err != nil {
 			return nil, err
 		}

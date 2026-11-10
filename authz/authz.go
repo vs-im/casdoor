@@ -94,6 +94,13 @@ p, *, *, POST, /api/send-verification-code, *, *
 p, *, *, POST, /api/send-magic-link, *, *
 p, *, *, GET, /api/verify-magic-link, *, *
 p, *, *, POST, /api/get-captured-magic-link, *, *
+p, *, *, POST, /api/mfa/push/send, *, *
+p, *, *, GET, /api/get-user-personal-info, *, *
+p, *, *, GET, /api/get-mcp-records, *, *
+p, *, *, GET, /api/export-own-data, *, *
+p, *, *, POST, /api/delete-own-account, *, *
+p, *, *, GET, /api/mfa/push/challenge, *, *
+p, *, *, POST, /api/mfa/push/answer, *, *
 p, *, *, GET, /api/get-captcha, *, *
 p, *, *, POST, /api/verify-captcha, *, *
 p, *, *, POST, /api/verify-code, *, *
@@ -101,6 +108,8 @@ p, *, *, POST, /api/v1/traces, *, *
 p, *, *, POST, /api/v1/metrics, *, *
 p, *, *, POST, /api/v1/logs, *, *
 p, *, *, POST, /api/reset-email-or-phone, *, *
+p, *, *, GET, /api/check-user-merge, *, *
+p, *, *, POST, /api/merge-user, *, *
 p, *, *, POST, /api/upload-resource, *, *
 p, *, *, GET, /.well-known/openid-configuration, *, *
 p, *, *, GET, /.well-known/oauth-authorization-server, *, *
@@ -110,7 +119,12 @@ p, *, *, *, /.well-known/jwks, *, *
 p, *, *, GET, /.well-known/:application/openid-configuration, *, *
 p, *, *, GET, /.well-known/:application/oauth-authorization-server, *, *
 p, *, *, GET, /.well-known/:application/oauth-protected-resource, *, *
+p, *, *, GET, /.well-known/oauth-protected-resource/api/server/:owner/:name, *, *
 p, *, *, GET, /.well-known/:application/webfinger, *, *
+p, *, *, GET, /orgs/:organization/.well-known/openid-configuration, *, *
+p, *, *, GET, /orgs/:organization/.well-known/oauth-authorization-server, *, *
+p, *, *, GET, /.well-known/openid-configuration/orgs/:organization, *, *
+p, *, *, GET, /.well-known/oauth-authorization-server/orgs/:organization, *, *
 p, *, *, *, /.well-known/:application/jwks, *, *
 p, *, *, GET, /api/get-saml-login, *, *
 p, *, *, POST, /api/acs, *, *
@@ -126,7 +140,9 @@ p, *, *, GET, /api/get-prometheus-info, *, *
 p, *, *, *, /api/metrics, *, *
 p, *, *, GET, /api/get-pricing, *, *
 p, *, *, GET, /api/get-plan, *, *
+p, *, *, GET, /api/get-subscriptions, *, *
 p, *, *, GET, /api/get-subscription, *, *
+p, *, *, POST, /api/set-subscription-auto-renew, *, *
 p, *, *, GET, /api/get-transactions, *, *
 p, *, *, GET, /api/get-transaction, *, *
 p, *, *, GET, /api/get-provider, *, *
@@ -136,6 +152,7 @@ p, *, *, GET, /api/get-all-objects, *, *
 p, *, *, GET, /api/get-all-actions, *, *
 p, *, *, GET, /api/get-all-roles, *, *
 p, *, *, GET, /api/get-invitation-info, *, *
+p, *, *, GET, /api/get-license, *, *
 p, *, *, GET, /api/faceid-signin-begin, *, *
 p, *, *, GET, /api/kerberos-login, *, *
 p, *, *, POST, /api/grant-consent, *, *
@@ -206,6 +223,13 @@ func IsAllowed(subOwner string, subName string, method string, urlPath string, o
 
 		if user.IsAdmin && subOwner == objOwner {
 			return true, nil
+		}
+
+		if strings.HasPrefix(urlPath, "/api/server/") && subOwner == objOwner {
+			allowed, err := object.IsServerAllowed(user, objOwner, objName)
+			if err != nil || allowed {
+				return allowed, err
+			}
 		}
 	}
 

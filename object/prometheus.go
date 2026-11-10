@@ -82,6 +82,10 @@ var (
 		Name: "magic_link_signup_failed",
 		Help: "Total failed signup attempts during magic link verify",
 	})
+	LoginCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "casdoor_login_total",
+		Help: "The number of sign-in attempts by result",
+	}, []string{"organization", "application", "result"})
 )
 
 func ClearThroughputPerSecond() {

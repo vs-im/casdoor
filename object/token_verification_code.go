@@ -29,7 +29,11 @@ const VerificationCodeGrantType = "urn:casdoor:params:oauth:grant-type:verificat
 // account of an email or phone that has none, the code proves nothing but the address, so
 // a signup item that asks for more than that keeps the grant to existing users
 func (application *Application) IsVerificationCodeSignupEnabled(verifyType string) bool {
-	if !util.InSlice(application.GrantTypes, VerificationCodeGrantType) {
+	return application.isAddressGrantSignupEnabled(VerificationCodeGrantType, verifyType)
+}
+
+func (application *Application) isAddressGrantSignupEnabled(grantType string, verifyType string) bool {
+	if !util.InSlice(application.GrantTypes, grantType) {
 		return false
 	}
 
@@ -43,7 +47,7 @@ func (application *Application) IsVerificationCodeSignupEnabled(verifyType strin
 		}
 
 		switch signupItem.Name {
-		case "ID", "Username", "Display name", "Password", "Confirm password", "Agreement", "Signup button", "Providers":
+		case "ID", "Logo", "Username", "Display name", "Password", "Confirm password", "Agreement", "Signup button", "Providers":
 			continue
 		case "Email":
 			if verifyType != VerifyTypeEmail {

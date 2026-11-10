@@ -2,13 +2,5 @@
   "extends": [
     "stylelint-config-standard",
     "stylelint-config-recommended-less"
-  ],
-  "overrides": [
-    {
-      "files": [
-        "**/*.less"
-      ],
-      "customSyntax": "postcss-safe-parser"
-    }
   ]
 }

@@ -56,7 +56,6 @@ import CustomScopeTable from "./table/CustomScopeTable";
 import PromptPage from "./auth/PromptPage";
 import copy from "copy-to-clipboard";
 import ThemeEditor from "./common/theme/ThemeEditor";
-import {shadcnThemeToken} from "./shadcnTheme";
 
 import SigninTable from "./table/SigninTable";
 import Editor from "./common/Editor";
@@ -330,22 +329,6 @@ class ApplicationEditPage extends React.Component {
     });
   }
 
-  updateMagicLinkSignupProvider(providerName) {
-    const application = this.state.application;
-    application.providers = (application.providers || []).map(providerItem => {
-      if (providerItem.name === providerName) {
-        return {...providerItem, rule: "Magic link"};
-      }
-      if (providerItem.rule === "Magic link" && providerItem.provider?.category === "Email") {
-        return {...providerItem, rule: "All"};
-      }
-      return providerItem;
-    });
-    this.setState({
-      application: application,
-    });
-  }
-
   getIdpInitiatedSsoUrl() {
     return `${window.location.origin}/login/saml/authorize/${this.state.application.owner}/${encodeURIComponent(this.state.applicationName)}`;
   }
@@ -379,7 +362,7 @@ class ApplicationEditPage extends React.Component {
               {Setting.getLabel(i18next.t("general:Name"), i18next.t("general:Name - Tooltip"))} :
             </Col>
             <Col span={21} >
-              <Input value={this.state.application.name} disabled={this.state.application.name === "hasura"} onChange={e => {
+              <Input value={this.state.application.name} disabled={this.state.application.name === "app-built-in"} onChange={e => {
                 const value = e.target.value;
                 if (/[/?:@#&%=+;]/.test(value)) {
                   const invalidChars = "/ ? : @ # & % = + ;";
@@ -661,32 +644,6 @@ class ApplicationEditPage extends React.Component {
             <Col span={1} >
               <Switch checked={this.state.application.enableSignUp} onChange={checked => {
                 this.updateApplicationField("enableSignUp", checked);
-              }} />
-            </Col>
-          </Row>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
-              {Setting.getLabel(i18next.t("application:Magic link sign-in enabled"), i18next.t("application:Magic link sign-in enabled - Tooltip"))} :
-            </Col>
-            <Col span={1} >
-              <Switch checked={this.state.application.magicLinkSigninEnabled ?? Setting.isMagicLinkEnabled(this.state.application)} onChange={checked => {
-                this.updateApplicationField("magicLinkSigninEnabled", checked);
-                if (!checked) {
-                  this.updateApplicationField("enableMagicLinkSignup", false);
-                }
-              }} />
-            </Col>
-          </Row>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 19 : 2}>
-              {Setting.getLabel(i18next.t("application:Magic link sign-up"), i18next.t("application:Magic link sign-up - Tooltip"))} :
-            </Col>
-            <Col span={1} >
-              <Switch checked={this.state.application.enableMagicLinkSignup ?? false} onChange={checked => {
-                if (checked && !(this.state.application.magicLinkSigninEnabled ?? Setting.isMagicLinkEnabled(this.state.application))) {
-                  this.updateApplicationField("magicLinkSigninEnabled", true);
-                }
-                this.updateApplicationField("enableMagicLinkSignup", checked);
               }} />
             </Col>
           </Row>
@@ -1216,76 +1173,6 @@ class ApplicationEditPage extends React.Component {
           </Row>
           <Row style={{marginTop: "20px"}} >
             <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
-              {Setting.getLabel(i18next.t("application:Magic link default TTL"), i18next.t("application:Magic link default TTL - Tooltip"))} :
-            </Col>
-            <Col span={21} >
-              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkExpireMinutes || 10} min={2} max={43200} step={1} precision={0} addonAfter="Minutes" onChange={value => {
-                this.updateApplicationField("magicLinkExpireMinutes", value);
-              }} />
-            </Col>
-          </Row>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
-              {Setting.getLabel(i18next.t("application:Magic link permission"), i18next.t("application:Magic link permission - Tooltip"))} :
-            </Col>
-            <Col span={21} >
-              <Input value={this.state.application.magicLinkPermission} placeholder="owner/name" onChange={e => {
-                this.updateApplicationField("magicLinkPermission", e.target.value);
-              }} />
-            </Col>
-          </Row>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
-              {Setting.getLabel(i18next.t("application:Magic link rate limit window"), i18next.t("application:Magic link rate limit window - Tooltip"))} :
-            </Col>
-            <Col span={21} >
-              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkRateLimitWindowMinutes || 15} min={1} step={1} precision={0} addonAfter="Minutes" onChange={value => {
-                this.updateApplicationField("magicLinkRateLimitWindowMinutes", value);
-              }} />
-            </Col>
-          </Row>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
-              {Setting.getLabel(i18next.t("application:Magic link email limit"), i18next.t("application:Magic link email limit - Tooltip"))} :
-            </Col>
-            <Col span={21} >
-              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkRateLimitEmail || 3} min={1} step={1} precision={0} onChange={value => {
-                this.updateApplicationField("magicLinkRateLimitEmail", value);
-              }} />
-            </Col>
-          </Row>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
-              {Setting.getLabel(i18next.t("application:Magic link IP limit"), i18next.t("application:Magic link IP limit - Tooltip"))} :
-            </Col>
-            <Col span={21} >
-              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkRateLimitIp || 10} min={1} step={1} precision={0} onChange={value => {
-                this.updateApplicationField("magicLinkRateLimitIp", value);
-              }} />
-            </Col>
-          </Row>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
-              {Setting.getLabel(i18next.t("application:Magic link application limit"), i18next.t("application:Magic link application limit - Tooltip"))} :
-            </Col>
-            <Col span={21} >
-              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkRateLimitApplication || 100} min={1} step={1} precision={0} onChange={value => {
-                this.updateApplicationField("magicLinkRateLimitApplication", value);
-              }} />
-            </Col>
-          </Row>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
-              {Setting.getLabel(i18next.t("application:Magic link captcha threshold"), i18next.t("application:Magic link captcha threshold - Tooltip"))} :
-            </Col>
-            <Col span={21} >
-              <InputNumber style={{width: "180px"}} value={this.state.application.magicLinkCaptchaThreshold || 1} min={1} step={1} precision={0} onChange={value => {
-                this.updateApplicationField("magicLinkCaptchaThreshold", value);
-              }} />
-            </Col>
-          </Row>
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 3}>
               {Setting.getLabel(i18next.t("provider:Signup HTML"), i18next.t("provider:Signup HTML - Tooltip"))} :
             </Col>
             <Col span={21} >
@@ -1346,10 +1233,6 @@ class ApplicationEditPage extends React.Component {
                     <SignupTable
                       title={i18next.t("application:Signup items")}
                       table={this.state.application.signupItems}
-                      applicationProviders={this.state.application.providers}
-                      onUpdateMagicLinkProvider={(value) => {
-                        this.updateMagicLinkSignupProvider(value);
-                      }}
                       onUpdateTable={(value) => {
                         this.updateApplicationField("signupItems", value);
                       }}
@@ -1902,9 +1785,8 @@ class ApplicationEditPage extends React.Component {
           <ConfigProvider theme={{
             token: {
               colorPrimary: themeData.colorPrimary,
-              colorInfo: shadcnThemeToken.colorInfo,
+              colorInfo: themeData.colorPrimary,
               borderRadius: themeData.borderRadius,
-              fontSize: 16,
             },
           }}>
             <div style={{position: "relative", width: previewWidth, border: "1px solid rgb(217,217,217)", boxShadow: "10px 10px 5px #888888", overflow: "auto"}}>
@@ -1935,9 +1817,8 @@ class ApplicationEditPage extends React.Component {
           <ConfigProvider theme={{
             token: {
               colorPrimary: themeData.colorPrimary,
-              colorInfo: shadcnThemeToken.colorInfo,
+              colorInfo: themeData.colorPrimary,
               borderRadius: themeData.borderRadius,
-              fontSize: 16,
             },
           }}>
             <div style={{position: "relative", width: previewWidth, border: "1px solid rgb(217,217,217)", boxShadow: "10px 10px 5px #888888", overflow: "auto"}}>
@@ -1969,9 +1850,8 @@ class ApplicationEditPage extends React.Component {
         <ConfigProvider theme={{
           token: {
             colorPrimary: themeData.colorPrimary,
-            colorInfo: shadcnThemeToken.colorInfo,
+            colorInfo: themeData.colorPrimary,
             borderRadius: themeData.borderRadius,
-            fontSize: 16,
           },
         }}>
           <div style={{position: "relative", width: previewWidth, border: "1px solid rgb(217,217,217)", boxShadow: "10px 10px 5px #888888", flexDirection: "column", flex: "auto"}}>
@@ -1986,7 +1866,7 @@ class ApplicationEditPage extends React.Component {
   submitApplicationEdit(exitAfterSave) {
     const application = Setting.deepCopy(this.state.application);
     application.providers = application.providers?.filter(provider => this.state.providers.map(provider => provider.name).includes(provider.name));
-    application.signinMethods = application.signinMethods?.filter(signinMethod => ["Password", "Verification code", "WebAuthn", "LDAP", "Face ID", "Magic link", "Device login", "WeChat"].includes(signinMethod.name));
+    application.signinMethods = application.signinMethods?.filter(signinMethod => ["Password", "Verification code", "WebAuthn", "LDAP", "Face ID", "Device login", "WeChat"].includes(signinMethod.name));
     const customScopeValidation = this.validateCustomScopes(application.customScopes);
     application.customScopes = customScopeValidation.scopes;
     if (!customScopeValidation.ok) {

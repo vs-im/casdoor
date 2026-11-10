@@ -30,6 +30,7 @@ type DynamicClientRegistrationRequest struct {
 	GrantTypes              []string `json:"grant_types,omitempty"`
 	ResponseTypes           []string `json:"response_types,omitempty"`
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method,omitempty"`
+	JwksUri                 string   `json:"jwks_uri,omitempty"`
 	ApplicationType         string   `json:"application_type,omitempty"`
 	Contacts                []string `json:"contacts,omitempty"`
 	LogoUri                 string   `json:"logo_uri,omitempty"`
@@ -50,6 +51,7 @@ type DynamicClientRegistrationResponse struct {
 	GrantTypes              []string `json:"grant_types,omitempty"`
 	ResponseTypes           []string `json:"response_types,omitempty"`
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method,omitempty"`
+	JwksUri                 string   `json:"jwks_uri,omitempty"`
 	ApplicationType         string   `json:"application_type,omitempty"`
 	Contacts                []string `json:"contacts,omitempty"`
 	LogoUri                 string   `json:"logo_uri,omitempty"`
@@ -121,79 +123,12 @@ func RegisterDynamicClient(req *DynamicClientRegistrationRequest, organization s
 		req.ApplicationType = "web"
 	}
 
-	// Generate unique application name
-	randomName := util.GetRandomName()
-	appName := fmt.Sprintf("dcr_%s", randomName)
-
-	// Inherit providers, signin methods, and branding from the organization's default application
-	// so that DCR-registered apps have a working sign-in method and correct branding out of the box.
-	var inheritedProviders []*ProviderItem
-	var inheritedSigninMethods []*SigninMethod
-	var inheritedLogo, inheritedFooterHtml, inheritedFormCss string
-	var inheritedThemeData *ThemeData
-	var inheritedSigninItems []*SigninItem
-	var inheritedEnableSigninSession, inheritedEnableWebAuthn bool
-	defaultApp, err := GetDefaultApplication(util.GetId("admin", organization))
-	if err == nil && defaultApp != nil {
-		inheritedProviders = defaultApp.Providers
-		inheritedSigninMethods = defaultApp.SigninMethods
-		inheritedLogo = defaultApp.Logo
-		inheritedThemeData = defaultApp.ThemeData
-		inheritedFooterHtml = defaultApp.FooterHtml
-		inheritedFormCss = defaultApp.FormCss
-		inheritedSigninItems = defaultApp.SigninItems
-		inheritedEnableSigninSession = defaultApp.EnableSigninSession
-		inheritedEnableWebAuthn = defaultApp.EnableWebAuthn
-	}
-
-	expireInHours, refreshExpireInHours, cookieExpireInHours := getDcrTokenLifetimes(defaultApp)
-
-	// Create Application object
-	// Note: DCR applications are created under "admin" owner by default
-	// This can be made configurable in future versions
-	clientId := util.GenerateClientId()
-	clientSecret := util.GenerateClientSecret()
 	registrationAccessToken := util.GenerateClientSecret()
-	createdTime := util.GetCurrentTime()
-
-	application := &Application{
-		Owner:                   "admin",
-		Name:                    appName,
-		Organization:            organization,
-		CreatedTime:             createdTime,
-		DisplayName:             req.ClientName,
-		Category:                "Agent",
-		Type:                    "MCP",
-		Scopes:                  []*ScopeItem{},
-		Logo:                    firstNonEmpty(req.LogoUri, inheritedLogo),
-		ThemeData:               inheritedThemeData,
-		FooterHtml:              inheritedFooterHtml,
-		FormCss:                 inheritedFormCss,
-		SigninItems:             inheritedSigninItems,
-		HomepageUrl:             req.ClientUri,
-		ClientId:                clientId,
-		ClientSecret:            clientSecret,
-		RedirectUris:            req.RedirectUris,
-		GrantTypes:              req.GrantTypes,
-		EnablePassword:          true,
-		EnableSignUp:            false,
-		DisableSignin:           false,
-		EnableSigninSession:     inheritedEnableSigninSession,
-		EnableCodeSignin:        true,
-		EnableAutoSignin:        false,
-		EnableWebAuthn:          inheritedEnableWebAuthn,
-		TokenFormat:             org.DefaultTokenFormat,
-		TokenFields:             org.DefaultTokenFields,
-		ExpireInHours:           expireInHours,
-		RefreshExpireInHours:    refreshExpireInHours,
-		CookieExpireInHours:     cookieExpireInHours,
-		FormOffset:              2,
-		Tags:                    []string{"dcr"},
-		TermsOfUse:              req.TosUri,
-		Providers:               inheritedProviders,
-		SigninMethods:           inheritedSigninMethods,
-		RegistrationAccessToken: registrationAccessToken,
-	}
+	application := newDynamicClientApplication(req, org, "dcr")
+	application.RegistrationAccessToken = registrationAccessToken
+	setPrivateKeyJwtCredential(application, req)
+	clientId := application.ClientId
+	clientSecret := application.ClientSecret
 
 	// Add the application
 	affected, err := AddApplication(application, lang)
@@ -218,6 +153,7 @@ func RegisterDynamicClient(req *DynamicClientRegistrationRequest, organization s
 		GrantTypes:              req.GrantTypes,
 		ResponseTypes:           req.ResponseTypes,
 		TokenEndpointAuthMethod: req.TokenEndpointAuthMethod,
+		JwksUri:                 req.JwksUri,
 		ApplicationType:         req.ApplicationType,
 		Contacts:                req.Contacts,
 		LogoUri:                 req.LogoUri,
@@ -230,6 +166,76 @@ func RegisterDynamicClient(req *DynamicClientRegistrationRequest, organization s
 	}
 
 	return response, nil, nil
+}
+
+// newDynamicClientApplication builds an application for a client that registers itself, tagged with the way it registered
+func newDynamicClientApplication(req *DynamicClientRegistrationRequest, org *Organization, tag string) *Application {
+	appName := fmt.Sprintf("%s_%s", tag, util.GetRandomName())
+
+	// Inherit providers, signin methods, and branding from the organization's default application
+	// so that DCR-registered apps have a working sign-in method and correct branding out of the box.
+	var inheritedProviders []*ProviderItem
+	var inheritedSigninMethods []*SigninMethod
+	var inheritedLogo, inheritedFooterHtml, inheritedFormCss string
+	var inheritedThemeData *ThemeData
+	var inheritedSigninItems []*SigninItem
+	var inheritedEnableSigninSession, inheritedEnableWebAuthn bool
+	defaultApp, err := GetDefaultApplication(util.GetId(org.Owner, org.Name))
+	if err == nil && defaultApp != nil {
+		inheritedProviders = defaultApp.Providers
+		inheritedSigninMethods = defaultApp.SigninMethods
+		inheritedLogo = defaultApp.Logo
+		inheritedThemeData = defaultApp.ThemeData
+		inheritedFooterHtml = defaultApp.FooterHtml
+		inheritedFormCss = defaultApp.FormCss
+		inheritedSigninItems = defaultApp.SigninItems
+		inheritedEnableSigninSession = defaultApp.EnableSigninSession
+		inheritedEnableWebAuthn = defaultApp.EnableWebAuthn
+	}
+
+	expireInHours, refreshExpireInHours, cookieExpireInHours := getDcrTokenLifetimes(defaultApp)
+
+	// Create Application object
+	// Note: DCR applications are created under "admin" owner by default
+	// This can be made configurable in future versions
+	return &Application{
+		Owner:                "admin",
+		Name:                 appName,
+		Organization:         org.Name,
+		CreatedTime:          util.GetCurrentTime(),
+		DisplayName:          req.ClientName,
+		Category:             "Agent",
+		Type:                 "MCP",
+		Scopes:               []*ScopeItem{},
+		Logo:                 firstNonEmpty(req.LogoUri, inheritedLogo),
+		ThemeData:            inheritedThemeData,
+		FooterHtml:           inheritedFooterHtml,
+		FormCss:              inheritedFormCss,
+		SigninItems:          inheritedSigninItems,
+		HomepageUrl:          req.ClientUri,
+		ClientId:             util.GenerateClientId(),
+		ClientSecret:         util.GenerateClientSecret(),
+		RedirectUris:         req.RedirectUris,
+		GrantTypes:           req.GrantTypes,
+		EnablePassword:       true,
+		EnableSignUp:         false,
+		DisableSignin:        false,
+		EnableSigninSession:  inheritedEnableSigninSession,
+		EnableCodeSignin:     true,
+		EnableAutoSignin:     false,
+		EnableWebAuthn:       inheritedEnableWebAuthn,
+		TokenFormat:          org.DefaultTokenFormat,
+		TokenFields:          org.DefaultTokenFields,
+		ExpireInHours:        expireInHours,
+		RefreshExpireInHours: refreshExpireInHours,
+		CookieExpireInHours:  cookieExpireInHours,
+		FormOffset:           2,
+		Tags:                 []string{tag},
+		TermsOfUse:           req.TosUri,
+		PrivacyPolicy:        req.PolicyUri,
+		Providers:            inheritedProviders,
+		SigninMethods:        inheritedSigninMethods,
+	}
 }
 
 // GetDynamicClientByToken finds a DCR application by clientId and validates the registration access token
@@ -249,6 +255,11 @@ func GetDynamicClientByToken(clientId, bearerToken string) (*Application, *DcrEr
 
 // GetDynamicClientRegistrationResponse builds a RFC 7592 read response from an application
 func GetDynamicClientRegistrationResponse(app *Application, registrationClientUri string) *DynamicClientRegistrationResponse {
+	tokenEndpointAuthMethod, jwksUri := "client_secret_basic", ""
+	if credential := getPrivateKeyJwtCredential(app); credential != nil {
+		tokenEndpointAuthMethod, jwksUri = "private_key_jwt", credential.JwksUri
+	}
+
 	return &DynamicClientRegistrationResponse{
 		ClientId:                app.ClientId,
 		ClientSecret:            app.ClientSecret,
@@ -257,10 +268,12 @@ func GetDynamicClientRegistrationResponse(app *Application, registrationClientUr
 		ClientName:              app.DisplayName,
 		RedirectUris:            app.RedirectUris,
 		GrantTypes:              app.GrantTypes,
-		TokenEndpointAuthMethod: "client_secret_basic",
+		TokenEndpointAuthMethod: tokenEndpointAuthMethod,
+		JwksUri:                 jwksUri,
 		ApplicationType:         "web",
 		LogoUri:                 app.Logo,
 		ClientUri:               app.HomepageUrl,
+		PolicyUri:               app.PrivacyPolicy,
 		TosUri:                  app.TermsOfUse,
 		RegistrationClientUri:   fmt.Sprintf("%s/%s", registrationClientUri, app.ClientId),
 		RegistrationAccessToken: app.RegistrationAccessToken,
@@ -293,6 +306,10 @@ func UpdateDynamicClient(app *Application, req *DynamicClientRegistrationRequest
 	if req.TosUri != "" {
 		app.TermsOfUse = req.TosUri
 	}
+	if req.PolicyUri != "" {
+		app.PrivacyPolicy = req.PolicyUri
+	}
+	setPrivateKeyJwtCredential(app, req)
 
 	_, err := UpdateApplication(util.GetId(app.Owner, app.Name), app, true, "", nil)
 	if err != nil {
@@ -332,7 +349,9 @@ func getDcrTokenLifetimes(defaultApp *Application) (float64, float64, int64) {
 	return expireInHours, refreshExpireInHours, cookieExpireInHours
 }
 
-var dcrGrantTypes = []string{"authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"}
+var dcrGrantTypes = []string{"authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code", "urn:ietf:params:oauth:grant-type:jwt-bearer"}
+
+var dcrTokenEndpointAuthMethods = []string{"client_secret_basic", "client_secret_post", "private_key_jwt", "none"}
 
 func checkDcrClientMetadata(req *DynamicClientRegistrationRequest) *DcrError {
 	for _, redirectUri := range req.RedirectUris {
@@ -353,6 +372,19 @@ func checkDcrClientMetadata(req *DynamicClientRegistrationRequest) *DcrError {
 		}
 	}
 
+	if req.TokenEndpointAuthMethod != "" && !util.InSlice(dcrTokenEndpointAuthMethods, req.TokenEndpointAuthMethod) {
+		return &DcrError{
+			Error:            "invalid_client_metadata",
+			ErrorDescription: fmt.Sprintf("the token_endpoint_auth_method: %s is not supported", req.TokenEndpointAuthMethod),
+		}
+	}
+	if req.TokenEndpointAuthMethod == "private_key_jwt" && !strings.HasPrefix(req.JwksUri, "https://") {
+		return &DcrError{
+			Error:            "invalid_client_metadata",
+			ErrorDescription: "the token_endpoint_auth_method: private_key_jwt requires a jwks_uri with https",
+		}
+	}
+
 	grantTypes := []string{}
 	for _, grantType := range req.GrantTypes {
 		if util.InSlice(dcrGrantTypes, grantType) {
@@ -361,6 +393,39 @@ func checkDcrClientMetadata(req *DynamicClientRegistrationRequest) *DcrError {
 	}
 	req.GrantTypes = grantTypes
 	return nil
+}
+
+func isDynamicClient(application *Application) bool {
+	return util.InSlice(application.Tags, "dcr") || util.InSlice(application.Tags, cimdTag)
+}
+
+func getPrivateKeyJwtCredential(application *Application) *FederatedCredential {
+	for _, credential := range application.FederatedCredentials {
+		if credential != nil && credential.Issuer == application.ClientId {
+			return credential
+		}
+	}
+	return nil
+}
+
+// setPrivateKeyJwtCredential trusts the keys at the jwks_uri of a client using private_key_jwt (RFC 7523)
+// as a federated credential whose issuer and subject are the client ID, which client_assertion is checked against
+func setPrivateKeyJwtCredential(application *Application, req *DynamicClientRegistrationRequest) {
+	credentials := []*FederatedCredential{}
+	for _, credential := range application.FederatedCredentials {
+		if credential != nil && credential.Issuer != application.ClientId {
+			credentials = append(credentials, credential)
+		}
+	}
+
+	if req.TokenEndpointAuthMethod == "private_key_jwt" {
+		credentials = append(credentials, &FederatedCredential{
+			Issuer:  application.ClientId,
+			JwksUri: req.JwksUri,
+			Subject: application.ClientId,
+		})
+	}
+	application.FederatedCredentials = credentials
 }
 
 func isScriptUrl(rawUrl string) bool {

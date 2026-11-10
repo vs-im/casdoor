@@ -16,6 +16,8 @@ interface ProviderButtonsProps {
   rule?: string;
   /** return false to swallow the click, e.g. on an unaccepted agreement */
   onBeforeClick?: () => boolean;
+  /** return true when the page handles the provider itself instead of leaving for it */
+  onProvider?: (providerItem: any) => boolean;
 }
 
 /** The providers an application offers for that method, in the order it lists them. */
@@ -31,7 +33,7 @@ function goToSamlUrl(provider: any, search: string) {
   const clientId = params.get("client_id") ?? "";
   const state = params.get("state");
   const realRedirectUri = params.get("redirect_uri");
-  const redirectUri = `${window.location.origin}/callback/saml`;
+  const redirectUri = `${Setting.getOriginUrl()}/callback/saml`;
 
   const relayState = `${clientId}&${state}&${provider.name}&${realRedirectUri}&${redirectUri}`;
   AuthBackend.getSamlLogin(`${provider.owner}/${provider.name}`, btoa(relayState)).then((res: any) => {
@@ -53,7 +55,7 @@ function goToSamlUrl(provider: any, search: string) {
  * /callback keeps working unchanged. SAML and the WeChat media platform
  * take their own paths, as in web/src/auth/ProviderButton.js.
  */
-export function ProviderButtons({application, method, rule, onBeforeClick}: ProviderButtonsProps) {
+export function ProviderButtons({application, method, rule, onBeforeClick, onProvider}: ProviderButtonsProps) {
   const location = useLocation();
   const [wechatItem, setWechatItem] = React.useState<any>(null);
 
@@ -64,6 +66,9 @@ export function ProviderButtons({application, method, rule, onBeforeClick}: Prov
 
     if (provider.category === "SAML") {
       goToSamlUrl(provider, location.search);
+      return;
+    }
+    if (onProvider?.(providerItem)) {
       return;
     }
     if (needsWeChatQrDialog(provider)) {
@@ -125,14 +130,15 @@ export function ProviderButtons({application, method, rule, onBeforeClick}: Prov
   // rule a short list still gets the buttons and a long one the grid.
   const big = rule === "big" || (rule !== "small" && items.length <= 3);
   if (big) {
+    // gaps are the buttons' own margins, so the default "Providers" CSS (.provider-big-img margin-bottom) applies to every gap
     return (
-      <div className="space-y-2">
+      <div className="flex flex-col">
         {items.map((item: any) => (
           <Button
             key={item.name}
             type="button"
             variant="outline"
-            className="provider-big-img w-full justify-start gap-3 px-4 font-normal"
+            className="provider-big-img mb-2 w-full justify-start gap-3 px-4 font-normal last:mb-0"
             onClick={() => onClick(item)}
           >
             <img

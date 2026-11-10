@@ -30,6 +30,8 @@ type OrganizationThemeCookie struct {
 	FooterHtml  string
 	Favicon     string
 	DisplayName string
+	Description string
+	Application string
 }
 
 func appendThemeCookie(ctx *context.Context, urlPath string) (*OrganizationThemeCookie, error) {
@@ -46,7 +48,6 @@ func appendThemeCookie(ctx *context.Context, urlPath string) (*OrganizationTheme
 
 func getOrganizationThemeCookieFromUrlPath(ctx *context.Context, urlPath string) (*OrganizationThemeCookie, error) {
 	var application *object.Application
-	var organization *object.Organization
 	var err error
 	if urlPath == "/login" || urlPath == "/signup" {
 		application, err = object.GetDefaultApplication(fmt.Sprintf("admin/built-in"))
@@ -98,7 +99,12 @@ func getOrganizationThemeCookieFromUrlPath(ctx *context.Context, urlPath string)
 	if application == nil {
 		return nil, nil
 	}
-	organization = application.OrganizationObj
+	return getOrganizationThemeCookieFromApplication(application)
+}
+
+func getOrganizationThemeCookieFromApplication(application *object.Application) (*OrganizationThemeCookie, error) {
+	var err error
+	organization := application.OrganizationObj
 	if organization == nil {
 		organization, err = object.GetOrganization(fmt.Sprintf("admin/%s", application.Organization))
 		if err != nil {
@@ -106,16 +112,37 @@ func getOrganizationThemeCookieFromUrlPath(ctx *context.Context, urlPath string)
 		}
 	}
 
+	// the same choice as Setting.getThemeData(): the application's theme, else the
+	// organization's, else none, which leaves the page on the edition's default theme
+	var themeData *object.ThemeData
+	if application.ThemeData != nil && application.ThemeData.IsEnabled {
+		themeData = application.ThemeData
+	} else if organization != nil && organization.ThemeData != nil && organization.ThemeData.IsEnabled {
+		themeData = organization.ThemeData
+	}
+
 	organizationThemeCookie := &OrganizationThemeCookie{
-		ThemeData:   application.ThemeData,
+		ThemeData:   themeData,
 		LogoUrl:     application.Logo,
 		LogoDarkUrl: application.LogoDark,
 		FooterHtml:  application.FooterHtml,
+		Favicon:     application.Favicon,
+		DisplayName: application.Title,
+		Description: application.Description,
+		Application: application.GetId(),
 	}
 
+	// the application's own title/favicon win over the organization's, the same as the frontend
 	if organization != nil {
-		organizationThemeCookie.Favicon = organization.Favicon
-		organizationThemeCookie.DisplayName = organization.DisplayName
+		if organizationThemeCookie.Favicon == "" {
+			organizationThemeCookie.Favicon = organization.Favicon
+		}
+		if organizationThemeCookie.DisplayName == "" {
+			organizationThemeCookie.DisplayName = organization.DisplayName
+		}
+	}
+	if organizationThemeCookie.Description == "" {
+		organizationThemeCookie.Description = organizationThemeCookie.DisplayName
 	}
 
 	return organizationThemeCookie, nil

@@ -14,7 +14,7 @@
 
 import * as Cookie from "cookie";
 
-export let DefaultApplication = "hasura";
+export let DefaultApplication = "app-built-in";
 
 export let ShowGithubCorner = false;
 export let IsDemoMode = false;
@@ -26,10 +26,10 @@ export let StaticBaseUrl = "https://cdn.casbin.org";
 
 export const InitThemeAlgorithm = true;
 export const ThemeDefault = {
-  themeType: "dark",
+  themeType: "default",
   colorPrimary: "#262626",
   borderRadius: 10,
-  isCompact: true,
+  isCompact: false,
 };
 
 export const CustomFooter = null;

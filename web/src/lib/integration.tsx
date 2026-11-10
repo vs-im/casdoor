@@ -1,0 +1,124 @@
+import * as React from "react";
+import i18next from "i18next";
+
+/** The public Marketplace site, where every integration has a page with its full guide: Chinese pages on the .cn host, English ones on the .com host. */
+export function getMarketplaceSiteUrl(): string {
+  return i18next.language?.startsWith("zh") ? "https://marketplace.casdoor.cn/zh" : "https://marketplace.casdoor.com";
+}
+
+export const IntegrationTypes = ["app", "provider", "theme", "action"] as const;
+
+export function getIntegrationTypeLabel(type: string): string {
+  switch (type) {
+  case "app":
+    return i18next.t("integration:App");
+  case "provider":
+    return i18next.t("general:Provider");
+  case "theme":
+    return i18next.t("theme:Theme");
+  case "action":
+    return i18next.t("general:Action");
+  default:
+    return type;
+  }
+}
+
+/** Marketplace texts are maps of language to text, with English always present. */
+export function getLocalized(text: Record<string, string> | string | undefined | null): string {
+  if (!text) {
+    return "";
+  }
+  if (typeof text === "string") {
+    return text;
+  }
+  const language = i18next.language?.split("-")[0];
+  return text[i18next.language] ?? text[language] ?? text.en ?? Object.values(text)[0] ?? "";
+}
+
+export function fillVariables(text: string, values: Record<string, string>): string {
+  return text.replace(/\{\{\s*([a-zA-Z][a-zA-Z0-9]*)\s*\}\}/g, (match, name) => values[name] || match);
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&#34;").replace(/'/g, "&#39;");
+}
+
+/**
+ * A copy of the application with a theme applied the way the backend installs it: the theme
+ * fields are replaced, and values going into HTML fields are escaped.
+ */
+export function applyTheme(application: any, theme: any, values: Record<string, string>): any {
+  const fill = (text: string | undefined, escape: boolean) =>
+    (text ?? "").replace(/\{\{\s*([a-zA-Z][a-zA-Z0-9]*)\s*\}\}/g, (match, name) => {
+      const value = values[name] ?? "";
+      return escape ? escapeHtml(value) : value;
+    });
+  return {
+    ...application,
+    themeData: theme.themeData ? {...theme.themeData, colorPrimary: fill(theme.themeData.colorPrimary, false)} : null,
+    formOffset: theme.formOffset ?? 2,
+    formCss: fill(theme.formCss, false),
+    formCssMobile: fill(theme.formCssMobile, false),
+    formSideHtml: fill(theme.formSideHtml, true),
+    footerHtml: fill(theme.footerHtml, true),
+    formBackgroundUrl: fill(theme.formBackgroundUrl, false),
+    formBackgroundUrlMobile: fill(theme.formBackgroundUrlMobile, false),
+  };
+}
+
+export const ThemePreviewMessage = "casdoor-theme-preview";
+
+/** Guide texts use `code` and **bold**. */
+export function renderInlineText(text: string): React.ReactNode[] {
+  return text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(Boolean).map((part, index) => {
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={index} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{part.slice(1, -1)}</code>;
+    }
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    return <React.Fragment key={index}>{part}</React.Fragment>;
+  });
+}
+
+export function parseBundle(bundle: string | undefined | null): any {
+  if (!bundle) {
+    return null;
+  }
+  try {
+    return JSON.parse(bundle);
+  } catch {
+    return null;
+  }
+}
+
+/** "payment" or "sms": the kind of provider an action is, from the action.json of its bundle */
+export function getActionKind(bundle: any): string {
+  return bundle?.files?.["action.json"]?.kind ?? "payment";
+}
+
+export function IntegrationLogo({logo, name, className = "size-10"}: {logo?: string; name: string; className?: string}) {
+  const [failed, setFailed] = React.useState(false);
+  if (logo && !failed) {
+    return <img src={logo} alt="" className={`${className} shrink-0 object-contain`} onError={() => setFailed(true)} />;
+  }
+  return (
+    <div className={`${className} flex shrink-0 items-center justify-center rounded-md bg-primary/10 font-semibold text-primary`}>
+      {(name || "?").slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
+const ACTION_TEXT_KEYS: Record<string, {summary: string; installed: string; uninstall: string}> = {
+  payment: {summary: "integration:Action install summary", installed: "integration:Action installed description", uninstall: "integration:Uninstall action description"},
+  sms: {summary: "integration:SMS action install summary", installed: "integration:SMS action installed description", uninstall: "integration:Uninstall SMS action description"},
+  push: {summary: "integration:Push action install summary", installed: "integration:Push action installed description", uninstall: "integration:Uninstall push action description"},
+  "syncer": {summary: "integration:Syncer action install summary", installed: "integration:Syncer action installed description", uninstall: "integration:Uninstall syncer action description"},
+  "password-check": {summary: "integration:Password check action install summary", installed: "integration:Password check action installed description", uninstall: "integration:Uninstall password check action description"},
+  "password-migration": {summary: "integration:Password migration action install summary", installed: "integration:Password migration action installed description", uninstall: "integration:Uninstall password migration action description"},
+};
+
+/** The install summary, the description after installing or the uninstall warning of an action of the kind. */
+export function getActionText(kind: string, which: "summary" | "installed" | "uninstall"): string {
+  return i18next.t((ACTION_TEXT_KEYS[kind] ?? ACTION_TEXT_KEYS.payment)[which]);
+}
